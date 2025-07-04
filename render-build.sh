@@ -18,7 +18,7 @@ poetry config virtualenvs.create false
 
 # Install dependencies using Poetry
 echo "Installing dependencies with Poetry..."
-poetry install --only=main --no-dev
+poetry install
 
 # Create data directory if it doesn't exist
 mkdir -p data
