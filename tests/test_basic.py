@@ -3,7 +3,7 @@ Basic tests for the Samna Salta bot
 """
 
 import pytest
-from src.utils.helpers import format_price, sanitize_phone_number, validate_phone_number
+from src.infrastructure.utilities.helpers import format_price, sanitize_phone_number, validate_phone_number
 
 
 def test_format_price():

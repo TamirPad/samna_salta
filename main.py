@@ -3,26 +3,25 @@
 Main entry point for the Samna Salta Telegram Bot
 """
 
-import asyncio
 import logging
-import os
 from pathlib import Path
 
 from dotenv import load_dotenv
 from telegram.ext import Application
 
-from src.bot.handlers import register_handlers
-from src.database.operations import init_db
-from src.utils.config import get_config
-from src.utils.helpers import setup_logging
+from src.presentation.telegram_bot.handlers import register_handlers
+from src.infrastructure.database.operations import init_db
+from src.infrastructure.configuration.config import get_config
+from src.infrastructure.logging.logging_config import ProductionLogger
+from src.infrastructure.container.dependency_injection import initialize_container
 
 # Load environment variables
 load_dotenv()
 
 def main():
     """Main function to run the bot"""
-    # Setup logging
-    setup_logging()
+    # Setup production logging
+    ProductionLogger.setup_logging()
     logger = logging.getLogger(__name__)
     
     try:
@@ -38,8 +37,12 @@ def main():
         logger.info("Creating Telegram application...")
         application = Application.builder().token(config.bot_token).build()
         
-        # Register handlers
-        logger.info("Registering handlers...")
+        # Initialize dependency container with bot instance
+        logger.info("Initializing dependency container...")
+        initialize_container(bot=application.bot)
+        
+        # Register Clean Architecture handlers
+        logger.info("Registering Clean Architecture handlers...")
         register_handlers(application)
         
         # Start the bot
