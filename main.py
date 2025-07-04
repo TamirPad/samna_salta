@@ -4,6 +4,7 @@ Main entry point for the Samna Salta Telegram Bot
 """
 
 import logging
+import asyncio
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -50,14 +51,39 @@ def main():
         logger.info(f"Bot token: {config.bot_token[:10]}...")
         logger.info(f"Admin chat ID: {config.admin_chat_id}")
         
-        # Run polling
-        application.run_polling(
-            allowed_updates=["message", "callback_query"],
-            drop_pending_updates=True
-        )
+        # Run polling with error handling
+        try:
+            application.run_polling(
+                allowed_updates=["message", "callback_query"],
+                drop_pending_updates=True
+            )
+        except AttributeError as e:
+            if "_Updater__polling_cleanup_cb" in str(e):
+                logger.warning("Polling cleanup callback issue detected, trying alternative startup...")
+                # Alternative startup method
+                asyncio.run(start_bot_alternative(application))
+            else:
+                raise
         
     except Exception as e:
         logger.error(f"Error starting bot: {e}")
+        raise
+
+async def start_bot_alternative(application):
+    """Alternative bot startup method"""
+    logger = logging.getLogger(__name__)
+    try:
+        logger.info("Starting bot with alternative method...")
+        async with application:
+            await application.start()
+            await application.updater.start_polling(
+                allowed_updates=["message", "callback_query"],
+                drop_pending_updates=True
+            )
+            logger.info("Bot started successfully!")
+            await application.updater.idle()
+    except Exception as e:
+        logger.error(f"Alternative startup failed: {e}")
         raise
 
 if __name__ == "__main__":
