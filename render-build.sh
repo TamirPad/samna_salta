@@ -8,8 +8,7 @@ python --version
 
 # Check if we're using Python 3.13 and inform about compatibility
 if python --version | grep -q "3.13"; then
-    echo "INFO: Python 3.13 detected - using compatibility workaround in main.py"
-    echo "The bot includes automatic fixes for python-telegram-bot compatibility"
+    echo "INFO: Python 3.13 detected - using python-telegram-bot v21+ with native compatibility"
 fi
 
 # Install Poetry if not available
