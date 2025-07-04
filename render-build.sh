@@ -6,11 +6,19 @@ set -o errexit
 echo "Python version being used:"
 python --version
 
-# Upgrade pip first to avoid compatibility issues
-pip install --upgrade pip
+# Install Poetry if not available
+if ! command -v poetry &> /dev/null; then
+    echo "Installing Poetry..."
+    curl -sSL https://install.python-poetry.org | python3 -
+    export PATH="$HOME/.local/bin:$PATH"
+fi
 
-# Install dependencies with verbose output
-pip install -r requirements.txt --verbose
+# Configure Poetry
+poetry config virtualenvs.create false
+
+# Install dependencies using Poetry
+echo "Installing dependencies with Poetry..."
+poetry install --only=main --no-dev
 
 # Create data directory if it doesn't exist
 mkdir -p data

@@ -1,0 +1,65 @@
+[tool.poetry]
+name = "samna-salta"
+version = "0.1.0"
+description = "Samna Salta Telegram Bot - Traditional Yemenite Products Ordering System"
+authors = ["Your Name <your.email@example.com>"]
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+python-telegram-bot = "20.7"
+SQLAlchemy = "^2.0.23"
+alembic = "^1.13.1"
+python-dotenv = "^1.0.0"
+PyYAML = "^6.0.1"
+pydantic = "^2.5.2"
+pydantic-settings = "^2.1.0"
+python-dateutil = "^2.8.2"
+structlog = "^23.2.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+pytest-asyncio = "^0.21.1"
+black = "^23.12.1"
+isort = "^5.13.2"
+flake8 = "^6.1.0"
+
+[tool.poetry.group.prod.dependencies]
+psycopg2-binary = "^2.9.9"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+asyncio_mode = "auto" 
