@@ -4,6 +4,7 @@ Main entry point for the Samna Salta Telegram Bot
 """
 
 import logging
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -18,6 +19,18 @@ from src.infrastructure.container.dependency_injection import initialize_contain
 # Load environment variables
 load_dotenv()
 
+def check_python_compatibility():
+    """Check Python version compatibility and apply workarounds if needed"""
+    python_version = sys.version_info
+    if python_version.major == 3 and python_version.minor >= 13:
+        # Python 3.13+ compatibility workaround for python-telegram-bot
+        import telegram.ext._updater
+        
+        # Add the missing attribute to the Updater class if it doesn't exist
+        if not hasattr(telegram.ext._updater.Updater, '_Updater__polling_cleanup_cb'):
+            telegram.ext._updater.Updater._Updater__polling_cleanup_cb = None
+            print(f"Applied Python {python_version.major}.{python_version.minor} compatibility workaround")
+
 def main():
     """Main function to run the bot"""
     # Setup production logging
@@ -25,6 +38,9 @@ def main():
     logger = logging.getLogger(__name__)
     
     try:
+        # Check Python compatibility and apply workarounds
+        check_python_compatibility()
+        
         # Load configuration
         logger.info("Loading configuration...")
         config = get_config()
