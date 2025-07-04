@@ -24,12 +24,34 @@ def check_python_compatibility():
     python_version = sys.version_info
     if python_version.major == 3 and python_version.minor >= 13:
         # Python 3.13+ compatibility workaround for python-telegram-bot
-        import telegram.ext._updater
-        
-        # Add the missing attribute to the Updater class if it doesn't exist
-        if not hasattr(telegram.ext._updater.Updater, '_Updater__polling_cleanup_cb'):
-            telegram.ext._updater.Updater._Updater__polling_cleanup_cb = None
-            print(f"Applied Python {python_version.major}.{python_version.minor} compatibility workaround")
+        try:
+            import telegram.ext._updater
+            
+            # Try to add the missing attribute using setattr to handle read-only attributes
+            if not hasattr(telegram.ext._updater.Updater, '_Updater__polling_cleanup_cb'):
+                try:
+                    # First try direct assignment
+                    telegram.ext._updater.Updater._Updater__polling_cleanup_cb = None
+                except (AttributeError, TypeError):
+                    # If that fails, use object.__setattr__ to bypass read-only protection
+                    object.__setattr__(telegram.ext._updater.Updater, '_Updater__polling_cleanup_cb', None)
+                
+                print(f"Applied Python {python_version.major}.{python_version.minor} compatibility workaround")
+            
+            # Alternative approach: monkey patch the Updater class
+            original_init = telegram.ext._updater.Updater.__init__
+            
+            def patched_init(self, *args, **kwargs):
+                result = original_init(self, *args, **kwargs)
+                if not hasattr(self, '_Updater__polling_cleanup_cb'):
+                    object.__setattr__(self, '_Updater__polling_cleanup_cb', None)
+                return result
+            
+            telegram.ext._updater.Updater.__init__ = patched_init
+            
+        except Exception as e:
+            print(f"Warning: Could not apply Python 3.13 compatibility workaround: {e}")
+            print("Bot may still work, attempting to continue...")
 
 def main():
     """Main function to run the bot"""
