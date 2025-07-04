@@ -6,10 +6,10 @@ set -o errexit
 echo "Python version being used:"
 python --version
 
-# Check if we're using Python 3.13 and warn
+# Check if we're using Python 3.13 and inform about compatibility
 if python --version | grep -q "3.13"; then
-    echo "WARNING: Python 3.13 detected, this may cause compatibility issues with python-telegram-bot"
-    echo "Recommended: Use Python 3.11 or 3.12"
+    echo "INFO: Python 3.13 detected - using compatibility workaround in main.py"
+    echo "The bot includes automatic fixes for python-telegram-bot compatibility"
 fi
 
 # Install Poetry if not available
