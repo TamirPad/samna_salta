@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: samna-salta-bot
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_CHAT_ID
+        sync: false
+      - key: DATABASE_URL
+        value: sqlite:///data/samna_salta.db
+      - key: LOG_LEVEL
+        value: INFO
+      - key: ENVIRONMENT
+        value: production
+      - key: DELIVERY_CHARGE
+        value: 5.00
+      - key: CURRENCY
+        value: ILS
+      - key: HILBEH_AVAILABLE_DAYS
+        value: wednesday,thursday,friday
+      - key: HILBEH_AVAILABLE_HOURS
+        value: 09:00-18:00 
