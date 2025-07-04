@@ -3,9 +3,11 @@ services:
     name: samna-salta-bot
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt
+    buildCommand: ./render-build.sh
     startCommand: python main.py
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.7
       - key: BOT_TOKEN
         sync: false
       - key: ADMIN_CHAT_ID
