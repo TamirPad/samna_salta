@@ -4,7 +4,8 @@ Configuration management for the Samna Salta bot
 
 import os
 from typing import List
-from pydantic import BaseSettings, Field
+from pydantic_settings import BaseSettings
+from pydantic import Field
 
 
 class Settings(BaseSettings):
@@ -27,8 +28,7 @@ class Settings(BaseSettings):
     
     # Business hours for Hilbeh
     hilbeh_available_days: List[str] = Field(
-        ["wednesday", "thursday", "friday"], 
-        env="HILBEH_AVAILABLE_DAYS"
+        default=["wednesday", "thursday", "friday"]
     )
     hilbeh_available_hours: str = Field("09:00-18:00", env="HILBEH_AVAILABLE_HOURS")
     
