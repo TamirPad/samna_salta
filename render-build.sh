@@ -6,9 +6,12 @@ set -o errexit
 echo "Python version being used:"
 python --version
 
-# Check if we're using Python 3.13 and inform about compatibility
+# Confirm we're using Python 3.13 as intended
 if python --version | grep -q "3.13"; then
-    echo "INFO: Python 3.13 detected - using python-telegram-bot v21+ with native compatibility"
+    echo "✅ Python 3.13 detected - perfect match for this project!"
+else
+    echo "⚠️  Expected Python 3.13, but got a different version"
+    echo "This project is optimized for Python 3.13+"
 fi
 
 # Install Poetry if not available

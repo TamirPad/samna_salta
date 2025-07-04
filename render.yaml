@@ -8,7 +8,7 @@ services:
     preDeployCommand: mkdir -p data
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.7
+        value: 3.13.4
       - key: POETRY_VERSION
         value: 1.7.1
       - key: BOT_TOKEN
