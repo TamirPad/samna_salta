@@ -110,29 +110,44 @@ class ErrorReporter:
             "recent_errors": [],
         }
 
-    def report_error(self, report: ErrorReport) -> str:
-        """Report an error with full context and metrics"""
+    def report_error(self, *args, **kwargs) -> str:
+        """Flexible error reporting.
 
+        Legacy tests call `report_error(error, user_id="x")` directly.  Accept either an
+        `ErrorReport` instance or a bare Exception plus kwargs.
+        """
+
+        if len(args) == 1 and isinstance(args[0], ErrorReport):
+            report: ErrorReport = args[0]
+        else:
+            # Build ErrorReport from positional/keyword params
+            error = args[0] if args else kwargs.get("error")
+            user_id = kwargs.get("user_id")
+            context = kwargs.get("context")
+            report = ErrorReport(error=error, user_id=user_id, context=context)
+
+        # ---- original implementation below (slightly refactored to use `report`) ----
+        error_obj = report.error
         # Generate unique error ID
-        error_id = f"ERR_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{id(report.error)}"
+        error_id = f"ERR_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{id(error_obj)}"
 
         # Extract error details
-        if isinstance(report.error, ApplicationError):
+        if isinstance(error_obj, ApplicationError):
             error_details = {
                 "error_id": error_id,
-                "error_message": report.error.message,
-                "error_code": report.error.error_code,
-                "severity": report.error.severity.value,
-                "category": report.error.category.value,
-                "context": report.error.context,
-                "timestamp": report.error.timestamp.isoformat(),
+                "error_message": error_obj.message,
+                "error_code": error_obj.error_code,
+                "severity": error_obj.severity.value,
+                "category": error_obj.category.value,
+                "context": error_obj.context,
+                "timestamp": error_obj.timestamp.isoformat(),
                 "user_id": report.user_id,
                 "additional_context": report.context,
             }
         else:
             error_details = {
                 "error_id": error_id,
-                "error_message": str(report.error),
+                "error_message": str(error_obj),
                 "error_code": "UNKNOWN",
                 "severity": ErrorSeverity.MEDIUM.value,
                 "category": ErrorCategory.SYSTEM.value,

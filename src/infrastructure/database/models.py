@@ -37,7 +37,11 @@ class Customer(Base):
 
     # Relationships
     orders: Mapped[List["Order"]] = relationship("Order", back_populates="customer")
-    carts: Mapped[List["Cart"]] = relationship("Cart", back_populates="customer")
+    carts: Mapped[List["Cart"]] = relationship(
+        "Cart",
+        back_populates="customer",
+        foreign_keys="Cart.customer_id",
+    )
 
 
 class Product(Base):
@@ -47,6 +51,7 @@ class Product(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
     description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    category: Mapped[str] = mapped_column(String(50), index=True, nullable=True)
     price: Mapped[float] = mapped_column(Float, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -64,6 +69,12 @@ class Product(Base):
         """Display price with currency"""
         return f"{self.price:.2f} ILS"
 
+    # Compatibility attribute expected by older code/tests
+    @property
+    def base_price(self) -> float:  # pragma: no cover
+        """Alias for price kept for backward-compatibility."""
+        return self.price
+
 
 class Cart(Base):
     """Shopping cart model"""
@@ -71,7 +82,9 @@ class Cart(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     telegram_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    customer_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("customers.id"), nullable=True)
     items: Mapped[Optional[List[Any]]] = mapped_column(JSON, default=list, nullable=True)
+    delivery_method: Mapped[str] = mapped_column(String(20), default="pickup", nullable=False)
     delivery_address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[Optional[datetime]] = mapped_column(
@@ -81,7 +94,11 @@ class Cart(Base):
     )
 
     # Relationships
-    customer: Mapped[Optional["Customer"]] = relationship("Customer", back_populates="carts")
+    customer: Mapped[Optional["Customer"]] = relationship(
+        "Customer",
+        back_populates="carts",
+        foreign_keys=[customer_id],
+    )
 
 
 class Order(Base):
@@ -95,6 +112,7 @@ class Order(Base):
     subtotal: Mapped[float] = mapped_column(Float, nullable=False)
     delivery_charge: Mapped[float] = mapped_column(Float, nullable=False)
     total: Mapped[float] = mapped_column(Float, nullable=False)
+    delivery_method: Mapped[str] = mapped_column(String(20), default="pickup", nullable=False)
     delivery_address: Mapped[str] = mapped_column(String(500), nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -116,8 +134,11 @@ class OrderItem(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     order_id: Mapped[int] = mapped_column(Integer, ForeignKey("orders.id"), nullable=False)
     product_id: Mapped[int] = mapped_column(Integer, ForeignKey("products.id"), nullable=False)
+    product_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    product_options: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True, default={})
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
-    price: Mapped[float] = mapped_column(Float, nullable=False)  # Price at time of order
+    unit_price: Mapped[float] = mapped_column(Float, nullable=False)
+    total_price: Mapped[float] = mapped_column(Float, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships

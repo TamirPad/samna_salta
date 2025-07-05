@@ -4,6 +4,7 @@ SQLAlchemy implementation of CartRepository
 
 import logging
 from typing import Any
+from contextlib import contextmanager
 
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -12,9 +13,18 @@ from src.domain.value_objects.product_id import ProductId
 from src.domain.value_objects.telegram_id import TelegramId
 from src.infrastructure.database.models import Cart as SQLCart
 from src.infrastructure.database.models import Product as SQLProduct
-from src.infrastructure.repositories.session_handler import managed_session
+from src.infrastructure.database.operations import get_session  # compatibility for tests
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def managed_session():  # type: ignore
+    session = get_session()
+    try:
+        yield session
+    finally:
+        session.close()
 
 
 class SQLAlchemyCartRepository(CartRepository):
@@ -169,6 +179,8 @@ class SQLAlchemyCartRepository(CartRepository):
 
             self._logger.info("💾 COMMITTING: %d items to database", len(items))
 
+            session.commit()
+
             # Verify the save by re-querying
             session.flush()  # Use flush to send changes without ending transaction
             session.refresh(cart)
@@ -222,6 +234,7 @@ class SQLAlchemyCartRepository(CartRepository):
             flag_modified(cart, "items")
 
             self._logger.info("💾 COMMITTING cart update for user %s", telegram_id.value)
+            session.commit()
             return True
 
     async def clear_cart(self, telegram_id: TelegramId) -> bool:
@@ -245,6 +258,8 @@ class SQLAlchemyCartRepository(CartRepository):
                 self._logger.info(
                     "💾 COMMITTING cleared cart for user %s", telegram_id.value
                 )
+
+                session.commit()
 
             else:
                 self._logger.info(

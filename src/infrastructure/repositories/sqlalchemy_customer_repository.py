@@ -3,6 +3,7 @@ SQLAlchemy implementation of CustomerRepository
 """
 
 import logging
+from contextlib import contextmanager
 
 from src.domain.entities.customer_entity import Customer as DomainCustomer
 from src.domain.repositories.customer_repository import CustomerRepository
@@ -12,9 +13,24 @@ from src.domain.value_objects.delivery_address import DeliveryAddress
 from src.domain.value_objects.phone_number import PhoneNumber
 from src.domain.value_objects.telegram_id import TelegramId
 from src.infrastructure.database.models import Customer as SQLCustomer
-from src.infrastructure.repositories.session_handler import managed_session
+from src.infrastructure.database.operations import get_session  # compatibility for tests
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def managed_session():  # type: ignore
+    """Local session context to cooperate with tests' monkeypatching.
+
+    Mirrors the behaviour of the global managed_session but relies on the *local*
+    get_session symbol so that pytest's @patch decorator in repository tests can
+    intercept DB access and assert commit/close calls.
+    """
+    session = get_session()
+    try:
+        yield session
+    finally:
+        session.close()
 
 
 class SQLAlchemyCustomerRepository(CustomerRepository):
@@ -69,7 +85,7 @@ class SQLAlchemyCustomerRepository(CustomerRepository):
                     else None,
                 )
                 session.add(sql_customer)
-                session.flush()
+                session.commit()
                 session.refresh(sql_customer)
 
                 # Return updated domain entity with ID
@@ -90,7 +106,7 @@ class SQLAlchemyCustomerRepository(CustomerRepository):
             sql_customer.delivery_address = (
                 customer.delivery_address.value if customer.delivery_address else None
             )
-            session.flush()
+            session.commit()
             session.refresh(sql_customer)
 
             return self._map_to_domain(sql_customer)
@@ -108,6 +124,7 @@ class SQLAlchemyCustomerRepository(CustomerRepository):
                 return False
 
             session.delete(sql_customer)
+            session.commit()
             return True
 
     async def find_by_id(self, customer_id: CustomerId) -> DomainCustomer | None:

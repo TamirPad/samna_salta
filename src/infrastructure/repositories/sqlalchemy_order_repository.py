@@ -7,6 +7,7 @@ Concrete implementation of OrderRepository using SQLAlchemy ORM.
 import logging
 from datetime import datetime
 from typing import Any
+from contextlib import contextmanager
 
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -15,7 +16,16 @@ from src.domain.value_objects.customer_id import CustomerId
 from src.domain.value_objects.order_id import OrderId
 from src.domain.value_objects.telegram_id import TelegramId
 from src.infrastructure.database.models import Customer, Order, OrderItem
-from src.infrastructure.database.operations import get_session
+from src.infrastructure.database.operations import get_session  # compatibility for tests
+
+
+@contextmanager
+def managed_session():  # type: ignore
+    session = get_session()
+    try:
+        yield session
+    finally:
+        session.close()
 
 
 class SQLAlchemyOrderRepository(OrderRepository):
@@ -29,66 +39,67 @@ class SQLAlchemyOrderRepository(OrderRepository):
         self._logger.info("📝 CREATE ORDER: Customer %s", order_data.get("customer_id"))
 
         try:
-            session = get_session()
-            try:
-                # Generate order number
-                order_number = self._generate_order_number()
+            with managed_session() as session:
+                try:
+                    # Generate order number
+                    order_number = self._generate_order_number()
 
-                # Create order
-                order = Order(
-                    customer_id=order_data["customer_id"],
-                    order_number=order_number,
-                    delivery_method=order_data.get("delivery_method", "pickup"),
-                    delivery_address=order_data.get("delivery_address"),
-                    delivery_charge=order_data.get("delivery_charge", 0.0),
-                    subtotal=order_data["subtotal"],
-                    total=order_data["total"],
-                    status="pending",
-                )
-                session.add(order)
-                session.flush()  # Get order ID
-
-                self._logger.info("🆕 ORDER CREATED: #%s, ID=%s", order_number, order.id)
-
-                # Create order items
-                for item_data in order_data.get("items", []):
-                    order_item = OrderItem(
-                        order_id=order.id,
-                        product_name=item_data["product_name"],
-                        product_options=item_data.get("options", {}),
-                        quantity=item_data["quantity"],
-                        unit_price=item_data["unit_price"],
-                        total_price=item_data["total_price"],
+                    # Create order
+                    order = Order(
+                        customer_id=order_data["customer_id"],
+                        order_number=order_number,
+                        delivery_method=order_data.get("delivery_method", "pickup"),
+                        delivery_address=order_data.get("delivery_address"),
+                        delivery_charge=order_data.get("delivery_charge", 0.0),
+                        subtotal=order_data["subtotal"],
+                        total=order_data["total"],
+                        status="pending",
                     )
-                    session.add(order_item)
+                    session.add(order)
+                    session.flush()  # Get order ID
 
-                session.commit()
-                session.refresh(order)
+                    self._logger.info("🆕 ORDER CREATED: #%s, ID=%s", order_number, order.id)
 
-                # Return order data
-                result = {
-                    "id": order.id,
-                    "order_number": order.order_number,
-                    "customer_id": order.customer_id,
-                    "delivery_method": order.delivery_method,
-                    "delivery_address": order.delivery_address,
-                    "delivery_charge": order.delivery_charge,
-                    "subtotal": order.subtotal,
-                    "total": order.total,
-                    "status": order.status,
-                    "created_at": order.created_at,
-                    "updated_at": order.updated_at,
-                }
+                    # Create order items
+                    for item_data in order_data.get("items", []):
+                        order_item = OrderItem(
+                            order_id=order.id,
+                            product_name=item_data["product_name"],
+                            product_options=item_data.get("options", {}),
+                            quantity=item_data["quantity"],
+                            unit_price=item_data["unit_price"],
+                            total_price=item_data["total_price"],
+                        )
+                        session.add(order_item)
 
-                self._logger.info("✅ ORDER CREATION SUCCESS: #%s", order_number)
-                return result
+                    session.commit()
+                    session.refresh(order)
 
-            finally:
-                session.close()
+                    # Return order data
+                    result = {
+                        "id": order.id,
+                        "order_number": order.order_number,
+                        "customer_id": order.customer_id,
+                        "delivery_method": order.delivery_method,
+                        "delivery_address": order.delivery_address,
+                        "delivery_charge": order.delivery_charge,
+                        "subtotal": order.subtotal,
+                        "total": order.total,
+                        "status": order.status,
+                        "created_at": order.created_at,
+                        "updated_at": order.updated_at,
+                    }
 
-        except SQLAlchemyError as e:
-            self._logger.error("💥 DATABASE ERROR creating order: %s", e)
-            raise
+                    self._logger.info("✅ ORDER CREATION SUCCESS: #%s", order_number)
+                    return result
+
+                except SQLAlchemyError as e:
+                    self._logger.error("💥 DATABASE ERROR creating order: %s", e)
+                    raise
+                except Exception as e:
+                    self._logger.error("💥 UNEXPECTED ERROR creating order: %s", e)
+                    raise
+
         except Exception as e:
             self._logger.error("💥 UNEXPECTED ERROR creating order: %s", e)
             raise
@@ -98,8 +109,7 @@ class SQLAlchemyOrderRepository(OrderRepository):
         self._logger.info("🔍 GET ORDER BY ID: %s", order_id.value)
 
         try:
-            session = get_session()
-            try:
+            with managed_session() as session:
                 order = session.query(Order).filter(Order.id == order_id.value).first()
 
                 if not order:
@@ -140,9 +150,6 @@ class SQLAlchemyOrderRepository(OrderRepository):
                 self._logger.info("✅ ORDER FOUND: #%s", order.order_number)
                 return result
 
-            finally:
-                session.close()
-
         except SQLAlchemyError as e:
             self._logger.error("💥 DATABASE ERROR getting order by ID: %s", e)
             raise
@@ -157,8 +164,7 @@ class SQLAlchemyOrderRepository(OrderRepository):
         self._logger.info("📋 GET ORDERS BY CUSTOMER: %s", customer_id.value)
 
         try:
-            session = get_session()
-            try:
+            with managed_session() as session:
                 orders = (
                     session.query(Order)
                     .filter(Order.customer_id == customer_id.value)
@@ -204,9 +210,6 @@ class SQLAlchemyOrderRepository(OrderRepository):
                 )
                 return result
 
-            finally:
-                session.close()
-
         except SQLAlchemyError as e:
             self._logger.error("💥 DATABASE ERROR getting orders by customer: %s", e)
             raise
@@ -221,8 +224,7 @@ class SQLAlchemyOrderRepository(OrderRepository):
         self._logger.info("📋 GET ORDERS BY TELEGRAM ID: %s", telegram_id.value)
 
         try:
-            session = get_session()
-            try:
+            with managed_session() as session:
                 # Get customer first
                 customer = (
                     session.query(Customer)
@@ -240,9 +242,6 @@ class SQLAlchemyOrderRepository(OrderRepository):
                 customer_id = CustomerId(customer.id)
                 return await self.get_orders_by_customer(customer_id)
 
-            finally:
-                session.close()
-
         except SQLAlchemyError as e:
             self._logger.error("💥 DATABASE ERROR getting orders by telegram ID: %s", e)
             raise
@@ -257,8 +256,7 @@ class SQLAlchemyOrderRepository(OrderRepository):
         self._logger.info("🔄 UPDATE ORDER STATUS: ID %s -> %s", order_id.value, status)
 
         try:
-            session = get_session()
-            try:
+            with managed_session() as session:
                 order = session.query(Order).filter(Order.id == order_id.value).first()
 
                 if not order:
@@ -273,9 +271,6 @@ class SQLAlchemyOrderRepository(OrderRepository):
                     "✅ ORDER STATUS UPDATED: #%s -> %s", order.order_number, status
                 )
                 return True
-
-            finally:
-                session.close()
 
         except SQLAlchemyError as e:
             self._logger.error("💥 DATABASE ERROR updating order status: %s", e)
@@ -296,8 +291,7 @@ class SQLAlchemyOrderRepository(OrderRepository):
             self._logger.info("📋 GET ALL ORDERS (limit=%d)", limit)
 
         try:
-            session = get_session()
-            try:
+            with managed_session() as session:
                 query = session.query(Order).order_by(Order.created_at.desc())
 
                 if status:
@@ -348,9 +342,6 @@ class SQLAlchemyOrderRepository(OrderRepository):
                 self._logger.info("✅ FOUND %d ORDERS", len(result))
                 return result
 
-            finally:
-                session.close()
-
         except SQLAlchemyError as e:
             self._logger.error("💥 DATABASE ERROR getting all orders: %s", e)
             raise
@@ -363,8 +354,7 @@ class SQLAlchemyOrderRepository(OrderRepository):
         self._logger.info("🗑️ DELETE ORDER: ID %s", order_id.value)
 
         try:
-            session = get_session()
-            try:
+            with managed_session() as session:
                 # First, delete order items
                 session.query(OrderItem).filter(
                     OrderItem.order_id == order_id.value
@@ -381,8 +371,6 @@ class SQLAlchemyOrderRepository(OrderRepository):
                     "📭 ORDER NOT FOUND for deletion: %s", order_id.value
                 )
                 return False
-            finally:
-                session.close()
 
         except SQLAlchemyError as e:
             self._logger.error("💥 DATABASE ERROR deleting order: %s", e)

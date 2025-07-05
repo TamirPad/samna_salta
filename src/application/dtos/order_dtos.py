@@ -42,6 +42,17 @@ class OrderItemInfo:
             options=data.get("options", {}),
         )
 
+    # Compatibility helper so tests can call item.dict()
+    def dict(self) -> Dict[str, Any]:  # pragma: no cover
+        return {
+            "product_name": self.product_name,
+            "quantity": self.quantity,
+            "unit_price": self.unit_price,
+            "total_price": self.total_price,
+            "product_id": self.product_id,
+            "options": self.options,
+        }
+
 
 @dataclass
 class OrderInfo:

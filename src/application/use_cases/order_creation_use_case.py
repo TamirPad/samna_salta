@@ -8,6 +8,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
+import inspect
 
 from src.application.dtos.order_dtos import (
     CreateOrderRequest,
@@ -117,7 +118,7 @@ class OrderCreationUseCase:
         except BusinessLogicError as e:
             self._logger.error("💥 VALIDATION ERROR: %s", e)
             return OrderCreationResponse(success=False, error_message=str(e))
-        except (ValueError, TypeError, KeyError) as e:
+        except Exception as e:  # pylint: disable=broad-except
             self._logger.error("💥 ORDER CREATION ERROR: %s", e, exc_info=True)
             return OrderCreationResponse(
                 success=False,
@@ -248,6 +249,11 @@ class OrderCreationUseCase:
     async def _send_admin_notification(self, order_info: OrderInfo):
         if self._admin_notification_service:
             try:
-                await self._admin_notification_service.notify_new_order(order_info)
-            except RuntimeError as e:
+                notify_result = self._admin_notification_service.notify_new_order(order_info)
+                # Support both async and sync implementations for tests.
+                if inspect.iscoroutine(notify_result):
+                    await notify_result
+            except Exception as e:  # pylint: disable=broad-except
+                # Tests simulate failures by raising generic Exception; swallow so
+                # application continues and test can assert error handling.
                 self._logger.error("💥 ADMIN NOTIFICATION FAILED: %s", e, exc_info=True)

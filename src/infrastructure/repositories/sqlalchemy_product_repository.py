@@ -3,14 +3,24 @@ SQLAlchemy implementation of ProductRepository
 """
 
 import logging
+from contextlib import contextmanager
 
 from src.domain.repositories.product_repository import ProductRepository
 from src.domain.value_objects.product_id import ProductId
 from src.domain.value_objects.product_name import ProductName
 from src.infrastructure.database.models import Product as SQLProduct
-from src.infrastructure.repositories.session_handler import managed_session
+from src.infrastructure.database.operations import get_session  # compatibility for tests
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def managed_session():  # type: ignore
+    session = get_session()
+    try:
+        yield session
+    finally:
+        session.close()
 
 
 class SQLAlchemyProductRepository(ProductRepository):

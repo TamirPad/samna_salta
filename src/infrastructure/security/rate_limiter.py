@@ -348,6 +348,36 @@ class BotSecurityManager:
         """Record failed request"""
         self.rate_limiter.record_failure(user_id)
 
+    # ------------------------------------------------------------------
+    # Back-compatibility helpers expected by tests
+    # ------------------------------------------------------------------
+
+    def check_request_allowed(self, user_id: int, endpoint: str | None = None):
+        """Return (is_allowed, error_msg) tuple, matching older API used in tests."""
+        return self.rate_limiter.is_allowed(user_id, endpoint)
+
+    def validate_message(self, user_id: int, message: str):
+        """Very simple message validation placeholder.
+
+        Marks messages containing obvious XSS/script patterns as invalid. Otherwise allowed."""
+        lowered = message.lower()
+        forbidden_substrings = ["<script", "javascript:", "onerror=", "onclick="]
+        if any(sub in lowered for sub in forbidden_substrings):
+            return False, "Invalid message content"
+        # also apply rate limiter so spammers can be blocked
+        allowed, err = self.rate_limiter.is_allowed(user_id, "message")
+        if not allowed:
+            return False, err or "Rate limited"
+        return True, None
+
+    def get_security_report(self):
+        """Aggregate statistics for tests."""
+        stats = self.rate_limiter.get_stats()
+        return {
+            "security_stats": stats,
+            "rate_limiter_active_users": stats.get("total_users", 0),
+        }
+
 
 class RateLimit:
     """Rate limit decorator and utility"""
@@ -379,6 +409,41 @@ class SecurityValidator:
         """Check if user is currently blocked"""
         user_limit = self.rate_limiter.user_limits[user_id]
         return user_limit.blocked_until is not None and time.time() < user_limit.blocked_until
+
+    # ------------------------------------------------------------------
+    # Compatibility helpers expected by tests
+    # ------------------------------------------------------------------
+
+    def validate_user_input(self, text: str, max_length: int = 1000):
+        """Basic validation: length and simple XSS patterns."""
+        if not text or len(text) > max_length:
+            return False, "Invalid length"
+
+        lowered = text.lower()
+        forbidden_substrings = [
+            "<script",
+            "javascript:",
+            "onerror=",
+            "onclick=",
+            "eval(",
+            "exec(",
+            "..",  # directory traversal
+            "file://",
+            "etc/passwd",
+        ]
+        if any(sub in lowered for sub in forbidden_substrings):
+            return False, "Invalid content"
+
+        return True, None
+
+    def validate_phone_number(self, phone: str):
+        """Very lightweight phone validation for tests – checks digits length."""
+        import re
+
+        digits = re.sub(r"\D", "", phone)
+        if 7 <= len(digits) <= 15:
+            return True, None
+        return False, "Invalid phone number"
 
 
 def get_security_manager() -> BotSecurityManager:

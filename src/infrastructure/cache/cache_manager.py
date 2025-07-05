@@ -36,15 +36,22 @@ class CacheEntry(Generic[T]):
 class CacheManager:
     """Simple in-memory cache manager with TTL support"""
 
-    def __init__(self):
+    def __init__(self, create_sub_caches: bool = True):
         self.cache: Dict[str, CacheEntry[Any]] = {}
         self.lock = Lock()
         self.stats = {
             "hits": 0,
             "misses": 0,
             "sets": 0,
-            "evictions": 0
+            "evictions": 0,
         }
+
+        # Create aggregate sub-caches only for the *root* cache manager; specialised
+        # subclasses pass ``create_sub_caches=False`` to avoid infinite recursion.
+        if create_sub_caches:
+            self.products_cache: ProductCacheManager = ProductCacheManager()
+            self.customers_cache: CustomerCacheManager = CustomerCacheManager()
+            self.orders_cache: OrderCacheManager = OrderCacheManager()
 
     def get(self, key: str) -> Optional[Any]:
         """Get value from cache"""
@@ -148,9 +155,57 @@ class CacheManager:
                 "entries": entries_info
             }
 
+    # ------------------------------------------------------------------
+    # Convenience wrapper methods for product cache
+    # ------------------------------------------------------------------
+
+    def get_product(self, product_id: int):
+        return self.products_cache.get_product_by_id(product_id)
+
+    def set_product(self, product_id: int, product: Any):
+        self.products_cache.set_product(product_id, product)
+
+    def invalidate_product_cache(self, product_id: int):
+        self.products_cache.delete(f"product_{product_id}")
+
+    # ------------------------------------------------------------------
+    # Convenience wrapper methods for customer cache
+    # ------------------------------------------------------------------
+
+    def get_customer(self, telegram_id: int):
+        return self.customers_cache.get_customer(telegram_id)
+
+    def set_customer(self, telegram_id: int, customer: Any):
+        self.customers_cache.set_customer(telegram_id, customer)
+
+    def invalidate_customer_cache(self, telegram_id: int):
+        self.customers_cache.delete(f"customer_{telegram_id}")
+
+    # ------------------------------------------------------------------
+    # Helper to aggregate stats (used by tests)
+    # ------------------------------------------------------------------
+
+    def get_all_stats(self):
+        return {
+            "products": self.products_cache.get_stats(),
+            "customers": self.customers_cache.get_stats(),
+            "orders": self.orders_cache.get_stats(),
+            "general": self.get_stats(),
+        }
+
+    def set_products_by_category(self, category: str, products: Any):
+        """Cache list of products for a given category (wrapper used by tests)."""
+        self.products_cache.set(f"category_{category}", products, CacheSettings.PRODUCTS_CACHE_TTL_SECONDS)
+
+    def get_products_by_category(self, category: str):
+        return self.products_cache.get(f"category_{category}")
+
 
 class ProductCacheManager(CacheManager):
     """Specialized cache manager for products"""
+
+    def __init__(self):
+        super().__init__(create_sub_caches=False)
 
     def get_products(self) -> Optional[Any]:
         """Get cached products"""
@@ -168,9 +223,19 @@ class ProductCacheManager(CacheManager):
         """Cache product with specific TTL"""
         self.set(f"product_{product_id}", product, CacheSettings.PRODUCTS_CACHE_TTL_SECONDS)
 
+    # High-level category operations expected by tests
+    def set_products_by_category(self, category: str, products: Any):
+        self.set(f"category_{category}", products, CacheSettings.PRODUCTS_CACHE_TTL_SECONDS)
+
+    def get_products_by_category(self, category: str):
+        return self.get(f"category_{category}")
+
 
 class CustomerCacheManager(CacheManager):
     """Specialized cache manager for customers"""
+
+    def __init__(self):
+        super().__init__(create_sub_caches=False)
 
     def get_customer(self, telegram_id: int) -> Optional[Any]:
         """Get cached customer"""
@@ -191,6 +256,9 @@ class CustomerCacheManager(CacheManager):
 
 class OrderCacheManager(CacheManager):
     """Specialized cache manager for orders"""
+
+    def __init__(self):
+        super().__init__(create_sub_caches=False)
 
     def get_order(self, order_id: int) -> Optional[Any]:
         """Get cached order"""

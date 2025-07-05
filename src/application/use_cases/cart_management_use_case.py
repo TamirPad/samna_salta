@@ -121,7 +121,7 @@ class CartManagementUseCase:
         except ValueError as e:
             self._logger.error("💥 VALIDATION ERROR adding to cart: %s", e)
             return CartOperationResponse(
-                success=False, error_message="Invalid request data"
+                success=False, error_message=str(e)
             )
         except (TypeError, AttributeError) as e:
             self._logger.error(
