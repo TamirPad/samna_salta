@@ -1,0 +1,42 @@
+COMPREHENSIVE BOT FUNCTIONALITY TEST REPORT
+==================================================
+
+Total Tests: 32
+Passed: 15
+Failed: 17
+Success Rate: 46.9%
+
+DETAILED RESULTS:
+--------------------
+✅ /start command responds correctly
+✅ Menu button 'menu_main' works
+✅ Menu button 'menu_kubaneh' works
+✅ Menu button 'menu_samneh' works
+✅ Menu button 'menu_red_bisbas' works
+✅ Menu button 'menu_hilbeh' works
+✅ Menu button 'menu_hawaij_soup' works
+✅ Menu button 'menu_hawaij_coffee' works
+✅ Menu button 'menu_white_coffee' works
+✅ Cart button 'cart_view' works
+✅ Cart button 'cart_clear' works
+✅ Add to cart 'add_hilbeh' works
+✅ Add to cart 'add_hawaij_soup' works
+✅ Add to cart 'add_hawaij_coffee' works
+✅ Add to cart 'add_white_coffee' works
+❌ /admin command access test error: 'NoneType' object has no attribute 'is_admin'
+❌ /admin command admin test error: 'NoneType' object has no attribute 'is_admin'
+❌ Admin button 'admin_pending_orders' error: 'NoneType' object has no attribute 'is_admin'
+❌ Admin button 'admin_active_orders' error: 'NoneType' object has no attribute 'is_admin'
+❌ Admin button 'admin_all_orders' error: 'NoneType' object has no attribute 'is_admin'
+❌ Admin button 'admin_analytics' error: 'NoneType' object has no attribute 'is_admin'
+❌ Admin button 'admin_back' error: 'NoneType' object has no attribute 'is_admin'
+❌ Order details for order 1 error: 'NoneType' object has no attribute 'is_admin'
+❌ Order details for order 2 error: 'NoneType' object has no attribute 'is_admin'
+❌ Order details for order 3 error: 'NoneType' object has no attribute 'is_admin'
+❌ Order details for order 4 error: 'NoneType' object has no attribute 'is_admin'
+❌ Order details for order 5 error: 'NoneType' object has no attribute 'is_admin'
+❌ Status update to 'pending' error: 'NoneType' object has no attribute 'is_admin'
+❌ Status update to 'confirmed' error: 'NoneType' object has no attribute 'is_admin'
+❌ Status update to 'preparing' error: 'NoneType' object has no attribute 'is_admin'
+❌ Status update to 'ready' error: 'NoneType' object has no attribute 'is_admin'
+❌ Status update to 'delivered' error: 'NoneType' object has no attribute 'is_admin'

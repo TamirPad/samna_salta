@@ -11,6 +11,7 @@ from src.application.dtos.order_dtos import OrderInfo, OrderItemInfo
 from src.domain.repositories.customer_repository import CustomerRepository
 from src.domain.repositories.order_repository import OrderRepository
 from src.domain.value_objects.customer_id import CustomerId
+from src.domain.value_objects.order_id import OrderId
 from src.infrastructure.services.admin_notification_service import (
     AdminNotificationService,
 )
@@ -58,6 +59,38 @@ class OrderStatusManagementUseCase:
         self._customer_notification_service = customer_notification_service
         self._logger = logging.getLogger(self.__class__.__name__)
 
+    async def get_order_by_id(self, order_id: int | OrderId) -> OrderInfo | None:
+        """Get order by ID and return as OrderInfo"""
+        self._logger.info("🔍 GETTING ORDER BY ID: %s", order_id)
+        
+        try:
+            # Convert to OrderId if needed
+            if isinstance(order_id, int):
+                order_id = OrderId(order_id)
+                
+            # Get order data
+            order_data = await self._order_repository.get_order_by_id(order_id)
+            if not order_data:
+                self._logger.info("📭 ORDER NOT FOUND: ID %s", order_id.value)
+                return None
+                
+            # Get customer info
+            customer = await self._customer_repository.find_by_id(
+                CustomerId(order_data["customer_id"])
+            )
+            if not customer:
+                self._logger.warning("👤 CUSTOMER NOT FOUND for order %s", order_id.value)
+                return None
+                
+            # Create and return OrderInfo
+            order_info = self._create_order_info(order_data, customer)
+            self._logger.info("✅ ORDER FOUND: #%s", order_info.order_number)
+            return order_info
+            
+        except (ValueError, TypeError) as e:
+            self._logger.error("💥 ERROR GETTING ORDER: %s", e, exc_info=True)
+            raise BusinessLogicError(f"Error retrieving order: {e}") from e
+
     async def update_order_status(
         self, order_id: int, new_status: str, admin_telegram_id: int
     ) -> OrderInfo:
@@ -71,7 +104,7 @@ class OrderStatusManagementUseCase:
 
         try:
             # Get order
-            order_data = await self._order_repository.get_order_by_id(order_id)
+            order_data = await self._order_repository.get_order_by_id(OrderId(order_id))
             if not order_data:
                 raise OrderNotFoundError(f"Order {order_id} not found")
 
@@ -87,13 +120,13 @@ class OrderStatusManagementUseCase:
 
             # Update status
             success = await self._order_repository.update_order_status(
-                order_id, new_status
+                OrderId(order_id), new_status
             )
             if not success:
                 raise BusinessLogicError("Failed to update order status")
 
             # Get updated order data
-            updated_order = await self._order_repository.get_order_by_id(order_id)
+            updated_order = await self._order_repository.get_order_by_id(OrderId(order_id))
             if not updated_order:
                 raise BusinessLogicError("Failed to retrieve updated order")
 
@@ -185,6 +218,29 @@ class OrderStatusManagementUseCase:
                     order_infos.append(order_info)
 
         return order_infos
+        
+    async def get_all_orders(self, limit: int = 100) -> list[OrderInfo]:
+        """Get all orders regardless of status"""
+        self._logger.info("📋 GETTING ALL ORDERS (limit=%d)", limit)
+        
+        try:
+            all_orders = await self._order_repository.get_all_orders(limit=limit)
+            
+            order_infos = []
+            for order_data in all_orders:
+                customer = await self._customer_repository.find_by_id(
+                    CustomerId(order_data["customer_id"])
+                )
+                if customer:
+                    order_info = self._create_order_info(order_data, customer)
+                    order_infos.append(order_info)
+                    
+            self._logger.info("✅ FOUND %d ORDERS", len(order_infos))
+            return order_infos
+            
+        except Exception as e:
+            self._logger.error("💥 GET ALL ORDERS ERROR: %s", e, exc_info=True)
+            raise
 
     def _is_valid_status_transition(self, current_status: str, new_status: str) -> bool:
         """Check if status transition is valid"""

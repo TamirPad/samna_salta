@@ -405,7 +405,7 @@ class AdminHandler:
     async def _get_formatted_order_details(self, order_id: int) -> str | None:
         """Helper to get and format order details."""
         order_use_case = self._container.get_order_status_management_use_case()
-        order_info = await order_use_case.get_order_by_id(CustomerId(order_id))
+        order_info = await order_use_case.get_order_by_id(order_id)
 
         if not order_info:
             return None

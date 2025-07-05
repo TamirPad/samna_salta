@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import joinedload
 
 from src.domain.repositories.order_repository import OrderRepository
 from src.domain.value_objects.customer_id import CustomerId
@@ -126,18 +127,24 @@ class SQLAlchemyOrderRepository(OrderRepository):
             raise
 
     async def get_order_by_id(self, order_id: OrderId) -> dict[str, Any] | None:
-        """Get order by ID"""
+        """Get order by ID with optimized loading"""
         self._logger.info("🔍 GET ORDER BY ID: %s", order_id.value)
 
         try:
             with managed_session() as session:
-                order = session.query(Order).filter(Order.id == order_id.value).first()
+                # Use joinedload to fetch order with customer and items in one query
+                order = (
+                    session.query(Order)
+                    .options(joinedload(Order.customer))
+                    .filter(Order.id == order_id.value)
+                    .first()
+                )
 
                 if not order:
                     self._logger.info("📭 ORDER NOT FOUND: ID %s", order_id.value)
                     return None
 
-                # Get order items
+                # Get order items in a separate optimized query
                 items = (
                     session.query(OrderItem)
                     .filter(OrderItem.order_id == order.id)
@@ -181,25 +188,44 @@ class SQLAlchemyOrderRepository(OrderRepository):
     async def get_orders_by_customer(
         self, customer_id: CustomerId
     ) -> list[dict[str, Any]]:
-        """Get orders by customer ID"""
+        """Get orders by customer ID with optimized loading"""
         self._logger.info("📋 GET ORDERS BY CUSTOMER: %s", customer_id.value)
 
         try:
             with managed_session() as session:
+                # Fetch orders with customer data in one query
                 orders = (
                     session.query(Order)
+                    .options(joinedload(Order.customer))
                     .filter(Order.customer_id == customer_id.value)
                     .order_by(Order.created_at.desc())
                     .all()
                 )
 
+                if not orders:
+                    self._logger.info("📭 NO ORDERS FOUND for customer %s", customer_id.value)
+                    return []
+
+                # Get all order IDs for batch loading items
+                order_ids = [order.id for order in orders]
+                
+                # Batch load all order items
+                all_items = (
+                    session.query(OrderItem)
+                    .filter(OrderItem.order_id.in_(order_ids))
+                    .all()
+                )
+                
+                # Group items by order_id for efficient lookup
+                items_by_order = {}
+                for item in all_items:
+                    if item.order_id not in items_by_order:
+                        items_by_order[item.order_id] = []
+                    items_by_order[item.order_id].append(item)
+
                 result = []
                 for order in orders:
-                    items = (
-                        session.query(OrderItem)
-                        .filter(OrderItem.order_id == order.id)
-                        .all()
-                    )
+                    items = items_by_order.get(order.id, [])
 
                     order_data = {
                         "id": order.id,
@@ -304,7 +330,12 @@ class SQLAlchemyOrderRepository(OrderRepository):
         self, limit: int = 100, status: str | None = None
     ) -> list[dict[str, Any]]:
         """
-        Get all orders with optional status filter
+        Get all orders with optional status filter - OPTIMIZED VERSION
+        
+        This method fixes the N+1 query problem by:
+        1. Using a single query with joins to get orders and customers
+        2. Batch loading all order items in one query
+        3. Grouping items by order for efficient lookup
         """
         if status:
             self._logger.info("📋 GET ALL ORDERS (limit=%d, status=%s)", limit, status)
@@ -313,32 +344,53 @@ class SQLAlchemyOrderRepository(OrderRepository):
 
         try:
             with managed_session() as session:
-                query = session.query(Order).order_by(Order.created_at.desc())
+                # OPTIMIZATION 1: Single query with join to get orders and customers
+                query = (
+                    session.query(Order, Customer)
+                    .join(Customer, Order.customer_id == Customer.id)
+                    .order_by(Order.created_at.desc())
+                )
 
                 if status:
                     query = query.filter(Order.status == status)
 
-                orders = query.limit(limit).all()
+                order_customer_pairs = query.limit(limit).all()
+                
+                if not order_customer_pairs:
+                    self._logger.info("📭 NO ORDERS FOUND")
+                    return []
 
+                # Extract orders and create customer lookup
+                orders = [pair[0] for pair in order_customer_pairs]
+                customers_by_id = {pair[1].id: pair[1] for pair in order_customer_pairs}
+                order_ids = [order.id for order in orders]
+
+                # OPTIMIZATION 2: Batch load all order items in one query
+                all_items = (
+                    session.query(OrderItem)
+                    .filter(OrderItem.order_id.in_(order_ids))
+                    .all()
+                )
+
+                # OPTIMIZATION 3: Group items by order_id for O(1) lookup
+                items_by_order = {}
+                for item in all_items:
+                    if item.order_id not in items_by_order:
+                        items_by_order[item.order_id] = []
+                    items_by_order[item.order_id].append(item)
+
+                # Build result with no additional queries
                 result = []
                 for order in orders:
-                    items = (
-                        session.query(OrderItem)
-                        .filter(OrderItem.order_id == order.id)
-                        .all()
-                    )
-                    customer = (
-                        session.query(Customer)
-                        .filter(Customer.id == order.customer_id)
-                        .first()
-                    )
+                    customer = customers_by_id[order.customer_id]
+                    items = items_by_order.get(order.id, [])
 
                     order_data = {
                         "id": order.id,
                         "order_number": order.order_number,
                         "customer_id": order.customer_id,
-                        "customer_name": customer.full_name if customer else "N/A",
-                        "customer_phone": customer.phone_number if customer else "N/A",
+                        "customer_name": customer.full_name,
+                        "customer_phone": customer.phone_number,
                         "delivery_method": order.delivery_method,
                         "delivery_address": order.delivery_address,
                         "delivery_charge": order.delivery_charge,
