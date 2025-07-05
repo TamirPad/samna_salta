@@ -748,3 +748,13 @@ def get_all_orders() -> list[Order]:
         return session.query(Order).order_by(Order.created_at.desc()).all()
     finally:
         session.close()
+
+
+# Backwards-compatibility alias — repositories previously imported get_session
+# from this module. Prefer get_db_session(), but keep this thin wrapper so
+# existing imports don't break. (Scheduled for removal after full refactor.)
+
+
+def get_session():  # pragma: no cover
+    """Return a SQLAlchemy Session (compat wrapper)."""
+    return get_db_session()
