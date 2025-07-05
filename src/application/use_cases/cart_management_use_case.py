@@ -13,6 +13,7 @@ from src.domain.repositories.cart_repository import CartRepository
 from src.domain.repositories.product_repository import ProductRepository
 from src.domain.value_objects.product_id import ProductId
 from src.domain.value_objects.telegram_id import TelegramId
+from src.infrastructure.utilities.constants import BusinessSettings
 
 logger = logging.getLogger(__name__)
 
@@ -264,8 +265,14 @@ class CartManagementUseCase:
                 OrderItemInfo.from_dict(item_data, total_price=item_total)
             )
 
-        delivery_method = cart_data.get("delivery_method", "pickup")
-        delivery_charge = 5.0 if delivery_method == "delivery" else 0.0
+        delivery_method = cart_data.get(
+            "delivery_method", BusinessSettings.DEFAULT_DELIVERY_METHOD
+        )
+        delivery_charge = (
+            BusinessSettings.DEFAULT_DELIVERY_CHARGE
+            if delivery_method == "delivery"
+            else 0.0
+        )
         total = subtotal + delivery_charge
 
         self._logger.info(

@@ -101,6 +101,7 @@ class ValidationSettings:
 class BusinessSettings:
     """Business rules and default values"""
     DEFAULT_DELIVERY_CHARGE: Final[float] = 5.00
+    DEFAULT_DELIVERY_METHOD: Final[str] = "pickup"
     DEFAULT_CURRENCY: Final[str] = "ILS"
     DEFAULT_HILBEH_DAYS: Final[list] = ["wednesday", "thursday", "friday"]
     DEFAULT_HILBEH_HOURS: Final[str] = "09:00-18:00"

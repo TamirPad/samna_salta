@@ -23,6 +23,7 @@ from src.infrastructure.services.admin_notification_service import (
     AdminNotificationService,
 )
 from src.infrastructure.utilities.exceptions import BusinessLogicError
+from src.infrastructure.utilities.constants import BusinessSettings
 
 
 @dataclass
@@ -188,9 +189,15 @@ class OrderCreationUseCase:
             )
 
         delivery_method = (
-            request.delivery_method or cart_data.get("delivery_method") or "pickup"
+            request.delivery_method
+            or cart_data.get("delivery_method")
+            or BusinessSettings.DEFAULT_DELIVERY_METHOD
         )
-        delivery_charge = 5.0 if delivery_method == "delivery" else 0.0
+        delivery_charge = (
+            BusinessSettings.DEFAULT_DELIVERY_CHARGE
+            if delivery_method == "delivery"
+            else 0.0
+        )
         delivery_address = request.delivery_address or cart_data.get("delivery_address")
         if delivery_method == "delivery" and not delivery_address:
             raise BusinessLogicError(

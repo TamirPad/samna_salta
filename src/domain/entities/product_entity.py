@@ -4,7 +4,7 @@ Product Entity - Core business logic for products
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, UTC
 from decimal import Decimal
 
 from src.domain.value_objects.price import Price
@@ -51,26 +51,26 @@ class Product:
     def activate(self):
         """Activate the product"""
         self.is_active = True
-        self.updated_at = datetime.now()
+        self.updated_at = datetime.now(UTC)
 
     def deactivate(self):
         """Deactivate the product"""
         self.is_active = False
-        self.updated_at = datetime.now()
+        self.updated_at = datetime.now(UTC)
 
     def update_price(self, new_price: Price):
         """Update product price"""
         if new_price.amount <= 0:
             raise ValueError("Price must be positive")
         self.price = new_price
-        self.updated_at = datetime.now()
+        self.updated_at = datetime.now(UTC)
 
     def update_description(self, new_description: str):
         """Update product description"""
         if not new_description:
             raise ValueError("Description cannot be empty")
         self.description = new_description
-        self.updated_at = datetime.now()
+        self.updated_at = datetime.now(UTC)
 
     @classmethod
     def create(cls, data: ProductData) -> "Product":
@@ -82,8 +82,8 @@ class Product:
             price=Price(data.price),
             category=data.category,
             image_url=data.image_url,
-            created_at=datetime.now(),
-            updated_at=datetime.now(),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
 
     def to_dict(self) -> dict:

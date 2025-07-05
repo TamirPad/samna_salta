@@ -2,24 +2,13 @@
 # exit on error
 set -o errexit
 
-# Create a virtual environment if it doesn't exist
-if [ ! -d "venv" ]; then
-  echo "Creating virtual environment..."
-  python -m venv venv
-fi
+# Use Poetry's in-project virtualenv so runtime path is predictable
+poetry config virtualenvs.in-project true
 
-# Activate the virtual environment
-source venv/bin/activate
-
-# Upgrade pip and install poetry
-echo "Installing/updating dependencies..."
-pip install --upgrade pip
-pip install poetry
-
-# Install project dependencies
+# Install dependencies according to lockfile
 poetry install --no-interaction --no-ansi
 
-# Create data directory if it doesn't exist
+# Ensure runtime data directory exists
 mkdir -p data
 
 echo "Build completed successfully!" 
