@@ -617,7 +617,11 @@ class TestOrderStatusManagementUseCase:
         assert result.order_id == 1
         assert result.status == "confirmed"
         order_repo.get_order_by_id.assert_called()
-        order_repo.update_order_status.assert_called_once_with(1, "confirmed")
+        # The actual implementation passes OrderId objects, so we need to check the call differently
+        order_repo.update_order_status.assert_called_once()
+        call_args = order_repo.update_order_status.call_args
+        assert call_args[0][0].value == 1  # Check OrderId value
+        assert call_args[0][1] == "confirmed"  # Check status
         customer_repo.find_by_id.assert_called_once()
 
     @pytest.mark.asyncio

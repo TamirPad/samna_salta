@@ -17,6 +17,7 @@ from sqlalchemy.orm import (
     relationship,
 )
 from sqlalchemy.sql import func
+from sqlalchemy.ext.mutable import MutableList  # local import to avoid circular deps
 
 # Create declarative base with proper type annotation
 _Base = declarative_base()
@@ -107,7 +108,9 @@ class Cart(Base):
         Integer, ForeignKey("customers.id"), nullable=True
     )
     items: Mapped[Optional[List[Any]]] = mapped_column(
-        JSON, default=list, nullable=True
+        MutableList.as_mutable(JSON),  # type: ignore[arg-type]
+        default=list,
+        nullable=True,
     )
     delivery_method: Mapped[str] = mapped_column(
         String(20), default="pickup", nullable=False

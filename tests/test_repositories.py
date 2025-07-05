@@ -180,6 +180,11 @@ class TestSQLAlchemyCustomerRepository:
         # Setup mocks
         mock_session = MagicMock()
         mock_get_session.return_value = mock_session
+        
+        # Mock the query chain to return None (no existing customer)
+        mock_query = mock_session.query.return_value
+        mock_filter = mock_query.filter.return_value
+        mock_filter.first.return_value = None
 
         # Create customer without ID
         customer = Customer(
@@ -201,7 +206,20 @@ class TestSQLAlchemyCustomerRepository:
         with patch(
             "src.infrastructure.repositories.sqlalchemy_customer_repository.SQLCustomer"
         ) as mock_sql_customer_class:
-            mock_sql_customer_class.return_value = sample_sql_customer
+            # Create a simple object instead of MagicMock to avoid attribute access issues
+            class MockCustomer:
+                def __init__(self):
+                    self.id = 1
+                    self.telegram_id = 123456789
+                    self.full_name = "Ahmed Al-Yemeni"
+                    self.phone_number = "+972501234567"
+                    self.delivery_address = "Tel Aviv, Israel"
+                    self.is_admin = False
+                    self.created_at = None
+                    self.updated_at = None
+            
+            mock_customer = MockCustomer()
+            mock_sql_customer_class.return_value = mock_customer
             result = await customer_repository.save(customer)
 
         # Verify

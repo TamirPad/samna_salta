@@ -479,6 +479,9 @@ def init_default_products():
         ]
 
         for product_data in products:
+            # Ensure price field is set correctly
+            if "base_price" in product_data:
+                product_data["price"] = product_data["base_price"]
             product = Product(**product_data)
             session.add(product)
 

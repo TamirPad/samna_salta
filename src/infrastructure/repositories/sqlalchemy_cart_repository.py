@@ -103,7 +103,7 @@ class SQLAlchemyCartRepository(CartRepository):
                         "product_id": product.id,
                         "product_name": product.name,
                         "quantity": item.get("quantity", 1),
-                        "unit_price": product.base_price,
+                        "unit_price": product.price,
                         "options": item.get("options", {}),
                     }
                     detailed_items.append(detailed_item)
@@ -130,15 +130,21 @@ class SQLAlchemyCartRepository(CartRepository):
     async def add_item(
         self,
         telegram_id: TelegramId,
-        product_id: ProductId,
+        product_id: ProductId | int,
         quantity: int,
         options: dict[str, Any],
     ) -> bool:
         """Add item to cart with options (required by abstract class)"""
+        # Handle both ProductId objects and plain integers
+        if isinstance(product_id, ProductId):
+            product_id_value = product_id.value
+        else:
+            product_id_value = product_id
+            
         self._logger.info(
             "➕ ADD ITEM: User %s, Product %s, Qty %d, Options %s",
             telegram_id.value,
-            product_id.value,
+            product_id_value,
             quantity,
             options,
         )
@@ -166,26 +172,26 @@ class SQLAlchemyCartRepository(CartRepository):
                 item_found = False
 
                 for item in items:
-                    if (item.get("product_id") == product_id.value and 
+                    if (item.get("product_id") == product_id_value and 
                         item.get("options", {}) == options):
                         item["quantity"] = item.get("quantity", 0) + quantity
                         item_found = True
                         self._logger.info(
                             "🔄 ITEM UPDATED: Product %s, New quantity %d",
-                            product_id.value,
+                            product_id_value,
                             item["quantity"],
                         )
                         break
 
                 if not item_found:
                     items.append({
-                        "product_id": product_id.value, 
+                        "product_id": product_id_value, 
                         "quantity": quantity,
                         "options": options
                     })
                     self._logger.info(
                         "🆕 ITEM ADDED: Product %s, Quantity %d, Options %s",
-                        product_id.value,
+                        product_id_value,
                         quantity,
                         options,
                     )

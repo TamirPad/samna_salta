@@ -210,6 +210,9 @@ class SQLAlchemyCustomerRepository(CustomerRepository):
 
     def _map_to_domain(self, sql_customer: SQLCustomer) -> DomainCustomer:
         """Map SQLAlchemy Customer to domain Customer"""
+        # Debug logging to see what values we're getting
+        self._logger.debug(f"Mapping customer: id={sql_customer.id}, telegram_id={sql_customer.telegram_id}, type={type(sql_customer.telegram_id)}")
+        
         return DomainCustomer(
             id=CustomerId(sql_customer.id),
             telegram_id=TelegramId(sql_customer.telegram_id),
