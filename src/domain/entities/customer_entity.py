@@ -6,7 +6,7 @@ Represents a customer in the Samna Salta business domain.
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Optional
 
 from src.domain.value_objects.customer_id import CustomerId
@@ -35,7 +35,7 @@ class Customer:
 
     def __post_init__(self):
         """Initialize timestamps if not provided"""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         if self.created_at is None:
             self.created_at = now
         if self.updated_at is None:
@@ -45,17 +45,17 @@ class Customer:
         """Update customer contact information"""
         self.full_name = name
         self.phone_number = phone
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
 
     def update_delivery_address(self, address: Optional[DeliveryAddress]) -> None:
         """Update customer delivery address"""
         self.delivery_address = address
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
 
     def set_admin_status(self, is_admin: bool) -> None:
         """Set admin status for the customer"""
         self.is_admin = is_admin
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
 
     def can_place_order(self) -> bool:
         """Check if customer can place an order"""

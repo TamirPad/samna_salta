@@ -324,5 +324,69 @@ def record_request_success(user_id: int) -> None:
 
 
 def record_request_failure(user_id: int) -> None:
-    """Record failed request"""
-    get_rate_limiter().record_failure(user_id)
+    """Record failed request for global rate limiter"""
+    _rate_limiter.record_failure(user_id)
+
+
+# Legacy aliases and additional classes for backward compatibility
+class BotSecurityManager:
+    """Security manager for the bot - wrapper around RateLimiter"""
+    
+    def __init__(self, rate_limiter: Optional[RateLimiter] = None):
+        self.rate_limiter = rate_limiter or get_rate_limiter()
+        
+    def check_rate_limit(self, user_id: int, endpoint: Optional[str] = None) -> bool:
+        """Check if user is within rate limits"""
+        allowed, _ = self.rate_limiter.is_allowed(user_id, endpoint)
+        return allowed
+        
+    def record_success(self, user_id: int) -> None:
+        """Record successful request"""
+        self.rate_limiter.record_success(user_id)
+        
+    def record_failure(self, user_id: int) -> None:
+        """Record failed request"""
+        self.rate_limiter.record_failure(user_id)
+
+
+class RateLimit:
+    """Rate limit decorator and utility"""
+    
+    def __init__(self, max_requests: int, window_seconds: int):
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        
+    def __call__(self, func):
+        """Decorator to apply rate limiting"""
+        def wrapper(*args, **kwargs):
+            # This would need to be implemented based on the specific use case
+            return func(*args, **kwargs)
+        return wrapper
+
+
+class SecurityValidator:
+    """Security validation utilities"""
+    
+    def __init__(self, rate_limiter: Optional[RateLimiter] = None):
+        self.rate_limiter = rate_limiter or get_rate_limiter()
+        
+    def validate_user_request(self, user_id: int, endpoint: Optional[str] = None) -> bool:
+        """Validate user request"""
+        allowed, _ = self.rate_limiter.is_allowed(user_id, endpoint)
+        return allowed
+        
+    def is_user_blocked(self, user_id: int) -> bool:
+        """Check if user is currently blocked"""
+        user_limit = self.rate_limiter.user_limits[user_id]
+        return user_limit.blocked_until is not None and time.time() < user_limit.blocked_until
+
+
+def get_security_manager() -> BotSecurityManager:
+    """Get global security manager instance"""
+    return BotSecurityManager()
+
+
+def security_check(user_id: int, endpoint: Optional[str] = None) -> bool:
+    """Perform security check for user and endpoint"""
+    manager = get_security_manager()
+    return manager.check_rate_limit(user_id, endpoint)

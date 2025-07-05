@@ -7,6 +7,9 @@ import logging
 import sys
 from pathlib import Path
 
+# Add current directory to Python path for deployment
+sys.path.insert(0, str(Path(__file__).parent))
+
 from dotenv import load_dotenv
 from telegram.ext import Application, ContextTypes
 
