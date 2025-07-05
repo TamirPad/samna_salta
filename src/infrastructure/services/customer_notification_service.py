@@ -123,7 +123,7 @@ class CustomerNotificationService:
 
         delivery_emoji = "🚚" if order_info.delivery_method == "delivery" else "🏪"
 
-        message = """
+        message = f"""
 🔔 <b>ORDER UPDATE</b>
 
 📋 Order #: <code>{order_info.order_number}</code>
@@ -139,14 +139,14 @@ class CustomerNotificationService:
 
             message += f"\n• {item.quantity}x {item.product_name}{options_text}"
 
-        message += """
+        message += f"""
 
 {delivery_emoji} <b>Delivery:</b> {order_info.delivery_method.title()}"""
 
         if order_info.delivery_address:
             message += f"\n📍 Address: {order_info.delivery_address}"
 
-        message += """
+        message += f"""
 💳 <b>Total:</b> ₪{order_info.total:.2f}
 
 Thank you for choosing Samna Salta! 🥧✨
@@ -164,7 +164,7 @@ Thank you for choosing Samna Salta! 🥧✨
 
     def _format_pickup_ready_message(self, order_info: OrderInfo) -> str:
         """Format special pickup ready message"""
-        message = """
+        message = f"""
 🎉 <b>YOUR ORDER IS READY!</b>
 
 📋 Order #: <code>{order_info.order_number}</code>
@@ -185,7 +185,7 @@ Thank you for choosing Samna Salta! 🥧✨
 
             message += f"\n• {item.quantity}x {item.product_name}{options_text}"
 
-        message += """
+        message += f"""
 
 💳 <b>Total:</b> ₪{order_info.total:.2f}
 

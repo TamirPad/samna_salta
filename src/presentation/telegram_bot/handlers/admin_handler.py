@@ -106,7 +106,7 @@ class AdminHandler:
             pending_orders = await order_status_use_case.get_pending_orders()
             active_orders = await order_status_use_case.get_active_orders()
 
-            dashboard_text = """
+            dashboard_text = f"""
 👑 <b>ADMIN DASHBOARD</b>
 
 📊 <b>Order Statistics:</b>
@@ -205,7 +205,7 @@ class AdminHandler:
                     ]
                 ]
             else:
-                text = """
+                text = f"""
 ⏳ <b>PENDING ORDERS ({len(orders)})</b>
 
 📋 <b>Orders requiring attention:</b>
@@ -262,7 +262,7 @@ class AdminHandler:
                     ]
                 ]
             else:
-                text = """
+                text = f"""
 🔄 <b>ACTIVE ORDERS ({len(orders)})</b>
 
 📋 <b>Orders in progress:</b>
@@ -310,7 +310,7 @@ class AdminHandler:
             order_repository = self._container.get_order_repository()
             all_orders_data = await order_repository.get_all_orders()
 
-            text = """
+            text = f"""
 📋 <b>ALL ORDERS ({len(all_orders_data)})</b>
 
 📊 <b>Recent orders:</b>
@@ -385,7 +385,7 @@ class AdminHandler:
                 "🚚" if order_data.get("delivery_method") == "delivery" else "🏪"
             )
 
-            text = """
+            text = f"""
 📋 <b>ORDER DETAILS</b>
 
 🔢 Order #: <code>{order_data['order_number']}</code>
@@ -406,7 +406,7 @@ class AdminHandler:
 
                 text += f"\n• {item['quantity']}x {item['product_name']}{options_text} - ₪{item['total_price']:.2f}"
 
-            text += """
+            text += f"""
 
 {delivery_emoji} <b>Delivery:</b>
 📦 Method: <b>{order_data.get('delivery_method', 'pickup').title()}</b>"""
@@ -414,7 +414,7 @@ class AdminHandler:
             if order_data.get("delivery_address"):
                 text += f"\n📍 Address: {order_data['delivery_address']}"
 
-            text += """
+            text += f"""
 
 💰 <b>Payment:</b>
 💵 Subtotal: ₪{order_data.get('subtotal', 0):.2f}

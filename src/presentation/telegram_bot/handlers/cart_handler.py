@@ -394,7 +394,7 @@ class CartHandler:
 
         delivery_emoji = "🚚" if order_info.delivery_method == "delivery" else "🏪"
 
-        message = """
+        message = f"""
 🎉 <b>ORDER CONFIRMED!</b>
 
 📋 <b>Order Details:</b>
@@ -416,7 +416,7 @@ class CartHandler:
 
             message += f"\n• {item.quantity}x {item.product_name}{options_text} - ₪{item.total_price:.2f}"
 
-        message += """
+        message += f"""
 
 {delivery_emoji} <b>Delivery:</b>
 📦 Method: <b>{order_info.delivery_method.title()}</b>"""
@@ -424,7 +424,7 @@ class CartHandler:
         if order_info.delivery_address:
             message += f"\n📍 Address: {order_info.delivery_address}"
 
-        message += """
+        message += f"""
 
 💰 <b>Payment Summary:</b>
 💵 Subtotal: ₪{order_info.subtotal:.2f}
@@ -463,7 +463,7 @@ Browse our delicious menu to add some items.
 
             delivery_emoji = "🚚" if cart_response.delivery_method == "delivery" else "🏪"
 
-            message = """
+            message = f"""
 🛒 <b>Your Cart ({len(cart_response.cart_items)} items)</b>
 
 <b>Items:</b>"""
@@ -479,14 +479,14 @@ Browse our delicious menu to add some items.
             delivery_method_display = (
                 cart_response.delivery_method or "pickup"
             ).title()
-            message += """
+            message += f"""
 
 {delivery_emoji} <b>Delivery:</b> {delivery_method_display}"""
 
             if cart_response.delivery_address:
                 message += f"\n📍 Address: {cart_response.delivery_address}"
 
-            message += """
+            message += f"""
 
 💰 <b>Summary:</b>
 💵 Subtotal: ₪{subtotal:.2f}

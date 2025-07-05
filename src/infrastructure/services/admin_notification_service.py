@@ -170,7 +170,7 @@ class AdminNotificationService:
 
         delivery_emoji = "🚚" if order_info.delivery_method == "delivery" else "🏪"
 
-        message = """
+        message = f"""
 🔔 <b>NEW ORDER RECEIVED!</b>
 
 📋 <b>Order Details:</b>
@@ -192,7 +192,7 @@ class AdminNotificationService:
 
             message += f"\n• {item.quantity}x {item.product_name}{options_text} - ₪{item.total_price:.2f}"
 
-        message += """
+        message += f"""
 
 {delivery_emoji} <b>Delivery:</b>
 📦 Method: <b>{order_info.delivery_method.title()}</b>"""
@@ -200,7 +200,7 @@ class AdminNotificationService:
         if order_info.delivery_address:
             message += f"\n📍 Address: {order_info.delivery_address}"
 
-        message += """
+        message += f"""
 
 💰 <b>Payment Summary:</b>
 💵 Subtotal: ₪{order_info.subtotal:.2f}
@@ -224,7 +224,7 @@ Please process this order promptly! 🚀
             "cancelled": "❌",
         }
 
-        message = """
+        message = f"""
 🔄 <b>ORDER STATUS UPDATE</b>
 
 📋 Order #: <code>{order_info.order_number}</code>
