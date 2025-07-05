@@ -135,18 +135,31 @@ HILBEH_AVAILABLE_HOURS=09:00-18:00
 - `/analytics` - View order statistics
 - `/products` - Manage product catalog
 
-## Testing
+## Automated Testing
 
+The project includes automated tests to ensure the bot's functionality works correctly:
+
+### Unit Tests
+- `tests/test_basic.py` - Tests basic utility functions like price formatting and phone number validation
+
+### Bot Automation Tests
+- `tests/test_bot_automation.py` - Simulates user interactions with the bot to verify core flows:
+  - Browsing product categories
+  - Adding products to cart
+  - Viewing the cart
+  - Placing orders
+  - Verifying order confirmations
+
+### Running Tests
 ```bash
 # Run all tests
-python -m pytest
+poetry run pytest
 
-# Run with coverage
-python -m pytest --cov=src
-
-# Run specific test category
-python -m pytest tests/test_use_cases/
+# Run specific test files with verbose output
+poetry run pytest tests/test_bot_automation.py -v
 ```
+
+These automated tests help ensure that changes to the codebase don't break existing functionality.
 
 ## Monitoring
 
