@@ -511,6 +511,48 @@ Browse our delicious menu to add some items.
         keyboard = [[InlineKeyboardButton("🔙 Back to Menu", callback_data="menu_main")]]
         return InlineKeyboardMarkup(keyboard)
 
+    @error_handler("clear_cart")
+    async def handle_clear_cart(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        """Handle clearing cart contents"""
+        query = update.callback_query
+        await query.answer()
+
+        user_id = update.effective_user.id
+        self._logger.info(f"🗑️ CLEAR CART: User {user_id}")
+
+        try:
+            # Get cart management use case
+            cart_use_case = self._container.get_cart_management_use_case()
+
+            # Clear cart
+            response = await cart_use_case.clear_cart(user_id)
+
+            if response.success:
+                self._logger.info(f"✅ CART CLEARED: User {user_id}")
+                await query.edit_message_text(
+                    "🗑️ <b>Cart Cleared!</b>\n\n"
+                    "Your cart has been emptied successfully.\n"
+                    "Browse our menu to add new items.",
+                    parse_mode="HTML",
+                    reply_markup=self._get_back_to_menu_keyboard(),
+                )
+            else:
+                self._logger.error(f"❌ CLEAR CART FAILED: {response.error_message}")
+                await query.edit_message_text(
+                    f"❌ Failed to clear cart\n\n"
+                    f"Error: {response.error_message}",
+                    reply_markup=self._get_back_to_menu_keyboard(),
+                )
+
+        except Exception as e:
+            self._logger.error(f"💥 CLEAR CART ERROR: {e}", exc_info=True)
+            await query.edit_message_text(
+                text="❌ Error clearing cart. Please try again.",
+                reply_markup=self._get_back_to_menu_keyboard(),
+            )
+
 
 def register_cart_handlers(application):
     """Register cart handlers with the application"""
@@ -525,6 +567,10 @@ def register_cart_handlers(application):
         CallbackQueryHandler(
             cart_handler.handle_send_order, pattern="^cart_send_order$"
         )
+    )
+
+    application.add_handler(
+        CallbackQueryHandler(cart_handler.handle_clear_cart, pattern="^cart_clear$")
     )
 
     # Register add to cart handlers for direct add patterns
