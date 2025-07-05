@@ -27,6 +27,7 @@ from ..repositories.sqlalchemy_cart_repository import SQLAlchemyCartRepository
 from ..repositories.sqlalchemy_customer_repository import SQLAlchemyCustomerRepository
 from ..repositories.sqlalchemy_order_repository import SQLAlchemyOrderRepository
 from ..repositories.sqlalchemy_product_repository import SQLAlchemyProductRepository
+from ..security.rate_limiter import BotSecurityManager
 from ..services.admin_notification_service import AdminNotificationService
 from ..services.customer_notification_service import CustomerNotificationService
 
@@ -85,6 +86,9 @@ class DependencyContainer:
             ] = CustomerNotificationService(
                 bot=self._bot, customer_repository=self.get_customer_repository()
             )
+
+            # Register security manager
+            self._instances["security_manager"] = BotSecurityManager()
 
             self._logger.debug("Services registered successfully")
         else:
@@ -180,6 +184,10 @@ class DependencyContainer:
     def get_customer_notification_service(self) -> CustomerNotificationService:
         """Get customer notification service instance"""
         return self._instances.get("customer_notification_service")
+
+    def get_security_manager(self) -> BotSecurityManager:
+        """Get security manager instance"""
+        return self._instances.get("security_manager")
 
     # Use Case getters
     def get_customer_registration_use_case(self) -> CustomerRegistrationUseCase:

@@ -393,12 +393,26 @@ class BotSecurityManager:
         return True, None
 
     def get_security_report(self):
-        """Aggregate statistics for tests."""
-        stats = self.rate_limiter.get_stats()
-        return {
-            "security_stats": stats,
-            "rate_limiter_active_users": stats.get("total_users", 0),
-        }
+        """Get security statistics and report"""
+        return {"security_stats": self.rate_limiter.get_stats(), "rate_limiter_active_users": len(self.rate_limiter.user_limits)}
+
+    def is_admin(self, telegram_id):
+        """Check if a user is an admin based on their telegram_id
+        
+        Args:
+            telegram_id: TelegramId or int value of the user's Telegram ID
+        
+        Returns:
+            bool: True if the user is an admin, False otherwise
+        """
+        # Get the numeric value if it's a TelegramId object
+        user_id = telegram_id.value if hasattr(telegram_id, 'value') else telegram_id
+        
+        # For now, hardcode the admin IDs for simplicity
+        # In a production environment, this should come from a database or config
+        admin_ids = [598829473]  # Add your admin Telegram IDs here
+        
+        return user_id in admin_ids
 
 
 class RateLimit:
