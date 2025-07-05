@@ -1,1 +1,1 @@
-web: python ./main.py 
+web: venv/bin/python ./main.py 
