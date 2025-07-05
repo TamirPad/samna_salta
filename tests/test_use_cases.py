@@ -179,7 +179,8 @@ class TestCartManagementUseCase:
         mock_product_repo = MagicMock()
         mock_product_repo.find_by_id = AsyncMock(return_value=mock_product)
 
-        use_case = CartManagementUseCase(mock_cart_repo, mock_product_repo)
+        mock_customer_repo = MagicMock()
+        use_case = CartManagementUseCase(mock_cart_repo, mock_product_repo, mock_customer_repo)
 
         request = AddToCartRequest(telegram_id=123456789, product_id=1, quantity=2)
 
@@ -195,7 +196,8 @@ class TestCartManagementUseCase:
         mock_product_repo = MagicMock()
         mock_product_repo.find_by_id = AsyncMock(return_value=None)
 
-        use_case = CartManagementUseCase(mock_cart_repo, mock_product_repo)
+        mock_customer_repo = MagicMock()
+        use_case = CartManagementUseCase(mock_cart_repo, mock_product_repo, mock_customer_repo)
 
         request = AddToCartRequest(telegram_id=123456789, product_id=999, quantity=1)
 
@@ -218,7 +220,8 @@ class TestCartManagementUseCase:
         mock_product_repo = MagicMock()
         mock_product_repo.find_by_id = AsyncMock(return_value=mock_product)
 
-        use_case = CartManagementUseCase(mock_cart_repo, mock_product_repo)
+        mock_customer_repo = MagicMock()
+        use_case = CartManagementUseCase(mock_cart_repo, mock_product_repo, mock_customer_repo)
 
         request = AddToCartRequest(telegram_id=123456789, product_id=1, quantity=1)
 

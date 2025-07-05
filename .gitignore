@@ -205,3 +205,51 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# ===== PRODUCTION-SPECIFIC IGNORES =====
+
+# Application logs (keep logs/ directory structure but ignore content)
+logs/*.log
+logs/*.log.*
+*.log
+
+# Development and test artifacts
+*_test.py
+test_*.py
+*_report.txt
+*_REPORT.md
+bot_test.log
+
+# Temporary and cache files
+*.tmp
+*.bak
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Development databases (keep structure, ignore data)
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+*.db-journal
+
+# IDE and editor files
+.vscode/
+.idea/
+*.sublime-*
+
+# Development configuration
+.env.local
+.env.development
+.env.test
+
+# Runtime files
+*.pid
+*.sock
+
+# Backup files
+*.backup
+*.old
+backup/
+backups/

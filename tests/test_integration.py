@@ -74,7 +74,7 @@ class TestCustomerWorkflow:
         # Initialize use cases
         customer_use_case = CustomerRegistrationUseCase(customer_repo)
         product_use_case = ProductCatalogUseCase(product_repo)
-        cart_use_case = CartManagementUseCase(cart_repo, product_repo)
+        cart_use_case = CartManagementUseCase(cart_repo, product_repo, customer_repo)
 
         # Step 1: Customer registration
         reg_request = CustomerRegistrationRequest(
