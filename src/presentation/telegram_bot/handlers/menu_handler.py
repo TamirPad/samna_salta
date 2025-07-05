@@ -20,6 +20,7 @@ from src.presentation.telegram_bot.keyboards.menu import (
     get_red_bisbas_menu_keyboard,
     get_samneh_menu_keyboard,
 )
+from src.infrastructure.utilities.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ class MenuHandler:
                 await self._show_white_coffee_menu(query)
             else:
                 self._logger.warning("⚠️ UNKNOWN MENU CALLBACK: %s", data)
-                await query.edit_message_text("Menu functionality available!")
+                await query.edit_message_text(tr("MENU_FUNCTIONALITY_AVAILABLE"))
 
         except BusinessLogicError as e:
             self._logger.error(
@@ -75,27 +76,19 @@ class MenuHandler:
                 e,
                 exc_info=True,
             )
-            await query.edit_message_text("An error occurred. Please try again.")
+            await query.edit_message_text(tr("MENU_ERROR_OCCURRED"))
 
     async def _show_main_menu(self, query: CallbackQuery):
         """Show the main menu"""
         self._logger.debug("📋 SHOWING: Main menu")
         await query.edit_message_text(
-            "What would you like to order today?", reply_markup=get_main_menu_keyboard()
+            tr("MENU_PROMPT"), reply_markup=get_main_menu_keyboard()
         )
 
     async def _show_kubaneh_menu(self, query: CallbackQuery):
         """Show Kubaneh sub-menu"""
         self._logger.debug("📋 SHOWING: Kubaneh menu")
-        text = (
-            "🍞 **Kubaneh Selection**\n\n"
-            "Choose your preferred Kubaneh type:\n\n"
-            "• **Classic** - Traditional plain Kubaneh\n"
-            "• **Seeded** - With various seeds\n"
-            "• **Herb** - Infused with herbs\n"
-            "• **Aromatic** - Special spice blend\n\n"
-            "*Price: 25 ILS per Kubaneh*"
-        )
+        text = tr("KUBANEH_DESC")
         await query.edit_message_text(
             text, reply_markup=get_kubaneh_menu_keyboard(), parse_mode="Markdown"
         )
@@ -103,13 +96,7 @@ class MenuHandler:
     async def _show_samneh_menu(self, query: CallbackQuery):
         """Show Samneh sub-menu"""
         self._logger.debug("📋 SHOWING: Samneh menu")
-        text = (
-            "🧈 **Samneh Selection**\n\n"
-            "Choose your preferred Samneh type:\n\n"
-            "• **Smoked** - Traditional smoked butter\n"
-            "• **Not smoked** - Pure clarified butter\n\n"
-            "*Price: 15 ILS*"
-        )
+        text = tr("SAMNEH_DESC")
         await query.edit_message_text(
             text, reply_markup=get_samneh_menu_keyboard(), parse_mode="Markdown"
         )
@@ -117,11 +104,7 @@ class MenuHandler:
     async def _show_red_bisbas_menu(self, query: CallbackQuery):
         """Show Red Bisbas menu"""
         self._logger.debug("📋 SHOWING: Red Bisbas menu")
-        text = (
-            "🌶️ **Red Bisbas (Schug)**\n\n"
-            "Traditional Yemenite hot sauce\n\n"
-            "*Price: 12 ILS*"
-        )
+        text = tr("RED_BISBAS_DESC")
         await query.edit_message_text(
             text, reply_markup=get_red_bisbas_menu_keyboard(), parse_mode="Markdown"
         )
@@ -136,16 +119,11 @@ class MenuHandler:
 
             if not response.success:
                 await query.edit_message_text(
-                    f"❌ {response.error_message}", reply_markup=get_main_menu_keyboard()
+                    tr("AVAILABILITY_CHECK_ERROR").format(error=response.error_message), reply_markup=get_main_menu_keyboard()
                 )
                 return
 
-            text = (
-                "🌿 **Hilbeh**\n\n"
-                "Traditional Yemenite fenugreek paste\n\n"
-                "Available today! ✅\n\n"
-                "*Price: 18 ILS*"
-            )
+            text = tr("HILBEH_DESC_AVAILABLE")
             await query.edit_message_text(
                 text, reply_markup=get_hilbeh_menu_keyboard(), parse_mode="Markdown"
             )
@@ -153,19 +131,14 @@ class MenuHandler:
         except BusinessLogicError as e:
             self._logger.error("💥 Error checking Hilbeh availability: %s", e)
             await query.edit_message_text(
-                "Error checking availability. Please try again.",
+                tr("AVAILABILITY_CHECK_ERROR_GENERIC"),
                 reply_markup=get_main_menu_keyboard(),
             )
 
     async def _show_hawaij_soup_menu(self, query: CallbackQuery):
         """Show Hawaij soup spice menu"""
         self._logger.debug("📋 SHOWING: Hawaij soup menu")
-        text = (
-            "🥘 **Hawaij Soup Spice**\n\n"
-            "Traditional Yemenite soup spice blend\n"
-            "Perfect for hearty soups and stews\n\n"
-            "*Price: 8 ILS*"
-        )
+        text = tr("HAWAIJ_SOUP_DESC")
         await query.edit_message_text(
             text,
             reply_markup=get_direct_add_keyboard("Hawaij soup spice"),
@@ -175,12 +148,7 @@ class MenuHandler:
     async def _show_hawaij_coffee_menu(self, query: CallbackQuery):
         """Show Hawaij coffee spice menu"""
         self._logger.debug("📋 SHOWING: Hawaij coffee menu")
-        text = (
-            "☕ **Hawaij Coffee Spice**\n\n"
-            "Traditional Yemenite coffee spice blend\n"
-            "Adds warmth and depth to your coffee\n\n"
-            "*Price: 8 ILS*"
-        )
+        text = tr("HAWAIJ_COFFEE_DESC")
         await query.edit_message_text(
             text,
             reply_markup=get_direct_add_keyboard("Hawaij coffee spice", include_info=False),
@@ -190,12 +158,7 @@ class MenuHandler:
     async def _show_white_coffee_menu(self, query: CallbackQuery):
         """Show White coffee menu"""
         self._logger.debug("📋 SHOWING: White coffee menu")
-        text = (
-            "☕ **White Coffee**\n\n"
-            "Traditional Yemenite white coffee\n"
-            "Caffeine-free, aromatic beverage\n\n"
-            "*Price: 10 ILS*"
-        )
+        text = tr("WHITE_COFFEE_DESC")
         await query.edit_message_text(
             text,
             reply_markup=get_direct_add_keyboard("White coffee", include_info=False),

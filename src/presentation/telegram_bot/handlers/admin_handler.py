@@ -22,6 +22,7 @@ from src.domain.value_objects.customer_id import CustomerId
 from src.domain.value_objects.telegram_id import TelegramId
 from src.infrastructure.container.dependency_injection import get_container
 from src.infrastructure.utilities.exceptions import BusinessLogicError, error_handler
+from src.infrastructure.utilities.i18n import tr
 
 # Conversation states
 AWAITING_ORDER_ID, AWAITING_STATUS_UPDATE = range(2)
@@ -47,7 +48,7 @@ class AdminHandler:
         # Check if user is admin
         if not await self._is_admin_user(user_id):
             await update.message.reply_text(
-                "⛔ Access denied. Admin privileges required."
+                tr("ADMIN_ACCESS_DENIED")
             )
             return
 
@@ -64,7 +65,7 @@ class AdminHandler:
 
         user_id = update.effective_user.id
         if not await self._is_admin_user(user_id):
-            await query.message.reply_text("⛔ Access denied.")
+            await query.message.reply_text(tr("ADMIN_ACCESS_DENIED"))
             return
 
         data = query.data
@@ -120,32 +121,32 @@ class AdminHandler:
             )
 
             dashboard_text = (
-                "👑 <b>ADMIN DASHBOARD</b>\n\n"
-                "📊 <b>Order Statistics:</b>\n"
-                f"⏳ Pending Orders: {len(pending_orders)}\n"
-                f"🔄 Active Orders: {len(active_orders)}\n"
-                f"📋 Total Today: {len(pending_orders) + len(active_orders)}\n\n"
-                "🛠️ <b>Quick Actions:</b>"
+                tr("ADMIN_DASHBOARD_TITLE") + "\n\n" +
+                tr("ADMIN_ORDER_STATS") + "\n" +
+                tr("ADMIN_PENDING_COUNT").format(count=len(pending_orders)) + "\n" +
+                tr("ADMIN_ACTIVE_COUNT").format(count=len(active_orders)) + "\n" +
+                tr("ADMIN_TOTAL_TODAY").format(count=len(pending_orders) + len(active_orders)) + "\n\n" +
+                tr("ADMIN_QUICK_ACTIONS")
             )
 
             keyboard = [
                 [
                     InlineKeyboardButton(
-                        "⏳ Pending Orders", callback_data="admin_pending_orders"
+                        tr("ADMIN_PENDING_ORDERS"), callback_data="admin_pending_orders"
                     ),
                     InlineKeyboardButton(
-                        "🔄 Active Orders", callback_data="admin_active_orders"
+                        tr("ADMIN_ACTIVE_ORDERS"), callback_data="admin_active_orders"
                     ),
                 ],
                 [
                     InlineKeyboardButton(
-                        "📋 All Orders", callback_data="admin_all_orders"
+                        tr("ADMIN_ALL_ORDERS"), callback_data="admin_all_orders"
                     ),
                     InlineKeyboardButton(
-                        "🔄 Update Status", callback_data="admin_update_status"
+                        tr("ADMIN_UPDATE_STATUS"), callback_data="admin_update_status"
                     ),
                 ],
-                [InlineKeyboardButton("📊 Analytics", callback_data="admin_analytics")],
+                [InlineKeyboardButton(tr("ADMIN_ANALYTICS"), callback_data="admin_analytics")],
             ]
 
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -177,7 +178,7 @@ class AdminHandler:
         if message_sender:
             try:
                 await message_sender.reply_text(
-                    "An error occurred. Please try again or contact support."
+                    tr("ADMIN_ERROR_MESSAGE")
                 )
             except Exception as e:
                 self._logger.error(
@@ -213,11 +214,11 @@ class AdminHandler:
             )
 
         except BusinessLogicError as e:
-            self._logger.error("💥 ANALYTICS ERROR: %s", e, exc_info=True)
-            await query.message.reply_text("Error generating analytics report.")
+            self._logger.error("💥 ANALYTICS ERROR: %s", e)
+            await query.message.reply_text(tr("ANALYTICS_ERROR"))
         except Exception as e:
-            self._logger.critical("💥 UNHANDLED ANALYTICS ERROR: %s", e, exc_info=True)
-            await query.message.reply_text("A critical error occurred.")
+            self._logger.critical("💥 CRITICAL ANALYTICS ERROR: %s", e, exc_info=True)
+            await query.message.reply_text(tr("ANALYTICS_CRITICAL_ERROR"))
 
     async def _show_pending_orders(self, query: CallbackQuery) -> None:
         """Show pending orders"""
@@ -274,8 +275,8 @@ class AdminHandler:
             )
 
         except BusinessLogicError as e:
-            self._logger.error("💥 PENDING ORDERS ERROR: %s", e, exc_info=True)
-            await query.message.reply_text("Error loading pending orders.")
+            self._logger.error("💥 PENDING ORDERS ERROR: %s", e)
+            await query.message.reply_text(tr("PENDING_ORDERS_ERROR"))
 
     async def _show_active_orders(self, query: CallbackQuery) -> None:
         """Show active orders"""
@@ -328,8 +329,8 @@ class AdminHandler:
             )
 
         except BusinessLogicError as e:
-            self._logger.error("💥 ACTIVE ORDERS ERROR: %s", e, exc_info=True)
-            await query.message.reply_text("Error loading active orders.")
+            self._logger.error("💥 ACTIVE ORDERS ERROR: %s", e)
+            await query.message.reply_text(tr("ACTIVE_ORDERS_ERROR"))
 
     async def _show_all_orders(self, query: CallbackQuery) -> None:
         """Show all orders"""
@@ -379,8 +380,8 @@ class AdminHandler:
             )
 
         except BusinessLogicError as e:
-            self._logger.error("💥 ALL ORDERS ERROR: %s", e, exc_info=True)
-            await query.message.reply_text("Error loading all orders.")
+            self._logger.error("💥 ALL ORDERS ERROR: %s", e)
+            await query.message.reply_text(tr("ALL_ORDERS_ERROR"))
 
     async def _show_order_details(self, query: CallbackQuery, order_id: int) -> None:
         """Show details for a specific order."""
@@ -400,8 +401,8 @@ class AdminHandler:
             )
 
         except BusinessLogicError as e:
-            self._logger.error("💥 ORDER DETAILS ERROR: %s", e, exc_info=True)
-            await query.message.reply_text("Error loading order details.")
+            self._logger.error("💥 ORDER DETAILS ERROR: %s", e)
+            await query.message.reply_text(tr("ORDER_DETAILS_ERROR"))
 
     async def _get_formatted_order_details(self, order_id: int) -> str | None:
         """Helper to get and format order details."""

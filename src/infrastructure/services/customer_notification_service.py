@@ -16,6 +16,7 @@ from src.infrastructure.services.notification_utils import (
     format_order_details,
     send_telegram_message,
 )
+from src.infrastructure.utilities.i18n import tr
 
 
 class CustomerNotificationService:
@@ -98,17 +99,17 @@ class CustomerNotificationService:
 
     def _format_status_update_message(self, order_info: OrderInfo) -> str:
         """Format order status update message for customer"""
-        header = "🔔 <b>ORDER UPDATE</b>"
+        header = tr("CUSTOMER_ORDER_UPDATE_HEADER")
         return format_order_details(order_info, header)
 
     def _format_pickup_ready_message(self, order_info: OrderInfo) -> str:
         """Format special pickup ready message"""
-        header = "🎉 <b>YOUR ORDER IS READY!</b>"
+        header = tr("CUSTOMER_ORDER_READY_HEADER")
         details = format_order_details(order_info, header)
         pickup_info = (
-            "\n\n🏪 <b>Pickup Details:</b>\n"
-            "📅 Available: Now\n"
-            "📍 Location: [Your Store Address]\n"
-            "⏰ Hours: [Your Store Hours]"
+            "\n\n" + tr("CUSTOMER_PICKUP_DETAILS") + "\n" +
+            tr("CUSTOMER_PICKUP_AVAILABLE") + "\n" +
+            tr("CUSTOMER_PICKUP_LOCATION") + "\n" +
+            tr("CUSTOMER_PICKUP_HOURS")
         )
         return details + pickup_info

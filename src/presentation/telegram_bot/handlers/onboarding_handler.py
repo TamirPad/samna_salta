@@ -37,6 +37,7 @@ from src.presentation.telegram_bot.states import (
     ONBOARDING_NAME,
     ONBOARDING_PHONE,
 )
+from src.infrastructure.utilities.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -75,8 +76,8 @@ class OnboardingHandler:
             if existing_customer:
                 # Welcome back existing customer with menu in one message
                 welcome_message = (
-                    f"Hi {existing_customer.full_name.value}, great to see you again! 🎉\n\n"
-                    "What would you like to order today?"
+                    tr("WELCOME_BACK").format(name=existing_customer.full_name.value) + "\n\n" +
+                    tr("WHAT_TO_ORDER_TODAY")
                 )
                 await update.message.reply_text(
                     welcome_message,
@@ -86,9 +87,9 @@ class OnboardingHandler:
 
             # Start onboarding for new customer
             await update.message.reply_text(
-                "Welcome to Samna Salta! 🍞\n\n"
-                "I'm here to help you order our delicious traditional Yemenite products.\n\n"
-                "To get started, please tell me your full name:"
+                tr("WELCOME_NEW_USER") + "\n\n" +
+                tr("WELCOME_HELP_MESSAGE") + "\n\n" +
+                tr("PLEASE_ENTER_NAME")
             )
             return ONBOARDING_NAME
 
@@ -99,7 +100,7 @@ class OnboardingHandler:
         except Exception as e:
             self._logger.error("Error in start_command: %s", e, exc_info=True)
             await self._send_error_message(
-                update, "Sorry, there was an error. Please try again with /start"
+                update, tr("ERROR_TRY_START_AGAIN")
             )
             return END
 
@@ -113,7 +114,7 @@ class OnboardingHandler:
             # Basic validation
             if len(name) < 2:
                 await update.message.reply_text(
-                    "Please enter your full name (at least 2 characters):"
+                    tr("NAME_TOO_SHORT")
                 )
                 return ONBOARDING_NAME
 
@@ -121,14 +122,14 @@ class OnboardingHandler:
             context.user_data["full_name"] = name
 
             await update.message.reply_text(
-                f"Nice to meet you, {name}! 👋\n\n"
-                "Now, please share your phone number so we can contact you about your order:"
+                tr("NICE_TO_MEET").format(name=name) + "\n\n" +
+                tr("PLEASE_SHARE_PHONE")
             )
             return ONBOARDING_PHONE
 
         except Exception as e:
             self._logger.error("Error in handle_name: %s", e, exc_info=True)
-            await self._send_error_message(update, "Please try again with /start")
+            await self._send_error_message(update, tr("ERROR_TRY_START_AGAIN"))
             return END
 
     async def handle_phone(
@@ -143,7 +144,7 @@ class OnboardingHandler:
 
             if not full_name:
                 await self._send_error_message(
-                    update, "Session expired. Please start again with /start"
+                    update, tr("SESSION_EXPIRED")
                 )
                 return END
 
@@ -159,7 +160,7 @@ class OnboardingHandler:
             if not response.success:
                 # Show validation error to user
                 await update.message.reply_text(
-                    f"❌ {response.error_message}\n\nPlease try again:"
+                    tr("VALIDATION_ERROR").format(error=response.error_message) + "\n\n" + tr("PLEASE_TRY_AGAIN")
                 )
                 next_state = ONBOARDING_PHONE
             else:
@@ -169,17 +170,17 @@ class OnboardingHandler:
 
                 if response.is_returning_customer:
                     await update.message.reply_text(
-                        f"Welcome back, {response.customer.full_name.value}! 🎉\n\n"
-                        "Your information has been updated.\n\n"
-                        "What would you like to order today?",
+                        tr("WELCOME_BACK_UPDATED").format(name=response.customer.full_name.value) + "\n\n" +
+                        tr("INFO_UPDATED") + "\n\n" +
+                        tr("WHAT_TO_ORDER_TODAY"),
                         reply_markup=get_main_menu_keyboard(),
                     )
                     next_state = END
                 else:
                     await update.message.reply_text(
-                        f"Thank you, {response.customer.full_name.value}! 📱\n\n"
-                        "How would you like to receive your order?\n\n"
-                        "Please choose your delivery method:",
+                        tr("THANK_YOU_PHONE").format(name=response.customer.full_name.value) + "\n\n" +
+                        tr("HOW_RECEIVE_ORDER") + "\n\n" +
+                        tr("CHOOSE_DELIVERY_METHOD"),
                         reply_markup=get_delivery_method_keyboard(),
                     )
                     next_state = ONBOARDING_DELIVERY_METHOD
@@ -187,7 +188,7 @@ class OnboardingHandler:
         except ValidationError as e:
             self._logger.warning("Validation error in handle_phone: %s", e)
             await update.message.reply_text(
-                f"❌ {str(e)}\n\nPlease enter a valid phone number:"
+                tr("VALIDATION_ERROR").format(error=str(e)) + "\n\n" + tr("ENTER_VALID_PHONE")
             )
             next_state = ONBOARDING_PHONE
         except BusinessLogicError as e:
@@ -196,7 +197,7 @@ class OnboardingHandler:
             next_state = END
         except Exception as e:
             self._logger.error("Error in handle_phone: %s", e)
-            await self._send_error_message(update, "Please try again with /start")
+            await self._send_error_message(update, tr("ERROR_TRY_START_AGAIN"))
             next_state = END
 
         return next_state
@@ -215,23 +216,23 @@ class OnboardingHandler:
             if delivery_method == "pickup":
                 # For pickup, go directly to menu
                 await query.edit_message_text(
-                    "Perfect! You've chosen self-pickup. We'll contact you to coordinate the pickup time.\n\n"
-                    "What would you like to order?",
+                    tr("PICKUP_CHOSEN") + "\n\n" +
+                    tr("WHAT_TO_ORDER"),
                     reply_markup=get_main_menu_keyboard(),
                 )
                 return END
 
             # For delivery, ask for address
             await query.edit_message_text(
-                "Great! You've chosen delivery. There's a 5 ILS delivery charge.\n\n"
-                "Please provide your full delivery address:"
+                tr("DELIVERY_CHOSEN") + "\n\n" +
+                tr("PROVIDE_DELIVERY_ADDRESS")
             )
             return ONBOARDING_DELIVERY_ADDRESS
 
         except Exception as e:
             self._logger.error("Error in handle_delivery_method: %s", e, exc_info=True)
             await self._send_error_message(
-                update.callback_query, "Please try again with /start"
+                update.callback_query, tr("ERROR_TRY_START_AGAIN")
             )
             return END
 
@@ -245,7 +246,7 @@ class OnboardingHandler:
             # Business rule validation
             if len(address) < 10:
                 await update.message.reply_text(
-                    "Please provide a complete delivery address (at least 10 characters):"
+                    tr("ADDRESS_TOO_SHORT")
                 )
                 return ONBOARDING_DELIVERY_ADDRESS
 
@@ -255,7 +256,7 @@ class OnboardingHandler:
             # Update customer using use case
             if "customer" not in context.user_data:
                 await self._send_error_message(
-                    update, "Session expired. Please start again with /start"
+                    update, tr("SESSION_EXPIRED")
                 )
                 return END
             customer = context.user_data["customer"]
@@ -271,8 +272,8 @@ class OnboardingHandler:
 
             # Final confirmation
             await update.message.reply_text(
-                "Thank you! Your delivery address has been saved. 🚚\n\n"
-                "What would you like to order?",
+                tr("DELIVERY_ADDRESS_SAVED") + "\n\n" +
+                tr("WHAT_TO_ORDER"),
                 reply_markup=get_main_menu_keyboard(),
             )
             return END
@@ -281,11 +282,11 @@ class OnboardingHandler:
             self._logger.warning(
                 "Validation or business logic error in handle_delivery_address: %s", e
             )
-            await update.message.reply_text(f"❌ {str(e)}\n\nPlease try again:")
+            await update.message.reply_text(tr("VALIDATION_ERROR").format(error=str(e)) + "\n\n" + tr("PLEASE_TRY_AGAIN"))
             return ONBOARDING_DELIVERY_ADDRESS
         except Exception as e:
             self._logger.error("Error in handle_delivery_address: %s", e, exc_info=True)
-            await self._send_error_message(update, "Please try again with /start")
+            await self._send_error_message(update, tr("ERROR_TRY_START_AGAIN"))
             return END
 
     async def cancel_onboarding(
@@ -295,7 +296,7 @@ class OnboardingHandler:
         user = update.effective_user
         self._logger.info("User %s canceled the onboarding process.", user.id)
         await update.message.reply_text(
-            "Onboarding canceled. You can start again anytime with /start."
+            tr("ONBOARDING_CANCELLED")
         )
         return END
 
@@ -306,7 +307,7 @@ class OnboardingHandler:
         """Handle unknown commands during onboarding."""
         self._logger.warning("Unknown command received: %s", update.message.text)
         await update.message.reply_text(
-            "Sorry, I didn't understand that command. Please follow the instructions."
+            tr("UNKNOWN_COMMAND")
         )
 
     @error_handler("unknown_message")
@@ -316,7 +317,7 @@ class OnboardingHandler:
         """Handle unknown messages during onboarding."""
         self._logger.warning("Unknown message received: %s", update.message.text)
         await update.message.reply_text(
-            "Sorry, I didn't understand that. Please provide the information I requested."
+            tr("UNKNOWN_MESSAGE")
         )
 
     async def _send_error_message(self, update, message: str):

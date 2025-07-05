@@ -12,6 +12,7 @@ from telegram.error import TelegramError
 from src.application.dtos.order_dtos import OrderInfo
 from src.domain.repositories.customer_repository import CustomerRepository
 from src.infrastructure.services.notification_utils import format_order_details
+from src.infrastructure.utilities.i18n import tr
 
 
 class AdminNotificationService:
@@ -191,12 +192,12 @@ class AdminNotificationService:
 
     def _format_new_order_message(self, order_info: OrderInfo) -> str:
         """Format new order notification message"""
-        header = "🔔 <b>NEW ORDER RECEIVED!</b>"
+        header = tr("ADMIN_NEW_ORDER_HEADER")
         return format_order_details(order_info, header)
 
     def _format_status_update_message(
         self, order_info: OrderInfo, old_status: str
     ) -> str:
         """Format order status update message"""
-        header = f"🔄 <b>Order Status Updated!</b> (from {old_status.title()})"
+        header = tr("ADMIN_ORDER_STATUS_UPDATE_HEADER")
         return format_order_details(order_info, header)

@@ -22,6 +22,7 @@ from src.presentation.telegram_bot.keyboards.menu import (
     get_cart_keyboard,
     get_main_menu_keyboard,
 )
+from src.infrastructure.utilities.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ class CartHandler:
                     "❌ INVALID CALLBACK: Could not parse %s", callback_data
                 )
                 await query.edit_message_text(
-                    "❌ Invalid product selection. Please try again."
+                    tr("INVALID_PRODUCT_SELECTION")
                 )
                 return
 
@@ -90,17 +91,21 @@ class CartHandler:
                 )
 
                 await query.edit_message_text(
-                    f"✅ <b>{product_info['display_name']} added to cart!</b>\n\n"
-                    f"🛒 Cart total: ₪{cart_total:.2f}\n"
-                    f"📦 Items in cart: {item_count}",
+                    tr("ADD_SUCCESS").format(
+                        item=product_info["display_name"],
+                        total=cart_total,
+                        count=item_count,
+                    ),
                     parse_mode="HTML",
                     reply_markup=self._get_post_add_keyboard(),
                 )
             else:
                 self._logger.error("❌ ADD FAILED: %s", response.error_message)
                 await query.edit_message_text(
-                    f"❌ Failed to add {product_info['display_name']} to cart\n\n"
-                    f"Error: {response.error_message}",
+                    tr("ADD_FAILURE").format(
+                        item=product_info["display_name"],
+                        error=response.error_message,
+                    ),
                     reply_markup=self._get_back_to_menu_keyboard(),
                 )
 
@@ -113,7 +118,7 @@ class CartHandler:
                 exc_info=True,
             )
             await query.edit_message_text(
-                "❌ An error occurred while adding to cart. Please try again.",
+                tr("ADD_ERROR"),
                 reply_markup=self._get_back_to_menu_keyboard(),
             )
 
@@ -141,7 +146,7 @@ class CartHandler:
 
             return {
                 "product_id": 1,  # Kubaneh product ID
-                "display_name": f"Kubaneh ({kubaneh_type.title()})",
+                "display_name": tr("KUBANEH_DISPLAY_NAME").format(type=kubaneh_type.title()),
                 "options": {"type": kubaneh_type},
             }
 
@@ -151,7 +156,7 @@ class CartHandler:
 
             return {
                 "product_id": 2,  # Samneh product ID
-                "display_name": f"Samneh ({smoking.replace('_', ' ').title()})",
+                "display_name": tr("SAMNEH_DISPLAY_NAME").format(type=smoking.replace('_', ' ').title()),
                 "options": {"smoking": smoking.replace("_", " ")},
             }
 
@@ -161,7 +166,7 @@ class CartHandler:
 
             return {
                 "product_id": 3,  # Red Bisbas product ID
-                "display_name": f"Red Bisbas ({size.title()})",
+                "display_name": tr("RED_BISBAS_DISPLAY_NAME").format(size=size.title()),
                 "options": {"size": size},
             }
 
@@ -217,9 +222,9 @@ class CartHandler:
     def _get_post_add_keyboard(self) -> InlineKeyboardMarkup:
         """Get keyboard shown after adding item to cart"""
         keyboard = [
-            [InlineKeyboardButton("🛒 View Cart", callback_data="cart_view")],
-            [InlineKeyboardButton("🍞 Continue Shopping", callback_data="menu_main")],
-            [InlineKeyboardButton("📤 Send Order", callback_data="cart_send_order")],
+            [InlineKeyboardButton(tr("VIEW_CART"), callback_data="cart_view")],
+            [InlineKeyboardButton(tr("CONTINUE_SHOPPING"), callback_data="menu_main")],
+            [InlineKeyboardButton(tr("SEND_ORDER"), callback_data="cart_send_order")],
         ]
         return InlineKeyboardMarkup(keyboard)
 
@@ -280,7 +285,7 @@ class CartHandler:
         except BusinessLogicError as e:
             self._logger.warning("VIEW CART ERROR: User %s, Error: %s", user_id, e)
             await query.edit_message_text(
-                "🛒 Your cart is empty or there was an error.",
+                tr("CART_EMPTY_OR_ERROR"),
                 reply_markup=self._get_back_to_menu_keyboard(),
             )
 
@@ -314,7 +319,7 @@ class CartHandler:
                     "⚠️ SEND ORDER: Cart empty or invalid for User %s", user_id
                 )
                 await query.edit_message_text(
-                    "🛒 Your cart is empty. Add items before sending an order.",
+                    tr("CART_EMPTY_ORDER"),
                     reply_markup=self._get_back_to_menu_keyboard(),
                 )
                 return
@@ -358,7 +363,7 @@ class CartHandler:
                     order_response.error_message,
                 )
                 await query.edit_message_text(
-                    "❌ There was a problem sending your order. Please try again.",
+                    tr("ORDER_SEND_PROBLEM"),
                     reply_markup=get_cart_keyboard(),
                 )
 
@@ -367,7 +372,7 @@ class CartHandler:
                 "💥 SEND ORDER ERROR: User %s, Error: %s", user_id, e, exc_info=True
             )
             await query.edit_message_text(
-                f"❌ Error creating order: {e}",
+                tr("ORDER_CREATE_ERROR").format(error=e),
                 reply_markup=get_cart_keyboard(),
             )
         except Exception as e:
@@ -378,7 +383,7 @@ class CartHandler:
                 exc_info=True,
             )
             await query.edit_message_text(
-                "❌ An unexpected error occurred. Please try again.",
+                tr("UNEXPECTED_ERROR"),
                 reply_markup=self._get_back_to_menu_keyboard(),
             )
 
@@ -391,12 +396,12 @@ class CartHandler:
             ]
         )
         return (
-            "✅ <b>Order Sent!</b>\n\n"
-            "Thank you for your order! We will contact you shortly to confirm the details.\n\n"
-            f"📝 <b>Order Summary</b>\n"
-            f"<b>Order #:</b> {order_info.order_number}\n"
-            f"<b>Total:</b> {format_price(order_info.total)}\n\n"
-            "<b>Items:</b>\n"
+            tr("ORDER_CONFIRMATION_HEADER") + "\n\n" +
+            tr("ORDER_CONFIRMATION_THANKS") + "\n\n" +
+            tr("ORDER_SUMMARY_TITLE") + "\n" +
+            tr("ORDER_NUMBER_LABEL").format(number=order_info.order_number) + "\n" +
+            tr("ORDER_TOTAL_LABEL").format(total=format_price(order_info.total)) + "\n\n" +
+            tr("ORDER_ITEMS_LABEL") + "\n" +
             f"{items_text}"
         )
 
@@ -413,8 +418,7 @@ class CartHandler:
         if not cart_response.success or not cart_response.cart_items:
             self._logger.info("🛒 CART is empty for User %s", user_id)
             await query.edit_message_text(
-                text="🛒 <b>Your Cart is Empty</b> 🛒\n\n"
-                "Add some delicious items from our menu!",
+                text=tr("CART_EMPTY_TITLE") + "\n\n" + tr("CART_EMPTY_MESSAGE"),
                 parse_mode="HTML",
                 reply_markup=self._get_back_to_menu_keyboard(),
             )
@@ -428,8 +432,8 @@ class CartHandler:
         ]
 
         cart_text = (
-            "🛒 <b>Your Cart</b> 🛒\n\n" + "\n".join(items_text) + "\n\n" +
-            f"<b>Total: {format_price(cart_response.cart_total)}</b>"
+            tr("CART_TITLE") + "\n\n" + "\n".join(items_text) + "\n\n" +
+            tr("CART_TOTAL").format(total=format_price(cart_response.cart_total))
         )
 
         await query.edit_message_text(
@@ -441,7 +445,7 @@ class CartHandler:
     def _get_back_to_menu_keyboard(self) -> InlineKeyboardMarkup:
         """Get a keyboard with a 'Back to Menu' button"""
         keyboard = [
-            [InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="menu_main")]
+            [InlineKeyboardButton(tr("BACK_MAIN_MENU"), callback_data="menu_main")]
         ]
         return InlineKeyboardMarkup(keyboard)
 
@@ -470,7 +474,7 @@ class CartHandler:
             if clear_response.success:
                 self._logger.info("✅ CART CLEARED for User %s", user_id)
                 await query.edit_message_text(
-                    "🗑️ Your cart has been cleared.",
+                    tr("CART_CLEARED"),
                     reply_markup=self._get_back_to_menu_keyboard(),
                 )
             else:
@@ -480,13 +484,13 @@ class CartHandler:
                     clear_response.error_message,
                 )
                 await query.edit_message_text(
-                    f"❌ Could not clear cart: {clear_response.error_message}",
+                    tr("CART_CLEAR_FAILED").format(error=clear_response.error_message),
                     reply_markup=get_cart_keyboard(),
                 )
 
         except BusinessLogicError as e:
             await query.edit_message_text(
-                f"❌ Error clearing cart: {e}",
+                tr("CART_CLEAR_ERROR").format(error=e),
                 reply_markup=self._get_back_to_menu_keyboard(),
             )
         except Exception as e:
@@ -497,7 +501,7 @@ class CartHandler:
                 exc_info=True,
             )
             await query.edit_message_text(
-                "❌ An unexpected error occurred. Please try again.",
+                tr("UNEXPECTED_ERROR"),
                 reply_markup=self._get_back_to_menu_keyboard(),
             )
 

@@ -5,30 +5,29 @@ Menu keyboards for the Samna Salta bot
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from src.infrastructure.utilities.helpers import is_hilbeh_available
+from src.infrastructure.utilities.i18n import tr
 
 
-def get_main_menu_keyboard():
-    """Get main menu keyboard"""
+def get_main_menu_keyboard(lang: str | None = None):
+    """Get main menu keyboard (translated)."""
     keyboard = [
         [
-            InlineKeyboardButton("🍞 Kubaneh", callback_data="menu_kubaneh"),
-            InlineKeyboardButton("🧈 Samneh", callback_data="menu_samneh"),
+            InlineKeyboardButton(tr("BUTTON_KUBANEH", lang), callback_data="menu_kubaneh"),
+            InlineKeyboardButton(tr("BUTTON_SAMNEH", lang), callback_data="menu_samneh"),
         ],
         [
-            InlineKeyboardButton("🌶️ Red Bisbas", callback_data="menu_red_bisbas"),
-            InlineKeyboardButton(
-                "🥘 Hawaij soup spice", callback_data="menu_hawaij_soup"
-            ),
+            InlineKeyboardButton(tr("BUTTON_RED_BISBAS", lang), callback_data="menu_red_bisbas"),
+            InlineKeyboardButton(tr("BUTTON_HAWAIIJ_SOUP", lang), callback_data="menu_hawaij_soup"),
         ],
         [
-            InlineKeyboardButton(
-                "☕ Hawaij coffee spice", callback_data="menu_hawaij_coffee"
-            ),
-            InlineKeyboardButton("☕ White coffee", callback_data="menu_white_coffee"),
+            InlineKeyboardButton(tr("BUTTON_HAWAIIJ_COFFEE", lang), callback_data="menu_hawaij_coffee"),
+            InlineKeyboardButton(tr("BUTTON_WHITE_COFFEE", lang), callback_data="menu_white_coffee"),
         ],
-        [InlineKeyboardButton("🌿 Hilbeh", callback_data="menu_hilbeh")],
-        [InlineKeyboardButton("🛒 View cart / Finish order", callback_data="cart_view")],
+        [InlineKeyboardButton(tr("BUTTON_HILBEH", lang), callback_data="menu_hilbeh")],
+        [InlineKeyboardButton(tr("BUTTON_VIEW_CART", lang), callback_data="cart_view")],
     ]
+
+    keyboard.append([InlineKeyboardButton(tr("BACK_MAIN_MENU"), callback_data="menu_main")])
 
     return InlineKeyboardMarkup(keyboard)
 
@@ -37,14 +36,14 @@ def get_kubaneh_menu_keyboard():
     """Get Kubaneh sub-menu keyboard"""
     keyboard = [
         [
-            InlineKeyboardButton("Classic", callback_data="kubaneh_classic"),
-            InlineKeyboardButton("Seeded", callback_data="kubaneh_seeded"),
+            InlineKeyboardButton(tr("KUBANEH_CLASSIC"), callback_data="kubaneh_classic"),
+            InlineKeyboardButton(tr("KUBANEH_SEEDED"), callback_data="kubaneh_seeded"),
         ],
         [
-            InlineKeyboardButton("Herb", callback_data="kubaneh_herb"),
-            InlineKeyboardButton("Aromatic", callback_data="kubaneh_aromatic"),
+            InlineKeyboardButton(tr("KUBANEH_HERB"), callback_data="kubaneh_herb"),
+            InlineKeyboardButton(tr("KUBANEH_AROMATIC"), callback_data="kubaneh_aromatic"),
         ],
-        [InlineKeyboardButton("⬅️ Back to main menu", callback_data="menu_main")],
+        [InlineKeyboardButton(tr("BACK_MAIN_MENU"), callback_data="menu_main")],
     ]
 
     return InlineKeyboardMarkup(keyboard)
@@ -55,13 +54,13 @@ def get_kubaneh_oil_keyboard(kubaneh_type: str):
     keyboard = [
         [
             InlineKeyboardButton(
-                "Olive oil", callback_data=f"kubaneh_{kubaneh_type}_olive_oil"
+                tr("OIL_OLIVE"), callback_data=f"kubaneh_{kubaneh_type}_olive_oil"
             ),
             InlineKeyboardButton(
-                "Samneh", callback_data=f"kubaneh_{kubaneh_type}_samneh"
+                tr("OIL_SAMNEH"), callback_data=f"kubaneh_{kubaneh_type}_samneh"
             ),
         ],
-        [InlineKeyboardButton("⬅️ Back to Kubaneh menu", callback_data="menu_kubaneh")],
+        [InlineKeyboardButton(tr("BACK_MAIN_MENU"), callback_data="menu_kubaneh")],
     ]
 
     return InlineKeyboardMarkup(keyboard)
@@ -71,10 +70,10 @@ def get_samneh_menu_keyboard():
     """Get Samneh sub-menu keyboard"""
     keyboard = [
         [
-            InlineKeyboardButton("Smoked", callback_data="samneh_smoked"),
-            InlineKeyboardButton("Not smoked", callback_data="samneh_not_smoked"),
+            InlineKeyboardButton(tr("SAMNEH_SMOKED"), callback_data="samneh_smoked"),
+            InlineKeyboardButton(tr("SAMNEH_NOT_SMOKED"), callback_data="samneh_not_smoked"),
         ],
-        [InlineKeyboardButton("⬅️ Back to main menu", callback_data="menu_main")],
+        [InlineKeyboardButton(tr("BACK_MAIN_MENU"), callback_data="menu_main")],
     ]
 
     return InlineKeyboardMarkup(keyboard)
@@ -84,10 +83,10 @@ def get_samneh_size_keyboard(smoking_type: str):
     """Get Samneh size selection keyboard"""
     keyboard = [
         [
-            InlineKeyboardButton("Small", callback_data=f"samneh_{smoking_type}_small"),
-            InlineKeyboardButton("Large", callback_data=f"samneh_{smoking_type}_large"),
+            InlineKeyboardButton(tr("SIZE_SMALL"), callback_data=f"samneh_{smoking_type}_small"),
+            InlineKeyboardButton(tr("SIZE_LARGE"), callback_data=f"samneh_{smoking_type}_large"),
         ],
-        [InlineKeyboardButton("⬅️ Back to Samneh menu", callback_data="menu_samneh")],
+        [InlineKeyboardButton(tr("BACK_MAIN_MENU"), callback_data="menu_samneh")],
     ]
 
     return InlineKeyboardMarkup(keyboard)
@@ -97,10 +96,10 @@ def get_red_bisbas_menu_keyboard():
     """Get Red Bisbas menu keyboard"""
     keyboard = [
         [
-            InlineKeyboardButton("Small", callback_data="red_bisbas_small"),
-            InlineKeyboardButton("Large", callback_data="red_bisbas_large"),
+            InlineKeyboardButton(tr("SIZE_SMALL"), callback_data="red_bisbas_small"),
+            InlineKeyboardButton(tr("SIZE_LARGE"), callback_data="red_bisbas_large"),
         ],
-        [InlineKeyboardButton("⬅️ Back to main menu", callback_data="menu_main")],
+        [InlineKeyboardButton(tr("BACK_MAIN_MENU"), callback_data="menu_main")],
     ]
 
     return InlineKeyboardMarkup(keyboard)
@@ -114,7 +113,7 @@ def get_direct_add_keyboard(product_name: str, include_info: bool = True):
     """
 
     add_button = InlineKeyboardButton(
-        "➕ Add to cart",
+        tr("ADD_TO_CART"),
         callback_data=f"add_{product_name.lower().replace(' ', '_')}",
     )
 
@@ -122,12 +121,12 @@ def get_direct_add_keyboard(product_name: str, include_info: bool = True):
 
     if include_info:
         info_button = InlineKeyboardButton(
-            "ℹ️ Info",
+            tr("INFO"),
             callback_data=f"info_{product_name.lower().replace(' ', '_')}",
         )
         rows.append([info_button])
 
-    rows.append([InlineKeyboardButton("⬅️ Back to main menu", callback_data="menu_main")])
+    rows.append([InlineKeyboardButton(tr("BACK_MAIN_MENU"), callback_data="menu_main")])
 
     return InlineKeyboardMarkup(rows)
 
@@ -136,20 +135,20 @@ def get_hilbeh_menu_keyboard():
     """Get Hilbeh menu keyboard (with availability check)"""
     if is_hilbeh_available():
         keyboard = [
-            [InlineKeyboardButton("➕ Add to cart", callback_data="add_hilbeh")],
-            [InlineKeyboardButton("ℹ️ Info", callback_data="info_hilbeh")],
-            [InlineKeyboardButton("⬅️ Back to main menu", callback_data="menu_main")],
+            [InlineKeyboardButton(tr("ADD_TO_CART"), callback_data="add_hilbeh")],
+            [InlineKeyboardButton(tr("INFO"), callback_data="info_hilbeh")],
+            [InlineKeyboardButton(tr("BACK_MAIN_MENU"), callback_data="menu_main")],
         ]
     else:
         keyboard = [
             [
                 InlineKeyboardButton(
-                    "❌ Not available today (Wed-Fri only)",
+                    tr("HILBEH_UNAVAILABLE"),
                     callback_data="hilbeh_unavailable",
                 )
             ],
-            [InlineKeyboardButton("ℹ️ Info", callback_data="info_hilbeh")],
-            [InlineKeyboardButton("⬅️ Back to main menu", callback_data="menu_main")],
+            [InlineKeyboardButton(tr("INFO"), callback_data="info_hilbeh")],
+            [InlineKeyboardButton(tr("BACK_MAIN_MENU"), callback_data="menu_main")],
         ]
 
     return InlineKeyboardMarkup(keyboard)
@@ -158,10 +157,10 @@ def get_hilbeh_menu_keyboard():
 def get_delivery_method_keyboard():
     """Get delivery method selection keyboard"""
     keyboard = [
-        [InlineKeyboardButton("🚶 Self-pickup", callback_data="delivery_pickup")],
+        [InlineKeyboardButton(tr("DELIVERY_PICKUP"), callback_data="delivery_pickup")],
         [
             InlineKeyboardButton(
-                "🚚 Delivery (+5 ILS)", callback_data="delivery_delivery"
+                tr("DELIVERY_DELIVERY"), callback_data="delivery_delivery"
             )
         ],
     ]
@@ -172,8 +171,8 @@ def get_delivery_method_keyboard():
 def get_cart_keyboard():
     """Get cart view keyboard"""
     keyboard = [
-        [InlineKeyboardButton("📝 Send order", callback_data="cart_send_order")],
-        [InlineKeyboardButton("⬅️ Back to menu", callback_data="menu_main")],
+        [InlineKeyboardButton(tr("SEND_ORDER"), callback_data="cart_send_order")],
+        [InlineKeyboardButton(tr("BACK_MAIN_MENU"), callback_data="menu_main")],
     ]
 
     return InlineKeyboardMarkup(keyboard)
@@ -184,12 +183,12 @@ def get_order_confirmation_keyboard():
     keyboard = [
         [
             InlineKeyboardButton(
-                "👍 Yes, details are correct", callback_data="order_confirm_yes"
+                tr("ORDER_CONFIRM_YES"), callback_data="order_confirm_yes"
             )
         ],
         [
             InlineKeyboardButton(
-                "✏️ No, I want to edit", callback_data="order_confirm_no"
+                tr("ORDER_CONFIRM_NO"), callback_data="order_confirm_no"
             )
         ],
     ]

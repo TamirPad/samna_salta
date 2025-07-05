@@ -10,6 +10,7 @@ from telegram import Bot
 from telegram.error import TelegramError
 
 from src.application.dtos.order_dtos import OrderInfo, OrderItemInfo
+from src.infrastructure.utilities.i18n import tr
 
 STATUS_EMOJI = {
     "pending": "⏳",
@@ -40,16 +41,16 @@ def format_order_details(order_info: OrderInfo, header: str) -> str:
     message = f"""
 {header}
 
-📋 <b>Order Details:</b>
-🔢 Order #: <code>{order_info.order_number}</code>
-{status_emoji} Status: <b>{order_info.status.title()}</b>
-📅 Date: {(order_info.created_at or __import__('datetime').datetime.utcnow()).strftime('%d/%m/%Y %H:%M')}
+{tr("ORDER_DETAILS_HEADER")}
+{tr("ORDER_NUMBER_FIELD")} <code>{order_info.order_number}</code>
+{status_emoji} {tr("STATUS_FIELD")} <b>{order_info.status.title()}</b>
+{tr("DATE_FIELD")} {(order_info.created_at or __import__('datetime').datetime.utcnow()).strftime('%d/%m/%Y %H:%M')}
 
-👤 <b>Customer Info:</b>
-👨‍💼 Name: <b>{order_info.customer_name}</b>
-📞 Phone: <code>{order_info.customer_phone}</code>
+{tr("CUSTOMER_INFO_HEADER")}
+{tr("NAME_FIELD")} <b>{order_info.customer_name}</b>
+{tr("PHONE_FIELD")} <code>{order_info.customer_phone}</code>
 
-🛒 <b>Items:</b>"""
+{tr("ITEMS_HEADER")}"""
 
     for item in order_info.items:
         options_text = format_item_options(item)
@@ -58,14 +59,16 @@ def format_order_details(order_info: OrderInfo, header: str) -> str:
 
     message += f"""
 
-{delivery_emoji} <b>Delivery:</b> {order_info.delivery_method.title()}"""
+{delivery_emoji} {tr("DELIVERY_FIELD")} {order_info.delivery_method.title()}"""
 
     if order_info.delivery_address:
-        message += f"\n📍 Address: {order_info.delivery_address}"
+        address_field = tr("ADDRESS_FIELD")
+        message += f"\n{address_field} {order_info.delivery_address}"
 
+    total_field = tr("TOTAL_FIELD")
     message += f"""
 
-💳 <b>Total:</b> ₪{order_info.total:.2f}
+{total_field} ₪{order_info.total:.2f}
 """
     return message
 
