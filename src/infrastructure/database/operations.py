@@ -63,32 +63,34 @@ class DatabaseManager:
         """Create database engine with environment-specific settings"""
         database_url = self.config.database_url
         
-        # Configure engine parameters based on environment
-        if self.config.environment == "production":
-            pool_size = DatabaseSettings.PRODUCTION_POOL_SIZE
-            max_overflow = DatabaseSettings.PRODUCTION_MAX_OVERFLOW
-        else:
-            pool_size = DatabaseSettings.DEVELOPMENT_POOL_SIZE
-            max_overflow = DatabaseSettings.DEVELOPMENT_MAX_OVERFLOW
-
-        # Engine configuration
-        engine_kwargs = {
-            "pool_size": pool_size,
-            "max_overflow": max_overflow,
+        # Base engine configuration
+        engine_kwargs: dict[str, Any] = {
             "pool_recycle": DatabaseSettings.POOL_RECYCLE_SECONDS,
             "pool_pre_ping": True,
             "echo": self.config.environment == "development",
         }
 
-        # SQLite-specific configurations
+        # SQLite-specific: use StaticPool and omit pool_size / max_overflow which are invalid
         if database_url.startswith("sqlite"):
-            engine_kwargs.update({
-                "poolclass": StaticPool,
-                "connect_args": {
-                    "check_same_thread": False,
-                    "timeout": RetrySettings.CONNECTION_TIMEOUT_SECONDS
-                },
-            })
+            engine_kwargs.update(
+                {
+                    "poolclass": StaticPool,
+                    "connect_args": {
+                        "check_same_thread": False,
+                        "timeout": RetrySettings.CONNECTION_TIMEOUT_SECONDS,
+                    },
+                }
+            )
+        else:
+            # Non-SQLite: configure pool sizing
+            if self.config.environment == "production":
+                pool_size = DatabaseSettings.PRODUCTION_POOL_SIZE
+                max_overflow = DatabaseSettings.PRODUCTION_MAX_OVERFLOW
+            else:
+                pool_size = DatabaseSettings.DEVELOPMENT_POOL_SIZE
+                max_overflow = DatabaseSettings.DEVELOPMENT_MAX_OVERFLOW
+
+            engine_kwargs.update({"pool_size": pool_size, "max_overflow": max_overflow})
 
         engine = create_engine(database_url, **engine_kwargs)
 
@@ -758,3 +760,8 @@ def get_all_orders() -> list[Order]:
 def get_session():  # pragma: no cover
     """Return a SQLAlchemy Session (compat wrapper)."""
     return get_db_session()
+
+
+def get_engine():  # pragma: no cover
+    """Return the global SQLAlchemy Engine (compat wrapper)."""
+    return get_db_manager().get_engine()
