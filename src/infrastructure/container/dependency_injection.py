@@ -120,6 +120,7 @@ class DependencyContainer:
         self._instances["cart_management_use_case"] = CartManagementUseCase(
             cart_repository=self.get_cart_repository(),
             product_repository=self.get_product_repository(),
+            customer_repository=self.get_customer_repository(),
         )
 
         # Order Creation Use Case

@@ -40,7 +40,7 @@
   "VIEW_CART": "🛒 צפה בעגלה",
   "CONTINUE_SHOPPING": "🍞 המשך קניות",
   
-  "KUBANEH_DESC": "🍞 <b>כובנה</b>\n\nבחרו את סוג הכובנה המועדף:\n\n• <b>קלאסית</b>\n• <b>עם זרעים</b>\n• <b>עם עשבי תיבול</b>\n• <b>ארומטית</b>\n\n<i>מחיר: 25 ₪ ליחידה</i>",
+  "KUBANEH_DESC": "🍞 <b>קובנה</b>\n\nבחרו את סוג הקובנה המועדף:\n\n• <b>קלאסית</b>\n• <b>עם זרעים</b>\n• <b>עם עשבי תיבול</b>\n• <b>ארומטית</b>\n\n<i>מחיר: 25 ₪ ליחידה</i>",
   "SAMNEH_DESC": "🧈 <b>סמנה</b>\n\nבחרו סוג סמנה:\n\n• <b>מעושנת</b>\n• <b>לא מעושנת</b>\n\n<i>מחיר: 15 ₪</i>",
   "RED_BISBAS_DESC": "🌶️ <b>בסבס אדום</b>\n\nרוטב תימני מסורתי חריף\n\n<i>מחיר: 12 ₪</i>",
   "HILBEH_DESC_AVAILABLE": "🌿 <b>חילבה</b>\n\nממרח חילבה תימני מסורתי\n\nזמין היום! ✅\n\n<i>מחיר: 18 ₪</i>",
@@ -133,10 +133,10 @@
   "CUSTOMER_PICKUP_LOCATION": "📍 מיקום: [כתובת החנות שלך]",
   "CUSTOMER_PICKUP_HOURS": "⏰ שעות: [שעות החנות שלך]",
   
-  "PRODUCT_KUBANEH_CLASSIC": "כובנה קלאסית - לחם תימני מסורתי ועשיר",
-  "PRODUCT_KUBANEH_SEEDED": "כובנה עם זרעים - לחם תימני עם זרעי שומשום וכמון",
-  "PRODUCT_KUBANEH_HERB": "כובנה עם עשבי תיבול - לחם תימני עם עשבי תיבול ארומטיים",
-  "PRODUCT_KUBANEH_AROMATIC": "כובנה ארומטית - לחם תימני עם תבלינים מיוחדים",
+  "PRODUCT_KUBANEH_CLASSIC": "קובנה קלאסית - לחם תימני מסורתי ועשיר",
+  "PRODUCT_KUBANEH_SEEDED": "קובנה עם זרעים - לחם תימני עם זרעי שומשום וכמון",
+  "PRODUCT_KUBANEH_HERB": "קובנה עם עשבי תיבול - לחם תימני עם עשבי תיבול ארומטיים",
+  "PRODUCT_KUBANEH_AROMATIC": "קובנה ארומטית - לחם תימני עם תבלינים מיוחדים",
   
   "PRODUCT_SAMNEH_SMOKED": "סמנה מעושנת - חמאה מובהרת עם טעם מעושן עשיר",
   "PRODUCT_SAMNEH_NOT_SMOKED": "סמנה לא מעושנת - חמאה מובהרת טהורה וטבעית",
@@ -171,7 +171,7 @@
   "ADDRESS_FIELD": "📍 כתובת:",
   "TOTAL_FIELD": "💳 <b>סה\"כ:</b>",
   
-  "KUBANEH_DISPLAY_NAME": "כובנה ({type})",
+  "KUBANEH_DISPLAY_NAME": "קובנה ({type})",
   "SAMNEH_DISPLAY_NAME": "סמנה ({type})",
   "RED_BISBAS_DISPLAY_NAME": "בסבס אדום ({size})",
   
@@ -231,5 +231,21 @@
   "CONFIRM_CLEAR_CART": "🗑️ <b>נקה עגלה</b> 🗑️\n\nהאם אתה בטוח שברצונך לנקות את העגלה?",
   "CLEAR_CART_YES": "✅ כן, נקה עגלה",
   "CLEAR_CART_NO": "❌ לא, חזור לעגלה",
-  "CART_CLEARED_SUCCESS": "🗑️ <b>העגלה נוקתה בהצלחה</b> 🗑️"
+  "CART_CLEARED_SUCCESS": "🗑️ <b>העגלה נוקתה בהצלחה</b> 🗑️",
+  
+  "DELIVERY_ADDRESS_REQUIRED": "📍 <b>כתובת משלוח נדרשת</b> 📍\n\nכדי להמשיך עם המשלוח, אנא ספק את כתובת המשלוח המלאה:",
+  "DELIVERY_ADDRESS_CURRENT": "📍 <b>כתובת משלוח נוכחית:</b>\n{address}\n\nהאם תרצה להשתמש בכתובת זו או להזין כתובת חדשה?",
+  "USE_CURRENT_ADDRESS": "✅ השתמש בכתובת נוכחית",
+  "ENTER_NEW_ADDRESS": "📝 הזן כתובת חדשה",
+  "DELIVERY_ADDRESS_PROMPT": "📍 <b>הזן כתובת משלוח</b> 📍\n\nאנא ספק את כתובת המשלוח המלאה (רחוב, מספר בית, עיר):",
+  "DELIVERY_ADDRESS_UPDATED": "✅ <b>כתובת המשלוח עודכנה</b> ✅\n\nכתובת חדשה: {address}",
+  "DELIVERY_ADDRESS_SAVED_CART": "✅ <b>כתובת המשלוח נשמרה לעגלה זו</b> ✅",
+  "BACK_TO_CART": "🛒 חזרה לעגלה",
+  
+  "ORDER_PREVIEW_TITLE": "📋 <b>אישור הזמנה</b> 📋",
+  "ORDER_DELIVERY_METHOD_LABEL": "<b>שיטת משלוח</b>",
+  "DELIVERY_ADDRESS_LABEL": "<b>כתובת משלוח</b>",
+  "PICKUP_FREE": "איסוף עצמי (חינם)",
+  "DELIVERY_PAID": "משלוח (+5 ₪)",
+  "ORDER_PREVIEW_CONFIRM_PROMPT": "האם אתה בטוח שברצונך לשלוח את ההזמנה?"
 } 

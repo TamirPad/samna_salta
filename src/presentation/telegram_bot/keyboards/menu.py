@@ -219,3 +219,33 @@ def get_order_confirmation_keyboard():
     ]
 
     return InlineKeyboardMarkup(keyboard)
+
+
+def get_delivery_address_choice_keyboard():
+    """Get delivery address choice keyboard (use current or enter new)"""
+    keyboard = [
+        [InlineKeyboardButton(tr("USE_CURRENT_ADDRESS"), callback_data="delivery_address_use_current")],
+        [InlineKeyboardButton(tr("ENTER_NEW_ADDRESS"), callback_data="delivery_address_enter_new")],
+        [InlineKeyboardButton(tr("BACK_TO_CART"), callback_data="cart_view")],
+    ]
+
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_back_to_cart_keyboard():
+    """Get simple back to cart keyboard"""
+    keyboard = [
+        [InlineKeyboardButton(tr("BACK_TO_CART"), callback_data="cart_view")],
+    ]
+
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_delivery_address_required_keyboard():
+    """Get keyboard for when delivery address is required"""
+    keyboard = [
+        [InlineKeyboardButton(tr("ENTER_NEW_ADDRESS"), callback_data="delivery_address_enter_new")],
+        [InlineKeyboardButton(tr("BACK_TO_CART"), callback_data="cart_view")],
+    ]
+
+    return InlineKeyboardMarkup(keyboard)

@@ -189,5 +189,21 @@
   "CONFIRM_CLEAR_CART": "🗑️ <b>Clear Cart</b> 🗑️\n\nAre you sure you want to clear your cart?",
   "CLEAR_CART_YES": "✅ Yes, Clear Cart",
   "CLEAR_CART_NO": "❌ No, Back to Cart",
-  "CART_CLEARED_SUCCESS": "🗑️ <b>Cart Cleared Successfully</b> 🗑️"
+  "CART_CLEARED_SUCCESS": "🗑️ <b>Cart Cleared Successfully</b> 🗑️",
+  
+  "DELIVERY_ADDRESS_REQUIRED": "📍 <b>Delivery Address Required</b> 📍\n\nTo continue with delivery, please provide your full delivery address:",
+  "DELIVERY_ADDRESS_CURRENT": "📍 <b>Current delivery address:</b>\n{address}\n\nWould you like to use this address or enter a new one?",
+  "USE_CURRENT_ADDRESS": "✅ Use Current Address",
+  "ENTER_NEW_ADDRESS": "📝 Enter New Address",
+  "DELIVERY_ADDRESS_PROMPT": "📍 <b>Enter Delivery Address</b> 📍\n\nPlease provide your full delivery address (street, number, city):",
+  "DELIVERY_ADDRESS_UPDATED": "✅ <b>Delivery Address Updated</b> ✅\n\nNew address: {address}",
+  "DELIVERY_ADDRESS_SAVED_CART": "✅ <b>Delivery Address Saved for This Cart</b> ✅",
+  "BACK_TO_CART": "🛒 Back to Cart",
+  
+  "ORDER_PREVIEW_TITLE": "📋 <b>Order Confirmation</b> 📋",
+  "ORDER_DELIVERY_METHOD_LABEL": "<b>Delivery Method</b>",
+  "DELIVERY_ADDRESS_LABEL": "<b>Delivery Address</b>",
+  "PICKUP_FREE": "Pickup (Free)",
+  "DELIVERY_PAID": "Delivery (+5 ₪)",
+  "ORDER_PREVIEW_CONFIRM_PROMPT": "Are you sure you want to send this order?"
 } 

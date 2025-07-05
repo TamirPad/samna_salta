@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from src.application.dtos.order_dtos import OrderItemInfo
 from src.domain.repositories.cart_repository import CartRepository
+from src.domain.repositories.customer_repository import CustomerRepository
 from src.domain.repositories.product_repository import ProductRepository
 from src.domain.value_objects.product_id import ProductId
 from src.domain.value_objects.telegram_id import TelegramId
@@ -72,10 +73,11 @@ class CartManagementUseCase:
     """
 
     def __init__(
-        self, cart_repository: CartRepository, product_repository: ProductRepository
+        self, cart_repository: CartRepository, product_repository: ProductRepository, customer_repository: CustomerRepository
     ):
         self._cart_repository = cart_repository
         self._product_repository = product_repository
+        self._customer_repository = customer_repository
         self._logger = logging.getLogger(self.__class__.__name__)
 
     async def add_to_cart(self, request: AddToCartRequest) -> CartOperationResponse:
@@ -272,6 +274,61 @@ class CartManagementUseCase:
             return CartOperationResponse(
                 success=False, error_message="Failed to update delivery method"
             )
+
+    async def update_delivery_address(self, telegram_id: int, delivery_address: str) -> CartOperationResponse:
+        """Update delivery address for customer's cart"""
+        self._logger.info("📍 UPDATE DELIVERY ADDRESS USE CASE: User %s", telegram_id)
+
+        try:
+            telegram_id_vo = TelegramId(telegram_id)
+
+            # Validate delivery address
+            if not delivery_address or len(delivery_address.strip()) < 10:
+                raise ValueError("Delivery address must be at least 10 characters")
+
+            success = await self._cart_repository.update_delivery_info(
+                telegram_id_vo, "delivery", delivery_address.strip()
+            )
+
+            if not success:
+                self._logger.error("💥 UPDATE DELIVERY ADDRESS FAILED: Repository returned false")
+                return CartOperationResponse(
+                    success=False, error_message="Failed to update delivery address"
+                )
+
+            # Get updated cart summary
+            cart_summary = await self._get_cart_summary(telegram_id_vo)
+
+            self._logger.info("✅ DELIVERY ADDRESS UPDATED: User %s", telegram_id)
+
+            return CartOperationResponse(success=True, cart_summary=cart_summary)
+
+        except (ValueError, TypeError) as e:
+            self._logger.error("💥 UPDATE DELIVERY ADDRESS ERROR: %s", e, exc_info=True)
+            return CartOperationResponse(
+                success=False, error_message=str(e)
+            )
+
+    async def get_customer_delivery_address(self, telegram_id: int) -> Optional[str]:
+        """Get customer's delivery address from their profile"""
+        self._logger.info("📍 GET CUSTOMER DELIVERY ADDRESS: User %s", telegram_id)
+
+        try:
+            telegram_id_vo = TelegramId(telegram_id)
+            customer = await self._customer_repository.find_by_telegram_id(telegram_id_vo)
+
+            if not customer:
+                self._logger.warning("👤 CUSTOMER NOT FOUND: User %s", telegram_id)
+                return None
+
+            delivery_address = customer.delivery_address.value if customer.delivery_address else None
+            self._logger.info("📍 CUSTOMER ADDRESS: %s", "Found" if delivery_address else "None")
+            
+            return delivery_address
+
+        except (ValueError, TypeError) as e:
+            self._logger.error("💥 GET CUSTOMER ADDRESS ERROR: %s", e, exc_info=True)
+            return None
 
     async def _get_cart_summary(self, telegram_id: TelegramId) -> CartSummary:
         """Get cart summary from repository and calculate totals"""
