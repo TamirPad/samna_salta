@@ -443,3 +443,46 @@ class SQLAlchemyCartRepository(CartRepository):
         except Exception as e:
             self._logger.error("💥 UNEXPECTED ERROR updating delivery info: %s", e)
             raise
+
+    async def update_delivery_method(
+        self, telegram_id: TelegramId, delivery_method: str
+    ) -> bool:
+        """Update delivery method for cart"""
+        self._logger.info(
+            "🚚 UPDATE DELIVERY METHOD: User %s, Method %s",
+            telegram_id.value,
+            delivery_method,
+        )
+
+        try:
+            with managed_session() as session:
+                cart = (
+                    session.query(SQLCart)
+                    .filter(SQLCart.telegram_id == telegram_id.value)
+                    .first()
+                )
+
+                if not cart:
+                    # Create cart if it doesn't exist
+                    cart = SQLCart(
+                        telegram_id=telegram_id.value,
+                        items=[],
+                        delivery_method=delivery_method,
+                    )
+                    session.add(cart)
+                    self._logger.info("🆕 CART CREATED with delivery method")
+                else:
+                    cart.delivery_method = delivery_method
+                    self._logger.info("🔄 DELIVERY METHOD UPDATED")
+
+                session.commit()
+
+                self._logger.info("✅ DELIVERY METHOD UPDATE SUCCESS")
+                return True
+
+        except SQLAlchemyError as e:
+            self._logger.error("💥 DATABASE ERROR updating delivery method: %s", e)
+            raise
+        except Exception as e:
+            self._logger.error("💥 UNEXPECTED ERROR updating delivery method: %s", e)
+            raise

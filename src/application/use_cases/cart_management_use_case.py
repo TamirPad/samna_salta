@@ -241,6 +241,38 @@ class CartManagementUseCase:
                 success=False, error_message="Failed to clear cart"
             )
 
+    async def update_delivery_method(self, telegram_id: int, delivery_method: str) -> CartOperationResponse:
+        """Update delivery method for customer's cart"""
+        self._logger.info("🚚 UPDATE DELIVERY METHOD USE CASE: User %s, Method: %s", telegram_id, delivery_method)
+
+        try:
+            telegram_id_vo = TelegramId(telegram_id)
+
+            # Validate delivery method
+            if delivery_method not in ["pickup", "delivery"]:
+                raise ValueError("Invalid delivery method")
+
+            success = await self._cart_repository.update_delivery_method(telegram_id_vo, delivery_method)
+
+            if not success:
+                self._logger.error("💥 UPDATE DELIVERY METHOD FAILED: Repository returned false")
+                return CartOperationResponse(
+                    success=False, error_message="Failed to update delivery method"
+                )
+
+            # Get updated cart summary
+            cart_summary = await self._get_cart_summary(telegram_id_vo)
+
+            self._logger.info("✅ DELIVERY METHOD UPDATED: User %s to %s", telegram_id, delivery_method)
+
+            return CartOperationResponse(success=True, cart_summary=cart_summary)
+
+        except (ValueError, TypeError) as e:
+            self._logger.error("💥 UPDATE DELIVERY METHOD ERROR: %s", e, exc_info=True)
+            return CartOperationResponse(
+                success=False, error_message="Failed to update delivery method"
+            )
+
     async def _get_cart_summary(self, telegram_id: TelegramId) -> CartSummary:
         """Get cart summary from repository and calculate totals"""
         self._logger.info("📊 CALCULATING CART SUMMARY: User %s", telegram_id.value)

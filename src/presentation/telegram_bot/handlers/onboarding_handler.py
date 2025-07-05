@@ -82,6 +82,7 @@ class OnboardingHandler:
                 await update.message.reply_text(
                     welcome_message,
                     reply_markup=get_main_menu_keyboard(),
+                    parse_mode="HTML"
                 )
                 return END
 
@@ -89,7 +90,8 @@ class OnboardingHandler:
             await update.message.reply_text(
                 tr("WELCOME_NEW_USER") + "\n\n" +
                 tr("WELCOME_HELP_MESSAGE") + "\n\n" +
-                tr("PLEASE_ENTER_NAME")
+                tr("PLEASE_ENTER_NAME"),
+                parse_mode="HTML"
             )
             return ONBOARDING_NAME
 
@@ -114,7 +116,8 @@ class OnboardingHandler:
             # Basic validation
             if len(name) < 2:
                 await update.message.reply_text(
-                    tr("NAME_TOO_SHORT")
+                    tr("NAME_TOO_SHORT"),
+                    parse_mode="HTML"
                 )
                 return ONBOARDING_NAME
 
@@ -123,7 +126,8 @@ class OnboardingHandler:
 
             await update.message.reply_text(
                 tr("NICE_TO_MEET").format(name=name) + "\n\n" +
-                tr("PLEASE_SHARE_PHONE")
+                tr("PLEASE_SHARE_PHONE"),
+                parse_mode="HTML"
             )
             return ONBOARDING_PHONE
 
@@ -160,7 +164,8 @@ class OnboardingHandler:
             if not response.success:
                 # Show validation error to user
                 await update.message.reply_text(
-                    tr("VALIDATION_ERROR").format(error=response.error_message) + "\n\n" + tr("PLEASE_TRY_AGAIN")
+                    tr("VALIDATION_ERROR").format(error=response.error_message) + "\n\n" + tr("PLEASE_TRY_AGAIN"),
+                    parse_mode="HTML"
                 )
                 next_state = ONBOARDING_PHONE
             else:
@@ -174,6 +179,7 @@ class OnboardingHandler:
                         tr("INFO_UPDATED") + "\n\n" +
                         tr("WHAT_TO_ORDER_TODAY"),
                         reply_markup=get_main_menu_keyboard(),
+                        parse_mode="HTML"
                     )
                     next_state = END
                 else:
@@ -182,6 +188,7 @@ class OnboardingHandler:
                         tr("HOW_RECEIVE_ORDER") + "\n\n" +
                         tr("CHOOSE_DELIVERY_METHOD"),
                         reply_markup=get_delivery_method_keyboard(),
+                        parse_mode="HTML"
                     )
                     next_state = ONBOARDING_DELIVERY_METHOD
 
@@ -219,13 +226,15 @@ class OnboardingHandler:
                     tr("PICKUP_CHOSEN") + "\n\n" +
                     tr("WHAT_TO_ORDER"),
                     reply_markup=get_main_menu_keyboard(),
+                    parse_mode="HTML"
                 )
                 return END
 
             # For delivery, ask for address
             await query.edit_message_text(
                 tr("DELIVERY_CHOSEN") + "\n\n" +
-                tr("PROVIDE_DELIVERY_ADDRESS")
+                tr("PROVIDE_DELIVERY_ADDRESS"),
+                parse_mode="HTML"
             )
             return ONBOARDING_DELIVERY_ADDRESS
 
@@ -243,38 +252,23 @@ class OnboardingHandler:
         try:
             address = update.message.text.strip()
 
-            # Business rule validation
+            # Basic validation
             if len(address) < 10:
                 await update.message.reply_text(
-                    tr("ADDRESS_TOO_SHORT")
+                    tr("ADDRESS_TOO_SHORT"),
+                    parse_mode="HTML"
                 )
                 return ONBOARDING_DELIVERY_ADDRESS
 
-            # Store address in context
+            # Store delivery address in context
             context.user_data["delivery_address"] = address
 
-            # Update customer using use case
-            if "customer" not in context.user_data:
-                await self._send_error_message(
-                    update, tr("SESSION_EXPIRED")
-                )
-                return END
-            customer = context.user_data["customer"]
-            updated_request = CustomerRegistrationRequest(
-                telegram_id=customer.telegram_id.value,
-                full_name=customer.full_name.value,
-                phone_number=customer.phone_number.value,
-                delivery_address=address,
-            )
-            await self._customer_registration_use_case.update_customer_details(
-                updated_request
-            )
-
-            # Final confirmation
+            # Complete onboarding
             await update.message.reply_text(
                 tr("DELIVERY_ADDRESS_SAVED") + "\n\n" +
                 tr("WHAT_TO_ORDER"),
                 reply_markup=get_main_menu_keyboard(),
+                parse_mode="HTML"
             )
             return END
 

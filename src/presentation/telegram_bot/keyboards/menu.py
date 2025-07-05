@@ -171,8 +171,33 @@ def get_delivery_method_keyboard():
 def get_cart_keyboard():
     """Get cart view keyboard"""
     keyboard = [
+        [InlineKeyboardButton(tr("CHANGE_DELIVERY"), callback_data="cart_change_delivery")],
         [InlineKeyboardButton(tr("SEND_ORDER"), callback_data="cart_send_order")],
-        [InlineKeyboardButton(tr("BACK_MAIN_MENU"), callback_data="menu_main")],
+        [
+            InlineKeyboardButton(tr("CLEAR_CART"), callback_data="cart_clear_confirm"),
+            InlineKeyboardButton(tr("BACK_MAIN_MENU"), callback_data="menu_main"),
+        ],
+    ]
+
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_cart_delivery_method_keyboard():
+    """Get delivery method selection keyboard for cart"""
+    keyboard = [
+        [InlineKeyboardButton(tr("DELIVERY_PICKUP"), callback_data="cart_delivery_pickup")],
+        [InlineKeyboardButton(tr("DELIVERY_DELIVERY"), callback_data="cart_delivery_delivery")],
+        [InlineKeyboardButton(tr("BACK_MAIN_MENU"), callback_data="cart_view")],
+    ]
+
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_clear_cart_confirmation_keyboard():
+    """Get clear cart confirmation keyboard"""
+    keyboard = [
+        [InlineKeyboardButton(tr("CLEAR_CART_YES"), callback_data="cart_clear_yes")],
+        [InlineKeyboardButton(tr("CLEAR_CART_NO"), callback_data="cart_view")],
     ]
 
     return InlineKeyboardMarkup(keyboard)

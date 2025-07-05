@@ -43,6 +43,10 @@ class CartRepository(ABC):
         """Clear cart for user"""
 
     @abstractmethod
+    async def update_delivery_method(self, telegram_id: TelegramId, delivery_method: str) -> bool:
+        """Update delivery method for cart"""
+
+    @abstractmethod
     async def get_or_create_cart(
         self, telegram_id: TelegramId
     ) -> Optional[Dict[str, Any]]:

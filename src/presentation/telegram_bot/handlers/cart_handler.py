@@ -21,6 +21,8 @@ from src.infrastructure.utilities.helpers import format_price, translate_product
 from src.presentation.telegram_bot.keyboards.menu import (
     get_cart_keyboard,
     get_main_menu_keyboard,
+    get_cart_delivery_method_keyboard,
+    get_clear_cart_confirmation_keyboard,
 )
 from src.infrastructure.utilities.i18n import tr
 
@@ -56,7 +58,8 @@ class CartHandler:
                     "❌ INVALID CALLBACK: Could not parse %s", callback_data
                 )
                 await query.edit_message_text(
-                    tr("INVALID_PRODUCT_SELECTION")
+                    tr("INVALID_PRODUCT_SELECTION"),
+                    parse_mode="HTML"
                 )
                 return
 
@@ -106,6 +109,7 @@ class CartHandler:
                         item=product_info["display_name"],
                         error=response.error_message,
                     ),
+                    parse_mode="HTML",
                     reply_markup=self._get_back_to_menu_keyboard(),
                 )
 
@@ -119,6 +123,7 @@ class CartHandler:
             )
             await query.edit_message_text(
                 tr("ADD_ERROR"),
+                parse_mode="HTML",
                 reply_markup=self._get_back_to_menu_keyboard(),
             )
 
@@ -265,6 +270,7 @@ class CartHandler:
             if not cart_response.success:
                 await query.edit_message_text(
                     text=cart_response.error_message,
+                    parse_mode="HTML",
                     reply_markup=self._get_back_to_menu_keyboard(),
                 )
                 return
@@ -332,6 +338,7 @@ class CartHandler:
                 )
                 await query.edit_message_text(
                     tr("CART_EMPTY_ORDER"),
+                    parse_mode="HTML",
                     reply_markup=self._get_back_to_menu_keyboard(),
                 )
                 return
@@ -376,6 +383,7 @@ class CartHandler:
                 )
                 await query.edit_message_text(
                     tr("ORDER_SEND_PROBLEM"),
+                    parse_mode="HTML",
                     reply_markup=get_cart_keyboard(),
                 )
 
@@ -385,6 +393,7 @@ class CartHandler:
             )
             await query.edit_message_text(
                 tr("ORDER_CREATE_ERROR").format(error=e),
+                parse_mode="HTML",
                 reply_markup=get_cart_keyboard(),
             )
         except Exception as e:
@@ -396,6 +405,7 @@ class CartHandler:
             )
             await query.edit_message_text(
                 tr("UNEXPECTED_ERROR"),
+                parse_mode="HTML",
                 reply_markup=self._get_back_to_menu_keyboard(),
             )
 
@@ -486,7 +496,8 @@ class CartHandler:
             if clear_response.success:
                 self._logger.info("✅ CART CLEARED for User %s", user_id)
                 await query.edit_message_text(
-                    tr("CART_CLEARED"),
+                    tr("CART_CLEARED_SUCCESS"),
+                    parse_mode="HTML",
                     reply_markup=self._get_back_to_menu_keyboard(),
                 )
             else:
@@ -514,8 +525,115 @@ class CartHandler:
             )
             await query.edit_message_text(
                 tr("UNEXPECTED_ERROR"),
+                parse_mode="HTML",
                 reply_markup=self._get_back_to_menu_keyboard(),
             )
+
+    @error_handler("clear_cart_confirm")
+    async def handle_clear_cart_confirm(
+        self, update: Update, _: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        """Handle clear cart confirmation prompt"""
+        query = update.callback_query
+        await query.answer()
+
+        self._logger.info("🗑️ CLEAR CART CONFIRM: User %s", query.from_user.id)
+
+        await query.edit_message_text(
+            tr("CONFIRM_CLEAR_CART"),
+            parse_mode="HTML",
+            reply_markup=get_clear_cart_confirmation_keyboard(),
+        )
+
+    @error_handler("change_delivery")
+    async def handle_change_delivery(
+        self, update: Update, _: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        """Handle delivery method change"""
+        query = update.callback_query
+        await query.answer()
+
+        self._logger.info("🚚 CHANGE DELIVERY: User %s", query.from_user.id)
+
+        await query.edit_message_text(
+            tr("DELIVERY_METHOD_TITLE") + "\n\n" + tr("DELIVERY_METHOD_PROMPT"),
+            parse_mode="HTML",
+            reply_markup=get_cart_delivery_method_keyboard(),
+        )
+
+    @error_handler("delivery_method_update")
+    async def handle_delivery_method_update(
+        self, update: Update, _: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        """Handle delivery method update"""
+        query = update.callback_query
+        await query.answer()
+
+        user_id = query.from_user.id
+        callback_data = query.data
+
+        self._logger.info("🚚 DELIVERY UPDATE: User %s, Method: %s", user_id, callback_data)
+
+        try:
+            # Parse delivery method from callback data
+            if callback_data == "cart_delivery_pickup":
+                delivery_method = "pickup"
+            elif callback_data == "cart_delivery_delivery":
+                delivery_method = "delivery"
+            else:
+                await query.edit_message_text(
+                    tr("DELIVERY_UPDATE_ERROR").format(error="Invalid delivery method"),
+                    reply_markup=get_cart_keyboard(),
+                )
+                return
+
+            # Get cart management use case
+            cart_use_case = self._container.get_cart_management_use_case()
+
+            # Update delivery method in cart
+            update_response = await cart_use_case.update_delivery_method(user_id, delivery_method)
+
+            if update_response.success:
+                self._logger.info("✅ DELIVERY UPDATED for User %s to %s", user_id, delivery_method)
+                await query.edit_message_text(
+                    tr("DELIVERY_UPDATED"),
+                    reply_markup=self._get_back_to_cart_keyboard(),
+                )
+            else:
+                self._logger.error(
+                    "❌ DELIVERY UPDATE FAILED for User %s: %s",
+                    user_id,
+                    update_response.error_message,
+                )
+                await query.edit_message_text(
+                    tr("DELIVERY_UPDATE_ERROR").format(error=update_response.error_message),
+                    reply_markup=get_cart_keyboard(),
+                )
+
+        except BusinessLogicError as e:
+            await query.edit_message_text(
+                tr("DELIVERY_UPDATE_ERROR").format(error=e),
+                reply_markup=get_cart_keyboard(),
+            )
+        except Exception as e:
+            self._logger.critical(
+                "💥 UNEXPECTED DELIVERY UPDATE ERROR: User %s, Error: %s",
+                user_id,
+                e,
+                exc_info=True,
+            )
+            await query.edit_message_text(
+                tr("UNEXPECTED_ERROR"),
+                parse_mode="HTML",
+                reply_markup=self._get_back_to_menu_keyboard(),
+            )
+
+    def _get_back_to_cart_keyboard(self) -> InlineKeyboardMarkup:
+        """Get a keyboard with a 'Back to Cart' button"""
+        keyboard = [
+            [InlineKeyboardButton(tr("VIEW_CART"), callback_data="cart_view")]
+        ]
+        return InlineKeyboardMarkup(keyboard)
 
 
 def register_cart_handlers(application: Application):
@@ -527,7 +645,16 @@ def register_cart_handlers(application: Application):
         CallbackQueryHandler(cart_handler.handle_view_cart, pattern="^cart_view$")
     )
     application.add_handler(
-        CallbackQueryHandler(cart_handler.handle_clear_cart, pattern="^cart_clear$")
+        CallbackQueryHandler(cart_handler.handle_clear_cart_confirm, pattern="^cart_clear_confirm$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(cart_handler.handle_clear_cart, pattern="^cart_clear_yes$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(cart_handler.handle_change_delivery, pattern="^cart_change_delivery$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(cart_handler.handle_delivery_method_update, pattern="^cart_delivery_")
     )
     application.add_handler(
         CallbackQueryHandler(
@@ -550,4 +677,5 @@ def register_cart_handlers(application: Application):
     application.add_handler(
         CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^red_bisbas_")
     )
+
     logger.info("🛒 Cart handlers registered")

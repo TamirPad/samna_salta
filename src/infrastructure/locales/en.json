@@ -178,5 +178,16 @@
   "ADMIN_STATUS_UPDATE_ERROR": "❌ Error updating status: {error}",
   "ADMIN_ORDER_ID_PROMPT": "Please enter the Order ID to update (the small number inside the \"ID ...\" parentheses).\nFor example, if the line reads '#ORD-20250705... (ID 20) - John', you should send 20.",
   "ADMIN_ORDER_ID_NOT_FOUND": "❌ Order not found. Make sure to send the numeric ID shown in the list.",
-  "ADMIN_ORDER_ID_TRY_ANOTHER": "❌ Order not found. Try another ID."
+  "ADMIN_ORDER_ID_TRY_ANOTHER": "❌ Order not found. Try another ID.",
+  
+  "CLEAR_CART": "🗑️ Clear Cart",
+  "CHANGE_DELIVERY": "🚚 Change Delivery",
+  "DELIVERY_METHOD_TITLE": "🚚 <b>Choose Delivery Method</b> 🚚",
+  "DELIVERY_METHOD_PROMPT": "How would you like to receive your order?",
+  "DELIVERY_UPDATED": "✅ Delivery method updated",
+  "DELIVERY_UPDATE_ERROR": "❌ Error updating delivery method: {error}",
+  "CONFIRM_CLEAR_CART": "🗑️ <b>Clear Cart</b> 🗑️\n\nAre you sure you want to clear your cart?",
+  "CLEAR_CART_YES": "✅ Yes, Clear Cart",
+  "CLEAR_CART_NO": "❌ No, Back to Cart",
+  "CART_CLEARED_SUCCESS": "🗑️ <b>Cart Cleared Successfully</b> 🗑️"
 } 

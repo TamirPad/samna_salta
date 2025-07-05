@@ -82,7 +82,7 @@ class MenuHandler:
         """Show the main menu"""
         self._logger.debug("📋 SHOWING: Main menu")
         await query.edit_message_text(
-            tr("MENU_PROMPT"), reply_markup=get_main_menu_keyboard()
+            tr("MENU_PROMPT"), reply_markup=get_main_menu_keyboard(), parse_mode="HTML"
         )
 
     async def _show_kubaneh_menu(self, query: CallbackQuery):
@@ -90,7 +90,7 @@ class MenuHandler:
         self._logger.debug("📋 SHOWING: Kubaneh menu")
         text = tr("KUBANEH_DESC")
         await query.edit_message_text(
-            text, reply_markup=get_kubaneh_menu_keyboard(), parse_mode="Markdown"
+            text, reply_markup=get_kubaneh_menu_keyboard(), parse_mode="HTML"
         )
 
     async def _show_samneh_menu(self, query: CallbackQuery):
@@ -98,7 +98,7 @@ class MenuHandler:
         self._logger.debug("📋 SHOWING: Samneh menu")
         text = tr("SAMNEH_DESC")
         await query.edit_message_text(
-            text, reply_markup=get_samneh_menu_keyboard(), parse_mode="Markdown"
+            text, reply_markup=get_samneh_menu_keyboard(), parse_mode="HTML"
         )
 
     async def _show_red_bisbas_menu(self, query: CallbackQuery):
@@ -106,7 +106,7 @@ class MenuHandler:
         self._logger.debug("📋 SHOWING: Red Bisbas menu")
         text = tr("RED_BISBAS_DESC")
         await query.edit_message_text(
-            text, reply_markup=get_red_bisbas_menu_keyboard(), parse_mode="Markdown"
+            text, reply_markup=get_red_bisbas_menu_keyboard(), parse_mode="HTML"
         )
 
     async def _show_hilbeh_menu(self, query: CallbackQuery):
@@ -119,13 +119,15 @@ class MenuHandler:
 
             if not response.success:
                 await query.edit_message_text(
-                    tr("AVAILABILITY_CHECK_ERROR").format(error=response.error_message), reply_markup=get_main_menu_keyboard()
+                    tr("AVAILABILITY_CHECK_ERROR").format(error=response.error_message), 
+                    reply_markup=get_main_menu_keyboard(),
+                    parse_mode="HTML"
                 )
                 return
 
             text = tr("HILBEH_DESC_AVAILABLE")
             await query.edit_message_text(
-                text, reply_markup=get_hilbeh_menu_keyboard(), parse_mode="Markdown"
+                text, reply_markup=get_hilbeh_menu_keyboard(), parse_mode="HTML"
             )
 
         except BusinessLogicError as e:
@@ -133,6 +135,7 @@ class MenuHandler:
             await query.edit_message_text(
                 tr("AVAILABILITY_CHECK_ERROR_GENERIC"),
                 reply_markup=get_main_menu_keyboard(),
+                parse_mode="HTML"
             )
 
     async def _show_hawaij_soup_menu(self, query: CallbackQuery):
@@ -142,7 +145,7 @@ class MenuHandler:
         await query.edit_message_text(
             text,
             reply_markup=get_direct_add_keyboard("Hawaij soup spice"),
-            parse_mode="Markdown",
+            parse_mode="HTML",
         )
 
     async def _show_hawaij_coffee_menu(self, query: CallbackQuery):
@@ -152,7 +155,7 @@ class MenuHandler:
         await query.edit_message_text(
             text,
             reply_markup=get_direct_add_keyboard("Hawaij coffee spice", include_info=False),
-            parse_mode="Markdown",
+            parse_mode="HTML",
         )
 
     async def _show_white_coffee_menu(self, query: CallbackQuery):
@@ -162,7 +165,7 @@ class MenuHandler:
         await query.edit_message_text(
             text,
             reply_markup=get_direct_add_keyboard("White coffee", include_info=False),
-            parse_mode="Markdown",
+            parse_mode="HTML",
         )
 
 
