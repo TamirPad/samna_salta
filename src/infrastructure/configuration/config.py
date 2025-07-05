@@ -28,7 +28,8 @@ class Settings(BaseSettings):
 
     # Business hours for Hilbeh
     hilbeh_available_days: List[str] = Field(
-        default=["wednesday", "thursday", "friday"]
+        default=["wednesday", "thursday", "friday"],
+        env="HILBEH_AVAILABLE_DAYS"
     )
     hilbeh_available_hours: str = Field("09:00-18:00", env="HILBEH_AVAILABLE_HOURS")
 

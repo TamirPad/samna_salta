@@ -1,156 +1,173 @@
 # Samna Salta - Telegram Ordering Bot
 
-A comprehensive Telegram bot for food ordering, designed for small businesses in the food sector. The bot guides customers through a complete ordering process from user onboarding to order confirmation.
+A comprehensive Telegram bot for traditional Yemenite food ordering, designed for small hometown businesses. Built with Clean Architecture principles for reliability and maintainability.
 
 ## Features
 
-### Customer Features
-- **User Onboarding**: Collect customer details (name, phone) with returning customer recognition
-- **Delivery Options**: Self-pickup or delivery with address collection
-- **Dynamic Menu System**: Multi-level menu navigation with product categories and options
-- **Shopping Cart**: Add items, view cart, and manage quantities
-- **Order Confirmation**: Review and confirm order details before submission
+### Customer Experience
+- **Smart Onboarding**: Automated customer registration with returning customer recognition
+- **Flexible Delivery**: Self-pickup or delivery options with address collection
+- **Interactive Menu**: Multi-level navigation with product categories and customization
+- **Shopping Cart**: Add items, modify quantities, and review orders
+- **Order Confirmation**: Complete order review before submission
+- **Business Hours**: Automatic handling of special availability (Hilbeh: Wed-Fri only)
 
-### Admin Features
-- **Order Notifications**: Receive detailed order summaries
-- **Admin Interface**: Manage products and categories via Telegram commands
-- **Customer Database**: Track returning customers and order history
+### Business Management
+- **Order Notifications**: Real-time order alerts to admin
+- **Customer Database**: Automatic customer tracking and history
+- **Product Management**: Easy product catalog management
+- **Analytics**: Order tracking and popular product insights
+- **Logging**: Comprehensive logging for debugging and monitoring
 
-## Product Categories
+## Product Catalog
 
-- **Kubaneh**: Classic/Seeded/Herb/Aromatic with Olive oil/Samneh options
-- **Samneh**: Smoked/Not smoked with Small/Large sizes
-- **Red Bisbas**: Small/Large sizes
-- **Hawaij soup spice**: Direct add to cart
-- **Hawaij coffee spice**: Direct add to cart
-- **White coffee**: Direct add to cart
-- **Hilbeh**: Available Wednesday-Friday only
+- **Kubaneh** (Traditional Yemenite Bread): Classic/Seeded/Herb/Aromatic with butter options
+- **Samneh** (Clarified Butter): Smoked/Regular in Small/Large sizes
+- **Red Bisbas** (Fenugreek Paste): Small/Large containers
+- **Hawaij Spices**: Soup and Coffee varieties
+- **White Coffee**: Traditional preparation
+- **Hilbeh** (Fenugreek Dip): Available Wednesday-Friday only
 
-## Tech Stack
+## Architecture
 
-- **Backend**: Python 3.8+
-- **Telegram Bot API**: python-telegram-bot
-- **Database**: SQLite (with PostgreSQL migration path)
-- **Configuration**: Environment variables
-- **Logging**: Structured logging
-
-## Project Structure
+Built with Clean Architecture principles for maintainability and testability:
 
 ```
 samna_salta/
 ├── src/
-│   ├── bot/
-│   │   ├── __init__.py
-│   │   ├── handlers/
-│   │   │   ├── __init__.py
-│   │   │   ├── admin.py
-│   │   │   ├── cart.py
-│   │   │   ├── menu.py
-│   │   │   └── onboarding.py
-│   │   ├── keyboards/
-│   │   │   ├── __init__.py
-│   │   │   ├── admin.py
-│   │   │   ├── cart.py
-│   │   │   └── menu.py
-│   │   └── states.py
-│   ├── database/
-│   │   ├── __init__.py
-│   │   ├── models.py
-│   │   └── operations.py
-│   ├── services/
-│   │   ├── __init__.py
-│   │   ├── cart_service.py
-│   │   ├── menu_service.py
-│   │   └── order_service.py
-│   └── utils/
-│       ├── __init__.py
-│       ├── config.py
-│       └── helpers.py
-├── config/
-│   └── config.yaml
-├── data/
-│   └── products.json
-├── tests/
-│   └── __init__.py
-├── requirements.txt
-├── main.py
-├── .env.example
-└── README.md
+│   ├── domain/                    # Business logic core
+│   │   ├── entities/              # Core business entities
+│   │   ├── repositories/          # Data access interfaces
+│   │   └── value_objects/         # Value objects and constraints
+│   ├── application/               # Application layer
+│   │   ├── dtos/                  # Data transfer objects
+│   │   └── use_cases/             # Business use cases
+│   ├── infrastructure/            # External concerns
+│   │   ├── database/              # Database operations
+│   │   ├── logging/               # Logging configuration
+│   │   ├── configuration/         # App configuration
+│   │   ├── security/              # Security measures
+│   │   └── container/             # Dependency injection
+│   └── presentation/              # User interface
+│       └── telegram_bot/          # Telegram bot interface
+├── data/                          # Database storage
+├── logs/                          # Application logs
+├── tests/                         # Test suite
+├── main.py                        # Application entry point
+├── render.yaml                    # Render deployment config
+└── requirements.txt               # Python dependencies
 ```
 
-## Setup Instructions
+## Quick Start
 
 ### Prerequisites
-- Python 3.8 or higher
-- Telegram Bot Token (from @BotFather)
+- Python 3.8+ (3.11 recommended for Render free tier)
+- Telegram Bot Token (get from @BotFather)
 - Admin Telegram Chat ID
 
-### Installation
+### Local Development
 
-1. **Clone the repository**
+1. **Setup**
    ```bash
    git clone <repository-url>
    cd samna_salta
-   ```
-
-2. **Create virtual environment**
-   ```bash
    python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install dependencies**
-   ```bash
+   source venv/bin/activate  # Windows: venv\Scripts\activate
    pip install -r requirements.txt
    ```
 
-4. **Configure environment**
+2. **Configure**
    ```bash
-   cp .env.example .env
+   cp env.example .env
    # Edit .env with your bot token and admin chat ID
    ```
 
-5. **Initialize database**
-   ```bash
-   python -c "from src.database.operations import init_db; init_db()"
-   ```
-
-6. **Run the bot**
+3. **Run**
    ```bash
    python main.py
    ```
 
+### Production Deployment (Render)
+
+Ready for deployment on Render free tier:
+
+1. **Fork/Clone** this repository
+2. **Connect** to Render and create a new Web Service
+3. **Configure** environment variables:
+   - `BOT_TOKEN`: Your Telegram bot token
+   - `ADMIN_CHAT_ID`: Your admin chat ID
+4. **Deploy** - Render will automatically use `render.yaml` configuration
+
 ## Configuration
 
-Create a `.env` file with the following variables:
-```
-BOT_TOKEN=your_telegram_bot_token
-ADMIN_CHAT_ID=your_admin_chat_id
-DATABASE_URL=sqlite:///data/orders.db
+### Environment Variables
+```env
+# Required
+BOT_TOKEN=your_telegram_bot_token_here
+ADMIN_CHAT_ID=your_admin_chat_id_here
+
+# Optional (defaults provided)
+DATABASE_URL=sqlite:///data/samna_salta.db
 LOG_LEVEL=INFO
+ENVIRONMENT=production
+DELIVERY_CHARGE=5.00
+CURRENCY=ILS
+HILBEH_AVAILABLE_DAYS=wednesday,thursday,friday
+HILBEH_AVAILABLE_HOURS=09:00-18:00
 ```
 
-## Development
+### Business Customization
+- Modify product catalog in database initialization
+- Adjust delivery charges and currency
+- Update business hours for special products
+- Customize order notification format
 
-### Running Tests
+## Commands
+
+### Customer Commands
+- `/start` - Begin ordering process
+- `/menu` - View product catalog
+- `/cart` - View current cart
+- `/help` - Get assistance
+
+### Admin Commands
+- `/orders` - View recent orders
+- `/analytics` - View order statistics
+- `/products` - Manage product catalog
+
+## Testing
+
 ```bash
-python -m pytest tests/
+# Run all tests
+python -m pytest
+
+# Run with coverage
+python -m pytest --cov=src
+
+# Run specific test category
+python -m pytest tests/test_use_cases/
 ```
 
-### Code Formatting
-```bash
-black src/ tests/
-isort src/ tests/
-```
+## Monitoring
 
-## Contributing
+The application includes comprehensive logging:
+- **Application logs**: `logs/samna_salta.log`
+- **Error logs**: `logs/errors.log`
+- **Performance logs**: `logs/performance.log`
+- **Security logs**: `logs/security.log`
 
-1. Create a feature branch
-2. Make your changes
-3. Add tests for new functionality
-4. Ensure all tests pass
-5. Submit a pull request
+## Support
+
+For small business support:
+- Check logs for debugging
+- Review order notifications
+- Monitor customer interactions
+- Track popular products
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+MIT License - Perfect for small business use.
+
+---
+
+*Built with ❤️ for hometown businesses* 

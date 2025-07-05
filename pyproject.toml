@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{include = "src"}]
 
 [tool.poetry.dependencies]
-python = "^3.13"
+python = "^3.11"
 python-telegram-bot = "^21.0"
 SQLAlchemy = "^2.0.23"
 alembic = "^1.13.1"
@@ -38,7 +38,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.black]
 line-length = 88
-target-version = ['py312']
+target-version = ['py311']
 include = '\.pyi?$'
 extend-exclude = '''
 /(

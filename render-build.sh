@@ -6,12 +6,14 @@ set -o errexit
 echo "Python version being used:"
 python --version
 
-# Confirm we're using Python 3.13 as intended
-if python --version | grep -q "3.13"; then
-    echo "✅ Python 3.13 detected - perfect match for this project!"
+# Confirm we're using Python 3.11+ as intended
+if python --version | grep -q "3.11"; then
+    echo "✅ Python 3.11 detected - perfect match for this project!"
+elif python --version | grep -q "3.12"; then
+    echo "✅ Python 3.12 detected - compatible with this project!"
 else
-    echo "⚠️  Expected Python 3.13, but got a different version"
-    echo "This project is optimized for Python 3.13+"
+    echo "⚠️  Expected Python 3.11+, but got a different version"
+    echo "This project is optimized for Python 3.11+"
 fi
 
 # Install Poetry if not available
