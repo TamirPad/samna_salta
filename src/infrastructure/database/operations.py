@@ -164,6 +164,30 @@ class DatabaseManager:
                     migrations = [
                         ("products", "price", "ALTER TABLE products ADD COLUMN price FLOAT DEFAULT 0.0"),
                         ("products", "category", "ALTER TABLE products ADD COLUMN category VARCHAR(50)"),
+                        # ------------------------------------------------------------------
+                        # Customers table – added in v0.2.0 but may be missing on old DBs
+                        # ------------------------------------------------------------------
+                        ("customers", "name", "ALTER TABLE customers ADD COLUMN name VARCHAR(100) DEFAULT ''"),
+                        (
+                            "customers",
+                            "phone_number",
+                            "ALTER TABLE customers ADD COLUMN phone_number VARCHAR(20) DEFAULT ''",
+                        ),
+                        (
+                            "customers",
+                            "delivery_address",
+                            "ALTER TABLE customers ADD COLUMN delivery_address VARCHAR(500)",
+                        ),
+                        (
+                            "customers",
+                            "created_at",
+                            "ALTER TABLE customers ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP",
+                        ),
+                        (
+                            "customers",
+                            "updated_at",
+                            "ALTER TABLE customers ADD COLUMN updated_at DATETIME",
+                        ),
                         (
                             "carts",
                             "delivery_method",
