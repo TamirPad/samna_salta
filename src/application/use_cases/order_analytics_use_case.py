@@ -11,6 +11,8 @@ from typing import Any
 
 from src.domain.repositories.customer_repository import CustomerRepository
 from src.domain.repositories.order_repository import OrderRepository
+from src.infrastructure.utilities.i18n import tr
+from src.infrastructure.utilities.helpers import translate_product_name
 
 
 class OrderAnalyticsUseCase:
@@ -308,58 +310,53 @@ class OrderAnalyticsUseCase:
         try:
             # Daily Summary
             daily = overview["daily_summary"]
-            report_lines = ["📊 <b>BUSINESS ANALYTICS REPORT</b>"]
+            report_lines = [tr("ANALYTICS_REPORT_TITLE")]
             report_lines.append(
-                f"📅 Generated: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+                tr("ANALYTICS_GENERATED").format(
+                    datetime=datetime.now().strftime('%d/%m/%Y %H:%M')
+                )
             )
-            report_lines.append("\n<b>TODAY'S PERFORMANCE:</b>")
-            report_lines.append(f"📋 Orders: {daily['total_orders']}")
-            report_lines.append(f"💰 Revenue: ₪{daily['total_revenue']:.2f}")
-            report_lines.append(f"📊 Avg Order: ₪{daily['average_order_value']:.2f}")
+            report_lines.append(f"\n{tr('ANALYTICS_TODAY_PERFORMANCE')}")
+            report_lines.append(tr("ANALYTICS_ORDERS").format(count=daily['total_orders']))
+            report_lines.append(tr("ANALYTICS_REVENUE").format(amount=daily['total_revenue']))
+            report_lines.append(tr("ANALYTICS_AVG_ORDER").format(amount=daily['average_order_value']))
 
             # Weekly Trends
             weekly = overview["weekly_trends"]
-            report_lines.append("\n<b>WEEKLY TRENDS:</b>")
-            report_lines.append(f"📋 Total Orders: {weekly['total_weekly_orders']}")
-            report_lines.append(
-                f"💰 Total Revenue: ₪{weekly['total_weekly_revenue']:.2f}"
-            )
-            report_lines.append(
-                f"📊 Daily Average: {weekly['daily_average_orders']:.1f} orders"
-            )
+            report_lines.append(f"\n{tr('ANALYTICS_WEEKLY_TRENDS')}")
+            report_lines.append(tr("ANALYTICS_TOTAL_ORDERS").format(count=weekly['total_weekly_orders']))
+            report_lines.append(tr("ANALYTICS_TOTAL_REVENUE").format(amount=weekly['total_weekly_revenue']))
+            report_lines.append(tr("ANALYTICS_DAILY_AVERAGE").format(avg=weekly['daily_average_orders']))
 
             # Popular Products
             products = overview["popular_products"]
-            report_lines.append("\n🏆 <b>TOP PRODUCTS:</b>")
+            report_lines.append(f"\n{tr('ANALYTICS_TOP_PRODUCTS')}")
             for i, product in enumerate(products[:3], 1):
+                # Translate product name
+                translated_name = translate_product_name(product['product_name'])
                 report_lines.append(
-                    f"{i}. {product['product_name']}: {product['order_count']} orders"
+                    tr("ANALYTICS_PRODUCT_LINE").format(
+                        rank=i, 
+                        name=translated_name, 
+                        count=product['order_count']
+                    )
                 )
 
             # Customer Insights
             customers = overview["customer_insights"]
-            report_lines.append("\n👥 <b>CUSTOMER INSIGHTS:</b>")
-            report_lines.append(f"👨‍💼 Total Customers: {customers['total_customers']}")
-            report_lines.append(
-                f"🔄 Repeat Rate: {customers['repeat_customer_rate']:.1f}%"
-            )
-            report_lines.append(
-                f"💰 Avg Customer Value: ₪{customers['avg_customer_lifetime_value']:.2f}"  # noqa: E501
-            )
+            report_lines.append(f"\n{tr('ANALYTICS_CUSTOMER_INSIGHTS')}")
+            report_lines.append(tr("ANALYTICS_TOTAL_CUSTOMERS").format(count=customers['total_customers']))
+            report_lines.append(tr("ANALYTICS_REPEAT_RATE").format(rate=customers['repeat_customer_rate']))
+            report_lines.append(tr("ANALYTICS_AVG_CUSTOMER_VALUE").format(amount=customers['avg_customer_lifetime_value']))
 
             # Lifetime Totals
-            report_lines.append("\n📋 <b>LIFETIME TOTALS:</b>")
-            report_lines.append(f"📊 Total Orders: {overview['total_lifetime_orders']}")
-            report_lines.append(
-                f"💰 Total Revenue: ₪{overview['total_lifetime_revenue']:.2f}"
-            )
-
-            report_lines.append(
-                f"📊 Avg LTV: ₪{overview['customer_insights']['avg_customer_lifetime_value']:.2f}"
-            )
+            report_lines.append(f"\n{tr('ANALYTICS_LIFETIME_TOTALS')}")
+            report_lines.append(tr("ANALYTICS_LIFETIME_ORDERS").format(count=overview['total_lifetime_orders']))
+            report_lines.append(tr("ANALYTICS_LIFETIME_REVENUE").format(amount=overview['total_lifetime_revenue']))
+            report_lines.append(tr("ANALYTICS_AVG_LTV").format(amount=overview['customer_insights']['avg_customer_lifetime_value']))
 
             return "\n".join(report_lines)
 
         except (KeyError, TypeError) as e:
             self._logger.error("💥 REPORT FORMATTING ERROR: %s", e, exc_info=True)
-            return "Error: Could not generate analytics report."
+            return tr("ANALYTICS_ERROR_REPORT")

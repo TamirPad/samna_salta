@@ -17,7 +17,7 @@ from src.application.dtos.cart_dtos import (
 from src.application.dtos.order_dtos import CreateOrderRequest
 from src.infrastructure.container.dependency_injection import get_container
 from src.infrastructure.utilities.exceptions import BusinessLogicError, error_handler
-from src.infrastructure.utilities.helpers import format_price
+from src.infrastructure.utilities.helpers import format_price, translate_product_name
 from src.presentation.telegram_bot.keyboards.menu import (
     get_cart_keyboard,
     get_main_menu_keyboard,
@@ -143,30 +143,42 @@ class CartHandler:
         # Kubaneh patterns: kubaneh_classic, kubaneh_seeded, etc.
         if product_type == "kubaneh":
             kubaneh_type = parts[1] if len(parts) > 1 else "classic"
+            
+            # Get the Hebrew translation for the kubaneh type
+            type_key = f"KUBANEH_{kubaneh_type.upper()}"
+            type_display = tr(type_key)
 
             return {
                 "product_id": 1,  # Kubaneh product ID
-                "display_name": tr("KUBANEH_DISPLAY_NAME").format(type=kubaneh_type.title()),
+                "display_name": tr("KUBANEH_DISPLAY_NAME").format(type=type_display),
                 "options": {"type": kubaneh_type},
             }
 
         # Samneh patterns: samneh_smoked, samneh_not_smoked
         if product_type == "samneh":
             smoking = "smoked" if parts[1] == "smoked" else "not_smoked"
+            
+            # Get the Hebrew translation for the samneh type
+            type_key = f"SAMNEH_{smoking.upper()}"
+            type_display = tr(type_key)
 
             return {
                 "product_id": 2,  # Samneh product ID
-                "display_name": tr("SAMNEH_DISPLAY_NAME").format(type=smoking.replace('_', ' ').title()),
+                "display_name": tr("SAMNEH_DISPLAY_NAME").format(type=type_display),
                 "options": {"smoking": smoking.replace("_", " ")},
             }
 
         # Red Bisbas patterns: red_bisbas_small, red_bisbas_large
         if product_type == "red" and len(parts) > 1 and parts[1] == "bisbas":
             size = parts[2] if len(parts) > 2 else "small"
+            
+            # Get the Hebrew translation for the size
+            size_key = f"SIZE_{size.upper()}"
+            size_display = tr(size_key)
 
             return {
                 "product_id": 3,  # Red Bisbas product ID
-                "display_name": tr("RED_BISBAS_DISPLAY_NAME").format(size=size.title()),
+                "display_name": tr("RED_BISBAS_DISPLAY_NAME").format(size=size_display),
                 "options": {"size": size},
             }
 
@@ -181,32 +193,32 @@ class CartHandler:
         product_map = {
             "hilbeh": {
                 "product_id": 7,  # Hilbeh product ID
-                "display_name": "Hilbeh",
+                "display_name": tr("PRODUCT_HILBEH"),
                 "options": {},
             },
             "hawaij_soup": {
                 "product_id": 4,  # Hawaij soup spice product ID
-                "display_name": "Hawaij Soup Spice",
+                "display_name": tr("PRODUCT_HAWAIJ_SOUP"),
                 "options": {},
             },
             "hawaij_soup_spice": {
                 "product_id": 4,  # Hawaij soup spice product ID
-                "display_name": "Hawaij Soup Spice",
+                "display_name": tr("PRODUCT_HAWAIJ_SOUP"),
                 "options": {},
             },
             "hawaij_coffee": {
                 "product_id": 5,  # Hawaij coffee spice product ID
-                "display_name": "Hawaij Coffee Spice",
+                "display_name": tr("PRODUCT_HAWAIJ_COFFEE"),
                 "options": {},
             },
             "hawaij_coffee_spice": {
                 "product_id": 5,  # Hawaij coffee spice product ID
-                "display_name": "Hawaij Coffee Spice",
+                "display_name": tr("PRODUCT_HAWAIJ_COFFEE"),
                 "options": {},
             },
             "white_coffee": {
                 "product_id": 6,  # White coffee product ID
-                "display_name": "White Coffee",
+                "display_name": tr("PRODUCT_WHITE_COFFEE"),
                 "options": {},
             },
         }
@@ -391,7 +403,7 @@ class CartHandler:
         """Formats the order confirmation message."""
         items_text = "\n".join(
             [
-                f"  - {item.quantity}x {item.product_name} @ {format_price(item.unit_price)}"
+                f"  - {item.quantity}x {translate_product_name(item.product_name, item.options)} @ {format_price(item.unit_price)}"
                 for item in order_info.items
             ]
         )
@@ -427,7 +439,7 @@ class CartHandler:
         self._logger.info("🛒 DISPLAYING cart for User %s", user_id)
 
         items_text = [
-            f"<b>{item.product_name}</b> x{item.quantity} @ {format_price(item.unit_price)} = {format_price(item.total_price)}"
+            f"<b>{translate_product_name(item.product_name, item.options)}</b> x{item.quantity} @ {format_price(item.unit_price)} = {format_price(item.total_price)}"
             for item in cart_response.cart_items
         ]
 

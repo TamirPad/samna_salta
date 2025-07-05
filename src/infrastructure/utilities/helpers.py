@@ -69,3 +69,59 @@ def validate_phone_number(phone: str) -> bool:
     valid_prefixes = ["50", "52", "53", "54", "55", "57", "58"]
 
     return mobile_part in valid_prefixes
+
+
+def translate_product_name(product_name: str, options: dict = None) -> str:
+    """
+    Translate a product name from database format to localized display name
+    
+    Args:
+        product_name: The product name as stored in the database
+        options: Product options (type, size, etc.)
+    
+    Returns:
+        Localized product display name
+    """
+    from src.infrastructure.utilities.i18n import tr
+    
+    # Map database product names to translation keys
+    product_name_lower = product_name.lower()
+    
+    if "kubaneh" in product_name_lower:
+        if options and "type" in options:
+            kubaneh_type = options["type"]
+            type_key = f"KUBANEH_{kubaneh_type.upper()}"
+            type_display = tr(type_key)
+            return tr("KUBANEH_DISPLAY_NAME").format(type=type_display)
+        return tr("PRODUCT_KUBANEH_CLASSIC")
+    
+    elif "samneh" in product_name_lower:
+        if options and "smoking" in options:
+            smoking_type = options["smoking"].replace(" ", "_")
+            type_key = f"SAMNEH_{smoking_type.upper()}"
+            type_display = tr(type_key)
+            return tr("SAMNEH_DISPLAY_NAME").format(type=type_display)
+        return tr("PRODUCT_SAMNEH_SMOKED")
+    
+    elif "red bisbas" in product_name_lower or "bisbas" in product_name_lower:
+        if options and "size" in options:
+            size = options["size"]
+            size_key = f"SIZE_{size.upper()}"
+            size_display = tr(size_key)
+            return tr("RED_BISBAS_DISPLAY_NAME").format(size=size_display)
+        return tr("PRODUCT_RED_BISBAS")
+    
+    elif "hilbeh" in product_name_lower:
+        return tr("PRODUCT_HILBEH")
+    
+    elif "hawaij" in product_name_lower and "soup" in product_name_lower:
+        return tr("PRODUCT_HAWAIJ_SOUP")
+    
+    elif "hawaij" in product_name_lower and "coffee" in product_name_lower:
+        return tr("PRODUCT_HAWAIJ_COFFEE")
+    
+    elif "white coffee" in product_name_lower:
+        return tr("PRODUCT_WHITE_COFFEE")
+    
+    # Fallback to original name if no translation found
+    return product_name

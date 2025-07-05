@@ -203,7 +203,7 @@ class AdminHandler:
             keyboard = [
                 [
                     InlineKeyboardButton(
-                        "🔙 Back to Dashboard", callback_data="admin_back"
+                        tr("ADMIN_BACK_TO_DASHBOARD"), callback_data="admin_back"
                     )
                 ]
             ]
@@ -230,19 +230,19 @@ class AdminHandler:
 
             if not orders:
                 text = (
-                    "⏳ <b>PENDING ORDERS</b>\n\n" "✅ No pending orders! All caught up."
+                    tr("ADMIN_PENDING_ORDERS_TITLE") + "\n\n" + tr("ADMIN_NO_PENDING_ORDERS")
                 )
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            "🔙 Back to Dashboard", callback_data="admin_back"
+                            tr("ADMIN_BACK_TO_DASHBOARD"), callback_data="admin_back"
                         )
                     ]
                 ]
             else:
                 text = (
-                    f"⏳ <b>PENDING ORDERS ({len(orders)})</b>\n\n"
-                    "📋 <b>Orders requiring attention:</b>"
+                    f"{tr('ADMIN_PENDING_ORDERS_TITLE')} ({len(orders)})\n\n"
+                    f"{tr('ADMIN_PENDING_ORDERS_LIST')}"
                 )
 
                 keyboard = []
@@ -263,7 +263,7 @@ class AdminHandler:
                 keyboard.append(
                     [
                         InlineKeyboardButton(
-                            "🔙 Back to Dashboard", callback_data="admin_back"
+                            tr("ADMIN_BACK_TO_DASHBOARD"), callback_data="admin_back"
                         )
                     ]
                 )
@@ -287,18 +287,18 @@ class AdminHandler:
             orders = await order_status_use_case.get_active_orders()
 
             if not orders:
-                text = "🔄 <b>ACTIVE ORDERS</b>\n\n" "✅ No active orders at the moment."
+                text = tr("ADMIN_ACTIVE_ORDERS_TITLE") + "\n\n" + tr("ADMIN_NO_ACTIVE_ORDERS")
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            "🔙 Back to Dashboard", callback_data="admin_back"
+                            tr("ADMIN_BACK_TO_DASHBOARD"), callback_data="admin_back"
                         )
                     ]
                 ]
             else:
                 text = (
-                    f"🔄 <b>ACTIVE ORDERS ({len(orders)})</b>\n\n"
-                    "📋 <b>Current active orders:</b>"
+                    f"{tr('ADMIN_ACTIVE_ORDERS_TITLE')} ({len(orders)})\n\n"
+                    f"{tr('ADMIN_ACTIVE_ORDERS_LIST')}"
                 )
                 keyboard = []
                 for order in orders[:10]:  # Show max 10 orders
@@ -317,7 +317,7 @@ class AdminHandler:
                 keyboard.append(
                     [
                         InlineKeyboardButton(
-                            "🔙 Back to Dashboard", callback_data="admin_back"
+                            tr("ADMIN_BACK_TO_DASHBOARD"), callback_data="admin_back"
                         )
                     ]
                 )
@@ -341,16 +341,16 @@ class AdminHandler:
             orders = await order_status_use_case.get_all_orders()
 
             if not orders:
-                text = "📋 <b>ALL ORDERS</b>\n\n✅ No orders found."
+                text = tr("ADMIN_ALL_ORDERS_TITLE") + "\n\n" + tr("ADMIN_NO_ORDERS_FOUND")
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            "🔙 Back to Dashboard", callback_data="admin_back"
+                            tr("ADMIN_BACK_TO_DASHBOARD"), callback_data="admin_back"
                         )
                     ]
                 ]
             else:
-                text = f"📋 <b>ALL ORDERS ({len(orders)})</b>"
+                text = f"{tr('ADMIN_ALL_ORDERS_TITLE')} ({len(orders)})"
                 keyboard = []
                 for order in orders[:15]:  # Show max 15
                     order_summary = (
@@ -368,7 +368,7 @@ class AdminHandler:
                 keyboard.append(
                     [
                         InlineKeyboardButton(
-                            "🔙 Back to Dashboard", callback_data="admin_back"
+                            tr("ADMIN_BACK_TO_DASHBOARD"), callback_data="admin_back"
                         )
                     ]
                 )
@@ -390,7 +390,7 @@ class AdminHandler:
             order_details = await self._get_formatted_order_details(order_id)
 
             if not order_details:
-                await query.edit_message_text("❌ Order not found.")
+                await query.edit_message_text(tr("ADMIN_ORDER_NOT_FOUND"))
                 return
 
             keyboard = self._create_order_details_keyboard(order_id)
@@ -413,23 +413,31 @@ class AdminHandler:
             return None
 
         details = [
-            f"📦 <b>Order #{order_info.order_number}</b> (ID {order_info.order_id})",
-            f"👤 <b>Customer:</b> {order_info.customer_name}",
-            f"📞 <b>Phone:</b> {order_info.customer_phone}",
-            f" STATUS: {getattr(order_info.status, 'value', str(order_info.status)).capitalize()}",
-            f"💰 <b>Total:</b> ₪{order_info.total:.2f}",
-            f"📅 <b>Created:</b> "
-            f"{(order_info.created_at or datetime.utcnow()).strftime('%Y-%m-%d %H:%M')}",
+            tr("ADMIN_ORDER_DETAILS_TITLE").format(number=order_info.order_number, id=order_info.order_id),
+            tr("ADMIN_CUSTOMER_LABEL").format(name=order_info.customer_name),
+            tr("ADMIN_PHONE_LABEL").format(phone=order_info.customer_phone),
+            tr("ADMIN_STATUS_LABEL").format(status=getattr(order_info.status, 'value', str(order_info.status)).capitalize()),
+            tr("ADMIN_TOTAL_LABEL").format(amount=order_info.total),
+            tr("ADMIN_CREATED_LABEL").format(
+                datetime=(order_info.created_at or datetime.utcnow()).strftime('%Y-%m-%d %H:%M')
+            ),
         ]
         if order_info.items:
-            details.append("\n🛒 <b>Items:</b>")
+            details.append(f"\n{tr('ADMIN_ITEMS_LABEL')}")
             for item in order_info.items:
                 price = getattr(item, 'total_price', getattr(item, 'price', None))
                 if price is None:
                     # Fallback to unit_price * quantity if total not provided
                     price = getattr(item, 'unit_price', 0.0) * getattr(item, 'quantity', 1)
+                # Translate product name
+                from src.infrastructure.utilities.helpers import translate_product_name
+                translated_name = translate_product_name(item.product_name)
                 details.append(
-                    f"- {item.product_name} (x{item.quantity}) - ₪{price:.2f}"
+                    tr("ADMIN_ITEM_LINE").format(
+                        name=translated_name,
+                        quantity=item.quantity,
+                        price=price
+                    )
                 )
         return "\n".join(details)
 
@@ -441,14 +449,14 @@ class AdminHandler:
         keyboard = [
             [
                 InlineKeyboardButton(
-                    f"Set to {status.capitalize()}",
+                    tr("ADMIN_SET_STATUS").format(status=status.capitalize()),
                     callback_data=f"admin_status_{order_id}_{status}",
                 )
             ]
             for status in statuses
         ]
         keyboard.append(
-            [InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_back")]
+            [InlineKeyboardButton(tr("ADMIN_BACK_TO_DASHBOARD"), callback_data="admin_back")]
         )
         return keyboard
 
@@ -475,19 +483,16 @@ class AdminHandler:
                 admin_telegram_id=TelegramId(admin_telegram_id),
             )
 
-            await query.answer(f"✅ Status updated to {new_status}")
+            await query.answer(tr("ADMIN_STATUS_UPDATED").format(status=new_status))
             await self._show_order_details(query, order_id)
 
         except (BusinessLogicError, ValueError) as e:
             self._logger.error("💥 STATUS UPDATE ERROR: %s", e, exc_info=True)
-            await query.message.reply_text(f"❌ Error updating status: {e}")
+            await query.message.reply_text(tr("ADMIN_STATUS_UPDATE_ERROR").format(error=e))
 
     async def _start_status_update(self, query: CallbackQuery) -> int:
         """Start conversation to update an order's status."""
-        await query.message.reply_text(
-            "Please enter the Order ID to update (the small number inside the \"ID ...\" parentheses).\n"
-            "For example, if the line reads '#ORD-20250705... (ID 20) - John', you should send 20."
-        )
+        await query.message.reply_text(tr("ADMIN_ORDER_ID_PROMPT"))
         return AWAITING_ORDER_ID
 
     async def show_order_details_for_status_update(
@@ -519,13 +524,13 @@ class AdminHandler:
                 order_id = matching.order_id
 
         if order_id is None:
-            await update.message.reply_text("❌ Order not found. Make sure to send the numeric ID shown in the list.")
+            await update.message.reply_text(tr("ADMIN_ORDER_ID_NOT_FOUND"))
             return AWAITING_ORDER_ID
 
         # Fetch formatted details and send as a regular message with inline keyboard
         order_details = await self._get_formatted_order_details(order_id)
         if not order_details:
-            await update.message.reply_text("❌ Order not found. Try another ID.")
+            await update.message.reply_text(tr("ADMIN_ORDER_ID_TRY_ANOTHER"))
             return AWAITING_ORDER_ID
 
         keyboard = self._create_order_details_keyboard(order_id)

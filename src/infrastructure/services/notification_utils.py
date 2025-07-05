@@ -11,6 +11,7 @@ from telegram.error import TelegramError
 
 from src.application.dtos.order_dtos import OrderInfo, OrderItemInfo
 from src.infrastructure.utilities.i18n import tr
+from src.infrastructure.utilities.helpers import translate_product_name
 
 STATUS_EMOJI = {
     "pending": "⏳",
@@ -55,7 +56,8 @@ def format_order_details(order_info: OrderInfo, header: str) -> str:
     for item in order_info.items:
         options_text = format_item_options(item)
         price = f" - ₪{item.total_price:.2f}"
-        message += f"\n• {item.quantity}x {item.product_name}{options_text}{price}"
+        translated_name = translate_product_name(item.product_name, item.options)
+        message += f"\n• {item.quantity}x {translated_name}{options_text}{price}"
 
     message += f"""
 
