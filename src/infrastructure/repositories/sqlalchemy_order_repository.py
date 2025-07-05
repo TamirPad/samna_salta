@@ -5,9 +5,9 @@ Concrete implementation of OrderRepository using SQLAlchemy ORM.
 """
 
 import logging
+from contextlib import contextmanager
 from datetime import datetime
 from typing import Any
-from contextlib import contextmanager
 
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -16,7 +16,9 @@ from src.domain.value_objects.customer_id import CustomerId
 from src.domain.value_objects.order_id import OrderId
 from src.domain.value_objects.telegram_id import TelegramId
 from src.infrastructure.database.models import Customer, Order, OrderItem
-from src.infrastructure.database.operations import get_session  # compatibility for tests
+from src.infrastructure.database.operations import (  # compatibility for tests
+    get_session,
+)
 
 
 @contextmanager
@@ -58,7 +60,9 @@ class SQLAlchemyOrderRepository(OrderRepository):
                     session.add(order)
                     session.flush()  # Get order ID
 
-                    self._logger.info("🆕 ORDER CREATED: #%s, ID=%s", order_number, order.id)
+                    self._logger.info(
+                        "🆕 ORDER CREATED: #%s, ID=%s", order_number, order.id
+                    )
 
                     # Create order items
                     for item_data in order_data.get("items", []):

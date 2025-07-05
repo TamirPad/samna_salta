@@ -14,10 +14,7 @@ class Settings(BaseSettings):
     """Application settings"""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore"
+        env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore"
     )
 
     # Bot configuration
@@ -26,38 +23,26 @@ class Settings(BaseSettings):
 
     # Database configuration
     database_url: str = Field(
-        default="sqlite:///data/samna_salta.db", 
-        description="Database connection URL"
+        default="sqlite:///data/samna_salta.db", description="Database connection URL"
     )
 
     # Application settings
-    log_level: str = Field(
-        default="INFO", 
-        description="Logging level"
-    )
+    log_level: str = Field(default="INFO", description="Logging level")
     environment: str = Field(
-        default="development", 
-        description="Application environment"
+        default="development", description="Application environment"
     )
 
     # Delivery settings
-    delivery_charge: float = Field(
-        default=5.00, 
-        description="Delivery charge amount"
-    )
-    currency: str = Field(
-        default="ILS", 
-        description="Currency code"
-    )
+    delivery_charge: float = Field(default=5.00, description="Delivery charge amount")
+    currency: str = Field(default="ILS", description="Currency code")
 
     # Business hours for Hilbeh
     hilbeh_available_days: List[str] = Field(
-        default=["wednesday", "thursday", "friday"], 
-        description="Days when Hilbeh is available"
+        default=["wednesday", "thursday", "friday"],
+        description="Days when Hilbeh is available",
     )
     hilbeh_available_hours: str = Field(
-        default="09:00-18:00", 
-        description="Hours when Hilbeh is available"
+        default="09:00-18:00", description="Hours when Hilbeh is available"
     )
 
 

@@ -13,7 +13,9 @@ from src.domain.value_objects.delivery_address import DeliveryAddress
 from src.domain.value_objects.phone_number import PhoneNumber
 from src.domain.value_objects.telegram_id import TelegramId
 from src.infrastructure.database.models import Customer as SQLCustomer
-from src.infrastructure.database.operations import get_session  # compatibility for tests
+from src.infrastructure.database.operations import (  # compatibility for tests
+    get_session,
+)
 
 logger = logging.getLogger(__name__)
 

@@ -6,7 +6,7 @@ Represents a customer in the Samna Salta business domain.
 """
 
 from dataclasses import dataclass
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Optional
 
 from src.domain.value_objects.customer_id import CustomerId

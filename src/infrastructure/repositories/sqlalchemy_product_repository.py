@@ -9,7 +9,9 @@ from src.domain.repositories.product_repository import ProductRepository
 from src.domain.value_objects.product_id import ProductId
 from src.domain.value_objects.product_name import ProductName
 from src.infrastructure.database.models import Product as SQLProduct
-from src.infrastructure.database.operations import get_session  # compatibility for tests
+from src.infrastructure.database.operations import (  # compatibility for tests
+    get_session,
+)
 
 logger = logging.getLogger(__name__)
 

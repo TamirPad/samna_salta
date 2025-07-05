@@ -8,11 +8,11 @@ import logging
 import sqlite3
 import time
 from datetime import datetime
-from typing import Optional, Any, Dict, List, Union, Callable
 from functools import wraps
+from typing import Any, Callable, Dict, List, Optional, Union
 
-from sqlalchemy import create_engine, Engine, event, text
-from sqlalchemy.exc import SQLAlchemyError, OperationalError
+from sqlalchemy import Engine, create_engine, event, text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.pool import StaticPool
@@ -26,19 +26,19 @@ from src.infrastructure.database.models import (
     OrderItem,
     Product,
 )
+from src.infrastructure.logging.logging_config import PerformanceLogger
 from src.infrastructure.utilities.constants import (
     DatabaseSettings,
-    RetrySettings,
     ErrorCodes,
-    PerformanceSettings
+    PerformanceSettings,
+    RetrySettings,
 )
 from src.infrastructure.utilities.exceptions import (
-    DatabaseOperationError,
     DatabaseConnectionError,
-    DatabaseTimeoutError,
+    DatabaseOperationError,
     DatabaseRetryExhaustedError,
+    DatabaseTimeoutError,
 )
-from src.infrastructure.logging.logging_config import PerformanceLogger
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ class DatabaseManager:
     def _create_engine(self) -> Engine:
         """Create database engine with environment-specific settings"""
         database_url = self.config.database_url
-        
+
         # Base engine configuration
         engine_kwargs: dict[str, Any] = {
             "pool_recycle": DatabaseSettings.POOL_RECYCLE_SECONDS,
@@ -101,7 +101,7 @@ class DatabaseManager:
 
     def _setup_engine_events(self, engine: Engine) -> None:
         """Setup SQLAlchemy events for performance monitoring"""
-        
+
         # During tests, create_engine() may be patched with a MagicMock. Those mocks
         # do not support SQLAlchemy event registration and would raise
         # InvalidRequestError. Silently skip in that scenario.
@@ -112,12 +112,16 @@ class DatabaseManager:
                 return
 
             @event.listens_for(engine, "before_cursor_execute")
-            def before_cursor_execute(conn, cursor, statement, parameters, context, execmany):  # noqa: D401,E501
+            def before_cursor_execute(
+                conn, cursor, statement, parameters, context, execmany
+            ):  # noqa: D401,E501
                 conn.info.setdefault("query_start_time", time.time())
                 logger.debug("Start Query: %s", statement)
 
             @event.listens_for(engine, "after_cursor_execute")
-            def after_cursor_execute(conn, cursor, statement, parameters, context, execmany):  # noqa: D401,E501
+            def after_cursor_execute(
+                conn, cursor, statement, parameters, context, execmany
+            ):  # noqa: D401,E501
                 total = time.time() - conn.info["query_start_time"]
                 logger.debug("Query Complete! Total Time: %.2fms", total * 1000)
 
@@ -130,8 +134,7 @@ class DatabaseManager:
         """Get session factory"""
         if self._session_factory is None:
             self._session_factory = sessionmaker(
-                bind=self.get_engine(),
-                expire_on_commit=False
+                bind=self.get_engine(), expire_on_commit=False
             )
         return self._session_factory
 
@@ -144,12 +147,47 @@ class DatabaseManager:
         try:
             with PerformanceLogger("create_tables", self.logger):
                 Base.metadata.create_all(self.get_engine())
-                self.logger.info("Database tables created successfully")
+
+                # ------------------------------------------------------------------
+                # Lightweight auto-migration for SQLite: add newly introduced columns
+                # when the table already exists but column is missing.  This keeps
+                # Render deploys working without Alembic.
+                # ------------------------------------------------------------------
+
+                if self.get_engine().dialect.name == "sqlite":
+                    conn = self.get_engine().connect()
+
+                    def _column_exists(table: str, column: str) -> bool:
+                        res = conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
+                        return any(row[1] == column for row in res)
+
+                    migrations = [
+                        ("products", "price", "ALTER TABLE products ADD COLUMN price FLOAT DEFAULT 0.0"),
+                        ("products", "category", "ALTER TABLE products ADD COLUMN category VARCHAR(50)"),
+                        (
+                            "carts",
+                            "delivery_method",
+                            "ALTER TABLE carts ADD COLUMN delivery_method VARCHAR(20) DEFAULT 'pickup'",
+                        ),
+                        (
+                            "orders",
+                            "delivery_method",
+                            "ALTER TABLE orders ADD COLUMN delivery_method VARCHAR(20) DEFAULT 'pickup'",
+                        ),
+                    ]
+
+                    for table, column, ddl in migrations:
+                        if not _column_exists(table, column):
+                            self.logger.info("Auto-migrating: %s", ddl)
+                            conn.execute(text(ddl))
+
+                    conn.close()
+
+                self.logger.info("Database tables created/updated successfully")
         except SQLAlchemyError as e:
             self.logger.error(f"Failed to create database tables: {e}", exc_info=True)
             raise DatabaseOperationError(
-                f"Failed to create database tables: {e}",
-                ErrorCodes.DATABASE_ERROR
+                f"Failed to create database tables: {e}", ErrorCodes.DATABASE_ERROR
             ) from e
 
     def drop_tables(self) -> None:
@@ -161,43 +199,39 @@ class DatabaseManager:
         except SQLAlchemyError as e:
             self.logger.error(f"Failed to drop database tables: {e}", exc_info=True)
             raise DatabaseOperationError(
-                f"Failed to drop database tables: {e}",
-                ErrorCodes.DATABASE_ERROR
+                f"Failed to drop database tables: {e}", ErrorCodes.DATABASE_ERROR
             ) from e
 
-    def execute_with_retry(
-        self,
-        operation: Callable[..., Any],
-        *args,
-        **kwargs
-    ) -> Any:
+    def execute_with_retry(self, operation: Callable[..., Any], *args, **kwargs) -> Any:
         """Execute database operation with retry logic"""
         last_exception: Optional[Exception] = None
-        
+
         for attempt in range(RetrySettings.MAX_RETRIES):
             try:
-                with PerformanceLogger(f"db_operation_attempt_{attempt + 1}", self.logger):
+                with PerformanceLogger(
+                    f"db_operation_attempt_{attempt + 1}", self.logger
+                ):
                     return operation(*args, **kwargs)
             except OperationalError as e:
                 last_exception = e
                 if attempt < RetrySettings.MAX_RETRIES - 1:
                     self.logger.warning(
                         f"Database operation failed (attempt {attempt + 1}/{RetrySettings.MAX_RETRIES}): {e}",
-                        extra={"attempt": attempt + 1, "operation": operation.__name__}
+                        extra={"attempt": attempt + 1, "operation": operation.__name__},
                     )
                     time.sleep(RetrySettings.RETRY_DELAY_SECONDS)
                 else:
                     self.logger.error(
                         f"Database operation failed after {RetrySettings.MAX_RETRIES} attempts: {e}",
                         extra={"operation": operation.__name__},
-                        exc_info=True
+                        exc_info=True,
                     )
             except SQLAlchemyError as e:
                 last_exception = e
                 self.logger.error(
                     f"Database operation failed with non-retryable error: {e}",
                     extra={"operation": operation.__name__},
-                    exc_info=True
+                    exc_info=True,
                 )
                 break
 
@@ -205,12 +239,12 @@ class DatabaseManager:
         if isinstance(last_exception, OperationalError):
             raise DatabaseRetryExhaustedError(
                 f"Database operation failed after {RetrySettings.MAX_RETRIES} attempts: {last_exception}",
-                ErrorCodes.DATABASE_ERROR
+                ErrorCodes.DATABASE_ERROR,
             ) from last_exception
         else:
             raise DatabaseOperationError(
                 f"Database operation failed: {last_exception}",
-                ErrorCodes.DATABASE_ERROR
+                ErrorCodes.DATABASE_ERROR,
             ) from last_exception
 
     def health_check(self) -> Dict[str, Any]:
@@ -220,7 +254,7 @@ class DatabaseManager:
                 with self.get_session() as session:
                     # Simple query to test connection
                     result = session.execute("SELECT 1").fetchone()
-                    
+
                     # Check if result is as expected
                     if result and result[0] == 1:
                         return {
@@ -269,15 +303,16 @@ def get_db_session() -> Session:
 
 def retry_on_database_error(
     max_retries: int = RetrySettings.MAX_RETRIES,
-    delay: int = RetrySettings.RETRY_DELAY_SECONDS
+    delay: int = RetrySettings.RETRY_DELAY_SECONDS,
 ) -> Callable:
     """Decorator for database operations with retry logic"""
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs) -> Any:
             last_exception: Optional[Exception] = None
             logger = logging.getLogger(func.__module__)
-            
+
             for attempt in range(max_retries):
                 try:
                     return func(*args, **kwargs)
@@ -286,37 +321,38 @@ def retry_on_database_error(
                     if attempt < max_retries - 1:
                         logger.warning(
                             f"Database operation {func.__name__} failed (attempt {attempt + 1}/{max_retries}): {e}",
-                            extra={"attempt": attempt + 1, "function": func.__name__}
+                            extra={"attempt": attempt + 1, "function": func.__name__},
                         )
                         time.sleep(delay)
                     else:
                         logger.error(
                             f"Database operation {func.__name__} failed after {max_retries} attempts: {e}",
                             extra={"function": func.__name__},
-                            exc_info=True
+                            exc_info=True,
                         )
                 except SQLAlchemyError as e:
                     last_exception = e
                     logger.error(
                         f"Database operation {func.__name__} failed with non-retryable error: {e}",
                         extra={"function": func.__name__},
-                        exc_info=True
+                        exc_info=True,
                     )
                     break
-            
+
             # All retries failed
             if isinstance(last_exception, (OperationalError, DatabaseConnectionError)):
                 raise DatabaseRetryExhaustedError(
                     f"Database operation {func.__name__} failed after {max_retries} attempts: {last_exception}",
-                    ErrorCodes.DATABASE_ERROR
+                    ErrorCodes.DATABASE_ERROR,
                 ) from last_exception
             else:
                 raise DatabaseOperationError(
                     f"Database operation {func.__name__} failed: {last_exception}",
-                    ErrorCodes.DATABASE_ERROR
+                    ErrorCodes.DATABASE_ERROR,
                 ) from last_exception
-        
+
         return wrapper
+
     return decorator
 
 

@@ -20,7 +20,7 @@ import structlog
 from pythonjsonlogger import jsonlogger
 
 from src.infrastructure.configuration.config import get_config
-from src.infrastructure.utilities.constants import LoggingSettings, FileSettings
+from src.infrastructure.utilities.constants import FileSettings, LoggingSettings
 
 
 @dataclass
@@ -237,7 +237,12 @@ class QAEnhancedFormatter(jsonlogger.JsonFormatter):
 class PerformanceLogger:
     """Context manager for performance logging"""
 
-    def __init__(self, operation_name: str, logger: Optional[logging.Logger] = None, details: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        operation_name: str,
+        logger: Optional[logging.Logger] = None,
+        details: Optional[Dict[str, Any]] = None,
+    ):
         self.operation_name = operation_name
         self.logger = logger or logging.getLogger(__name__)
         self.details = details or {}
@@ -253,7 +258,7 @@ class PerformanceLogger:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         duration = (time.time() - self.start_time) * 1000  # Convert to milliseconds
-        
+
         if exc_type is None:
             self.logger.info(
                 f"Completed operation: {self.operation_name}",
@@ -285,7 +290,9 @@ class SecurityLogger:
     def __init__(self, logger: Optional[logging.Logger] = None):
         self.logger = logger or logging.getLogger(__name__)
 
-    def log_suspicious_activity(self, user_id: int, activity: str, details: Optional[Dict[str, Any]] = None):
+    def log_suspicious_activity(
+        self, user_id: int, activity: str, details: Optional[Dict[str, Any]] = None
+    ):
         """Log suspicious user activity"""
         self.logger.warning(
             f"SECURITY EVENT: Suspicious activity detected",
@@ -297,11 +304,19 @@ class SecurityLogger:
             },
         )
 
-    def log_access_attempt(self, user_id: int, resource: str, success: bool, context: Optional[Dict[str, Any]] = None):
+    def log_access_attempt(
+        self,
+        user_id: int,
+        resource: str,
+        success: bool,
+        context: Optional[Dict[str, Any]] = None,
+    ):
         """Log access attempts to protected resources"""
         level = logging.INFO if success else logging.WARNING
-        message = f"SECURITY EVENT: Access {'granted' if success else 'denied'} to {resource}"
-        
+        message = (
+            f"SECURITY EVENT: Access {'granted' if success else 'denied'} to {resource}"
+        )
+
         self.logger.log(
             level,
             message,
@@ -314,7 +329,9 @@ class SecurityLogger:
             },
         )
 
-    def log_rate_limit_exceeded(self, user_id: int, endpoint: str, context: Optional[Dict[str, Any]] = None):
+    def log_rate_limit_exceeded(
+        self, user_id: int, endpoint: str, context: Optional[Dict[str, Any]] = None
+    ):
         """Log rate limit violations"""
         self.logger.warning(
             f"SECURITY EVENT: Rate limit exceeded for {endpoint}",

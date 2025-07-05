@@ -4,11 +4,11 @@ Order Creation Use Case
 Handles the business logic for creating orders from cart items.
 """
 
+import inspect
 import logging
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
-import inspect
 
 from src.application.dtos.order_dtos import (
     CreateOrderRequest,
@@ -23,8 +23,8 @@ from src.domain.value_objects.telegram_id import TelegramId
 from src.infrastructure.services.admin_notification_service import (
     AdminNotificationService,
 )
-from src.infrastructure.utilities.exceptions import BusinessLogicError
 from src.infrastructure.utilities.constants import BusinessSettings
+from src.infrastructure.utilities.exceptions import BusinessLogicError
 
 
 @dataclass
@@ -249,7 +249,9 @@ class OrderCreationUseCase:
     async def _send_admin_notification(self, order_info: OrderInfo):
         if self._admin_notification_service:
             try:
-                notify_result = self._admin_notification_service.notify_new_order(order_info)
+                notify_result = self._admin_notification_service.notify_new_order(
+                    order_info
+                )
                 # Support both async and sync implementations for tests.
                 if inspect.iscoroutine(notify_result):
                     await notify_result

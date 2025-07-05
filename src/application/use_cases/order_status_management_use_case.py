@@ -4,8 +4,8 @@ Order Status Management Use Case
 Handles the business logic for updating order statuses and notifications.
 """
 
-import logging
 import inspect
+import logging
 
 from src.application.dtos.order_dtos import OrderInfo, OrderItemInfo
 from src.domain.repositories.customer_repository import CustomerRepository
@@ -228,12 +228,16 @@ class OrderStatusManagementUseCase:
         """Send notifications for status update"""
         # Notify customer
         if self._customer_notification_service:
-            res = self._customer_notification_service.notify_order_status_update(order_info)
+            res = self._customer_notification_service.notify_order_status_update(
+                order_info
+            )
             if inspect.iscoroutine(res):
                 await res
 
         # Notify admins
         if self._admin_notification_service:
-            res2 = self._admin_notification_service.notify_order_status_update(order_info, old_status)
+            res2 = self._admin_notification_service.notify_order_status_update(
+                order_info, old_status
+            )
             if inspect.iscoroutine(res2):
                 await res2

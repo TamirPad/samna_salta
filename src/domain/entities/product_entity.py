@@ -4,7 +4,7 @@ Product Entity - Core business logic for products
 """
 
 from dataclasses import dataclass
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from src.domain.value_objects.price import Price

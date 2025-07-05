@@ -9,7 +9,7 @@ import time
 import traceback
 from typing import Optional
 
-from telegram import Update, Message, MaybeInaccessibleMessage
+from telegram import MaybeInaccessibleMessage, Message, Update
 from telegram.ext import ContextTypes
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,12 @@ logger = logging.getLogger(__name__)
 class SamnaSaltaError(Exception):
     """Base exception for all Samna Salta errors"""
 
-    def __init__(self, message: str, user_message: Optional[str] = None, error_code: Optional[str] = None):
+    def __init__(
+        self,
+        message: str,
+        user_message: Optional[str] = None,
+        error_code: Optional[str] = None,
+    ):
         super().__init__(message)
         self.message = message
         self.user_message = user_message or "An error occurred. Please try again."
@@ -35,21 +40,25 @@ class DatabaseError(SamnaSaltaError):
 
 class DatabaseOperationError(DatabaseError):
     """Specific database operation errors"""
+
     pass
 
 
 class DatabaseConnectionError(DatabaseError):
     """Database connection errors"""
+
     pass
 
 
 class DatabaseTimeoutError(DatabaseError):
     """Database timeout errors"""
+
     pass
 
 
 class DatabaseRetryExhaustedError(DatabaseError):
     """Error when database retries are exhausted"""
+
     pass
 
 
@@ -70,6 +79,7 @@ class BusinessLogicError(SamnaSaltaError):
 
 class OrderError(BusinessLogicError):
     """Order-related business logic errors"""
+
     pass
 
 
@@ -83,26 +93,31 @@ class OrderNotFoundError(OrderError):
 
 class OrderStatusError(OrderError):
     """Invalid order status transition error"""
+
     pass
 
 
 class CartError(BusinessLogicError):
     """Cart-related errors"""
+
     pass
 
 
 class ProductError(BusinessLogicError):
     """Product-related errors"""
+
     pass
 
 
 class CustomerError(BusinessLogicError):
     """Customer-related errors"""
+
     pass
 
 
 class AuthenticationError(SamnaSaltaError):
     """Authentication and authorization errors"""
+
     pass
 
 
@@ -117,16 +132,19 @@ class RateLimitExceededError(SamnaSaltaError):
 
 class ConfigurationError(SamnaSaltaError):
     """Configuration-related errors"""
+
     pass
 
 
 class ExternalServiceError(SamnaSaltaError):
     """External service errors (Telegram API, etc.)"""
+
     pass
 
 
 class TelegramError(ExternalServiceError):
     """Telegram-specific errors"""
+
     pass
 
 
@@ -267,7 +285,7 @@ class ErrorReporter:
         error: Exception,
         update: Optional[Update] = None,
         context=None,
-        user_message: Optional[str] = None
+        user_message: Optional[str] = None,
     ) -> None:
         """Report error with proper context"""
         # Log the error
@@ -276,15 +294,19 @@ class ErrorReporter:
             exc_info=True,
             extra={
                 "error_type": type(error).__name__,
-                "user_id": update.effective_user.id if update and update.effective_user else None,
+                "user_id": update.effective_user.id
+                if update and update.effective_user
+                else None,
                 "update_type": type(update).__name__ if update else None,
-            }
+            },
         )
 
         # Send user-friendly message
         if update:
-            error_text = user_message or getattr(error, 'user_message', 'An error occurred. Please try again.')
-            
+            error_text = user_message or getattr(
+                error, "user_message", "An error occurred. Please try again."
+            )
+
             # For callback queries
             if update.callback_query:
                 await send_callback_error_message(update.callback_query, error_text)
@@ -298,29 +320,26 @@ error_reporter = ErrorReporter()
 
 
 async def send_error_message(
-    update: Update,
-    message: Optional[Message],
-    error_text: str
+    update: Update, message: Optional[Message], error_text: str
 ) -> None:
     """Send error message safely to user"""
     try:
-        if message and hasattr(message, 'reply_text'):
+        if message and hasattr(message, "reply_text"):
             await message.reply_text(error_text)
-        elif update.effective_message and hasattr(update.effective_message, 'reply_text'):
+        elif update.effective_message and hasattr(
+            update.effective_message, "reply_text"
+        ):
             await update.effective_message.reply_text(error_text)
     except Exception as e:
         logger.error(f"Failed to send error message: {e}")
 
 
-async def send_callback_error_message(
-    query,
-    error_text: str
-) -> None:
+async def send_callback_error_message(query, error_text: str) -> None:
     """Send error message for callback queries safely"""
     try:
-        if query and hasattr(query, 'message'):
+        if query and hasattr(query, "message"):
             message = query.message
-            if message and hasattr(message, 'reply_text'):
+            if message and hasattr(message, "reply_text"):
                 await message.reply_text(error_text)
     except Exception as e:
         logger.error(f"Failed to send callback error message: {e}")

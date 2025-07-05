@@ -5,29 +5,46 @@ Uses constants for TTL values and proper type annotations for better maintainabi
 """
 
 import logging
+import threading
 import time
-from typing import Any, Dict, Optional, Union, TypeVar, Generic
+from functools import wraps
 from threading import Lock
+from typing import Any, Dict, Generic, Optional, TypeVar, Union
+
+# Optional heavy imports – only needed if advanced DB optimisation modules are installed.
+try:
+    from src.infrastructure.database.database_optimizations import (
+        get_database_manager,  # type: ignore
+    )
+    from src.infrastructure.performance.query_optimizer import (
+        OptimizedQueries,  # type: ignore
+    )
+except ImportError:  # pragma: no cover
+    OptimizedQueries = None  # type: ignore
+
+    def get_database_manager():  # type: ignore
+        return None
+
 
 from src.infrastructure.utilities.constants import CacheSettings
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class CacheEntry(Generic[T]):
     """Cache entry with timestamp and value"""
-    
+
     def __init__(self, value: T, ttl: int):
         self.value = value
         self.expires_at = time.time() + ttl
         self.created_at = time.time()
-    
+
     def is_expired(self) -> bool:
         """Check if cache entry is expired"""
         return time.time() > self.expires_at
-    
+
     def get_age(self) -> float:
         """Get age of cache entry in seconds"""
         return time.time() - self.created_at
@@ -77,7 +94,7 @@ class CacheManager:
         """Set value in cache with TTL"""
         if ttl is None:
             ttl = CacheSettings.GENERAL_CACHE_TTL_SECONDS
-            
+
         with self.lock:
             self.cache[key] = CacheEntry(value, ttl)
             self.stats["sets"] += 1
@@ -96,38 +113,34 @@ class CacheManager:
         """Clear all cache entries"""
         with self.lock:
             self.cache.clear()
-            self.stats = {
-                "hits": 0,
-                "misses": 0,
-                "sets": 0,
-                "evictions": 0
-            }
+            self.stats = {"hits": 0, "misses": 0, "sets": 0, "evictions": 0}
             logger.info("Cache cleared")
 
     def cleanup_expired(self) -> int:
         """Remove expired entries and return count"""
         with self.lock:
             expired_keys = [
-                key for key, entry in self.cache.items()
-                if entry.is_expired()
+                key for key, entry in self.cache.items() if entry.is_expired()
             ]
-            
+
             for key in expired_keys:
                 del self.cache[key]
-                
+
             self.stats["evictions"] += len(expired_keys)
-            
+
             if expired_keys:
                 logger.debug(f"Cleaned up {len(expired_keys)} expired cache entries")
-                
+
             return len(expired_keys)
 
     def get_stats(self) -> Dict[str, Union[int, float]]:
         """Get cache statistics"""
         with self.lock:
             total_requests = self.stats["hits"] + self.stats["misses"]
-            hit_rate = (self.stats["hits"] / total_requests) if total_requests > 0 else 0.0
-            
+            hit_rate = (
+                (self.stats["hits"] / total_requests) if total_requests > 0 else 0.0
+            )
+
             return {
                 "hits": self.stats["hits"],
                 "misses": self.stats["misses"],
@@ -135,7 +148,7 @@ class CacheManager:
                 "evictions": self.stats["evictions"],
                 "hit_rate": hit_rate,
                 "total_entries": len(self.cache),
-                "total_requests": total_requests
+                "total_requests": total_requests,
             }
 
     def get_cache_info(self) -> Dict[str, Any]:
@@ -143,17 +156,16 @@ class CacheManager:
         with self.lock:
             entries_info = []
             for key, entry in self.cache.items():
-                entries_info.append({
-                    "key": key,
-                    "age": entry.get_age(),
-                    "expires_in": entry.expires_at - time.time(),
-                    "is_expired": entry.is_expired()
-                })
-            
-            return {
-                "stats": self.get_stats(),
-                "entries": entries_info
-            }
+                entries_info.append(
+                    {
+                        "key": key,
+                        "age": entry.get_age(),
+                        "expires_in": entry.expires_at - time.time(),
+                        "is_expired": entry.is_expired(),
+                    }
+                )
+
+            return {"stats": self.get_stats(), "entries": entries_info}
 
     # ------------------------------------------------------------------
     # Convenience wrapper methods for product cache
@@ -195,7 +207,9 @@ class CacheManager:
 
     def set_products_by_category(self, category: str, products: Any):
         """Cache list of products for a given category (wrapper used by tests)."""
-        self.products_cache.set(f"category_{category}", products, CacheSettings.PRODUCTS_CACHE_TTL_SECONDS)
+        self.products_cache.set(
+            f"category_{category}", products, CacheSettings.PRODUCTS_CACHE_TTL_SECONDS
+        )
 
     def get_products_by_category(self, category: str):
         return self.products_cache.get(f"category_{category}")
@@ -221,11 +235,15 @@ class ProductCacheManager(CacheManager):
 
     def set_product(self, product_id: int, product: Any) -> None:
         """Cache product with specific TTL"""
-        self.set(f"product_{product_id}", product, CacheSettings.PRODUCTS_CACHE_TTL_SECONDS)
+        self.set(
+            f"product_{product_id}", product, CacheSettings.PRODUCTS_CACHE_TTL_SECONDS
+        )
 
     # High-level category operations expected by tests
     def set_products_by_category(self, category: str, products: Any):
-        self.set(f"category_{category}", products, CacheSettings.PRODUCTS_CACHE_TTL_SECONDS)
+        self.set(
+            f"category_{category}", products, CacheSettings.PRODUCTS_CACHE_TTL_SECONDS
+        )
 
     def get_products_by_category(self, category: str):
         return self.get(f"category_{category}")
@@ -243,7 +261,11 @@ class CustomerCacheManager(CacheManager):
 
     def set_customer(self, telegram_id: int, customer: Any) -> None:
         """Cache customer with specific TTL"""
-        self.set(f"customer_{telegram_id}", customer, CacheSettings.CUSTOMERS_CACHE_TTL_SECONDS)
+        self.set(
+            f"customer_{telegram_id}",
+            customer,
+            CacheSettings.CUSTOMERS_CACHE_TTL_SECONDS,
+        )
 
     def get_all_customers(self) -> Optional[Any]:
         """Get cached customer list"""
@@ -320,38 +342,38 @@ def get_general_cache() -> CacheManager:
 def cleanup_all_caches() -> Dict[str, int]:
     """Clean up expired entries from all caches"""
     results = {}
-    
+
     if _product_cache:
         results["products"] = _product_cache.cleanup_expired()
-    
+
     if _customer_cache:
         results["customers"] = _customer_cache.cleanup_expired()
-    
+
     if _order_cache:
         results["orders"] = _order_cache.cleanup_expired()
-    
+
     if _general_cache:
         results["general"] = _general_cache.cleanup_expired()
-    
+
     return results
 
 
 def get_all_cache_stats() -> Dict[str, Any]:
     """Get statistics from all caches"""
     stats = {}
-    
+
     if _product_cache:
         stats["products"] = _product_cache.get_stats()
-    
+
     if _customer_cache:
         stats["customers"] = _customer_cache.get_stats()
-    
+
     if _order_cache:
         stats["orders"] = _order_cache.get_stats()
-    
+
     if _general_cache:
         stats["general"] = _general_cache.get_stats()
-    
+
     return stats
 
 

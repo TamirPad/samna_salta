@@ -120,9 +120,7 @@ class CartManagementUseCase:
 
         except ValueError as e:
             self._logger.error("💥 VALIDATION ERROR adding to cart: %s", e)
-            return CartOperationResponse(
-                success=False, error_message=str(e)
-            )
+            return CartOperationResponse(success=False, error_message=str(e))
         except (TypeError, AttributeError) as e:
             self._logger.error(
                 "💥 UNEXPECTED ERROR adding to cart: %s", e, exc_info=True

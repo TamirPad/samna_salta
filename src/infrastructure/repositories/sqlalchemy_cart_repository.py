@@ -3,8 +3,8 @@ SQLAlchemy implementation of CartRepository
 """
 
 import logging
-from typing import Any
 from contextlib import contextmanager
+from typing import Any
 
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -13,7 +13,9 @@ from src.domain.value_objects.product_id import ProductId
 from src.domain.value_objects.telegram_id import TelegramId
 from src.infrastructure.database.models import Cart as SQLCart
 from src.infrastructure.database.models import Product as SQLProduct
-from src.infrastructure.database.operations import get_session  # compatibility for tests
+from src.infrastructure.database.operations import (  # compatibility for tests
+    get_session,
+)
 
 logger = logging.getLogger(__name__)
 
