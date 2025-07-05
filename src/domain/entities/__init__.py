@@ -7,6 +7,4 @@ These represent the fundamental business concepts and rules.
 
 from .customer_entity import Customer
 
-__all__ = [
-    'Customer'
-] 
+__all__ = ["Customer"]

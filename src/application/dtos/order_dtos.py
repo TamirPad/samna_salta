@@ -5,13 +5,14 @@ Data Transfer Objects for order-related operations.
 """
 
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
 class CreateOrderRequest:
     """Request to create an order"""
+
     telegram_id: int
     delivery_method: Optional[str] = None  # 'pickup' or 'delivery'
     delivery_address: Optional[str] = None
@@ -21,6 +22,7 @@ class CreateOrderRequest:
 @dataclass
 class OrderItemInfo:
     """Order item information"""
+
     product_name: str
     quantity: int
     unit_price: float
@@ -31,6 +33,7 @@ class OrderItemInfo:
 @dataclass
 class OrderInfo:
     """Complete order information"""
+
     order_id: int
     order_number: str
     customer_name: str
@@ -49,6 +52,7 @@ class OrderInfo:
 @dataclass
 class OrderCreationResponse:
     """Response from order creation"""
+
     success: bool
     order_info: Optional[OrderInfo] = None
     error_message: Optional[str] = None
@@ -57,12 +61,14 @@ class OrderCreationResponse:
 @dataclass
 class OrderSummaryRequest:
     """Request to get order summary"""
+
     telegram_id: int
 
 
 @dataclass
 class OrderListRequest:
     """Request to list orders"""
+
     customer_id: Optional[int] = None
     telegram_id: Optional[int] = None
     status: Optional[str] = None
@@ -72,7 +78,8 @@ class OrderListRequest:
 @dataclass
 class OrderListResponse:
     """Response with list of orders"""
+
     success: bool
     orders: List[OrderInfo]
     total_count: int
-    error_message: Optional[str] = None 
+    error_message: Optional[str] = None

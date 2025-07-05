@@ -7,6 +7,4 @@ These follow the Repository pattern and Dependency Inversion principle.
 
 from .customer_repository import CustomerRepository
 
-__all__ = [
-    'CustomerRepository'
-] 
+__all__ = ["CustomerRepository"]

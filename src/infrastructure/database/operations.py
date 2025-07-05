@@ -4,13 +4,14 @@ Database operations for the Samna Salta bot
 
 import logging
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.exc import SQLAlchemyError
+from typing import Any, Dict, List, Optional
 
-from .models import Base, Customer, Product, Order, OrderItem, Cart
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session, sessionmaker
+
 from ..configuration.config import get_config
+from .models import Base, Cart, Customer, Order, OrderItem, Product
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,9 @@ def get_session() -> Session:
     """Get database session"""
     global _SessionLocal
     if _SessionLocal is None:
-        _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=get_engine())
+        _SessionLocal = sessionmaker(
+            autocommit=False, autoflush=False, bind=get_engine()
+        )
     return _SessionLocal()
 
 
@@ -42,10 +45,10 @@ def init_db():
         engine = get_engine()
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables created successfully")
-        
+
         # Initialize default products
         init_default_products()
-        
+
     except SQLAlchemyError as e:
         logger.error(f"Failed to initialize database: {e}")
         raise
@@ -59,7 +62,7 @@ def init_default_products():
         if session.query(Product).count() > 0:
             logger.info("Products already exist, skipping initialization")
             return
-        
+
         # Default products configuration
         products = [
             {
@@ -69,8 +72,8 @@ def init_default_products():
                 "base_price": 25.00,
                 "options": {
                     "type": ["Classic", "Seeded", "Herb", "Aromatic"],
-                    "oil": ["Olive oil", "Samneh"]
-                }
+                    "oil": ["Olive oil", "Samneh"],
+                },
             },
             {
                 "name": "Samneh",
@@ -79,55 +82,53 @@ def init_default_products():
                 "base_price": 15.00,
                 "options": {
                     "smoking": ["Smoked", "Not smoked"],
-                    "size": ["Small", "Large"]
-                }
+                    "size": ["Small", "Large"],
+                },
             },
             {
                 "name": "Red Bisbas",
                 "category": "spice",
                 "description": "Traditional Yemenite spice blend",
                 "base_price": 12.00,
-                "options": {
-                    "size": ["Small", "Large"]
-                }
+                "options": {"size": ["Small", "Large"]},
             },
             {
                 "name": "Hawaij soup spice",
                 "category": "spice",
                 "description": "Traditional soup spice blend",
                 "base_price": 8.00,
-                "options": {}
+                "options": {},
             },
             {
                 "name": "Hawaij coffee spice",
                 "category": "spice",
                 "description": "Traditional coffee spice blend",
                 "base_price": 8.00,
-                "options": {}
+                "options": {},
             },
             {
                 "name": "White coffee",
                 "category": "beverage",
                 "description": "Traditional Yemenite white coffee",
                 "base_price": 10.00,
-                "options": {}
+                "options": {},
             },
             {
                 "name": "Hilbeh",
                 "category": "spread",
                 "description": "Traditional fenugreek spread (available Wed-Fri only)",
                 "base_price": 18.00,
-                "options": {}
-            }
+                "options": {},
+            },
         ]
-        
+
         for product_data in products:
             product = Product(**product_data)
             session.add(product)
-        
+
         session.commit()
         logger.info(f"Initialized {len(products)} default products")
-        
+
     except SQLAlchemyError as e:
         session.rollback()
         logger.error(f"Failed to initialize products: {e}")
@@ -137,14 +138,18 @@ def init_default_products():
 
 
 # Customer operations
-def get_or_create_customer(telegram_id: int, full_name: str, phone_number: str) -> Customer:
+def get_or_create_customer(
+    telegram_id: int, full_name: str, phone_number: str
+) -> Customer:
     """Get existing customer or create new one"""
     session = get_session()
     try:
-        customer = session.query(Customer).filter(
-            Customer.phone_number == phone_number
-        ).first()
-        
+        customer = (
+            session.query(Customer)
+            .filter(Customer.phone_number == phone_number)
+            .first()
+        )
+
         if customer:
             # Update telegram_id if it changed
             if customer.telegram_id != telegram_id:
@@ -152,18 +157,16 @@ def get_or_create_customer(telegram_id: int, full_name: str, phone_number: str) 
                 customer.updated_at = datetime.utcnow()
                 session.commit()
             return customer
-        
+
         # Create new customer
         customer = Customer(
-            telegram_id=telegram_id,
-            full_name=full_name,
-            phone_number=phone_number
+            telegram_id=telegram_id, full_name=full_name, phone_number=phone_number
         )
         session.add(customer)
         session.commit()
         session.refresh(customer)
         return customer
-        
+
     except SQLAlchemyError as e:
         session.rollback()
         logger.error(f"Failed to get/create customer: {e}")
@@ -176,9 +179,9 @@ def get_customer_by_telegram_id(telegram_id: int) -> Optional[Customer]:
     """Get customer by telegram ID"""
     session = get_session()
     try:
-        return session.query(Customer).filter(
-            Customer.telegram_id == telegram_id
-        ).first()
+        return (
+            session.query(Customer).filter(Customer.telegram_id == telegram_id).first()
+        )
     finally:
         session.close()
 
@@ -188,7 +191,7 @@ def get_all_products() -> List[Product]:
     """Get all active products"""
     session = get_session()
     try:
-        return session.query(Product).filter(Product.is_active == True).all()
+        return session.query(Product).filter(Product.is_active).all()
     finally:
         session.close()
 
@@ -217,15 +220,15 @@ def get_or_create_cart(telegram_id: int) -> Cart:
     session = get_session()
     try:
         cart = session.query(Cart).filter(Cart.telegram_id == telegram_id).first()
-        
+
         if not cart:
             cart = Cart(telegram_id=telegram_id, items=[])
             session.add(cart)
             session.commit()
             session.refresh(cart)
-        
+
         return cart
-        
+
     except SQLAlchemyError as e:
         session.rollback()
         logger.error(f"Failed to get/create cart: {e}")
@@ -234,7 +237,9 @@ def get_or_create_cart(telegram_id: int) -> Cart:
         session.close()
 
 
-def add_to_cart(telegram_id: int, product_id: int, quantity: int = 1, options: dict = None) -> bool:
+def add_to_cart(
+    telegram_id: int, product_id: int, quantity: int = 1, options: dict = None
+) -> bool:
     """Add item to cart"""
     session = get_session()
     try:
@@ -242,42 +247,44 @@ def add_to_cart(telegram_id: int, product_id: int, quantity: int = 1, options: d
         product = session.query(Product).filter(Product.id == product_id).first()
         if not product:
             return False
-        
+
         # Get or create cart
         cart = session.query(Cart).filter(Cart.telegram_id == telegram_id).first()
         if not cart:
             cart = Cart(telegram_id=telegram_id, items=[])
             session.add(cart)
-        
+
         # Current cart items
         items = cart.items or []
-        
+
         # Check if item already exists in cart
         item_key = f"{product_id}_{str(options) if options else 'none'}"
         existing_item = None
         for i, item in enumerate(items):
-            if item.get('product_id') == product_id and item.get('options') == options:
+            if item.get("product_id") == product_id and item.get("options") == options:
                 existing_item = i
                 break
-        
+
         if existing_item is not None:
             # Update quantity
-            items[existing_item]['quantity'] += quantity
+            items[existing_item]["quantity"] += quantity
         else:
             # Add new item
-            items.append({
-                'product_id': product_id,
-                'product_name': product.name,
-                'quantity': quantity,
-                'unit_price': product.base_price,
-                'options': options or {}
-            })
-        
+            items.append(
+                {
+                    "product_id": product_id,
+                    "product_name": product.name,
+                    "quantity": quantity,
+                    "unit_price": product.base_price,
+                    "options": options or {},
+                }
+            )
+
         cart.items = items
         cart.updated_at = datetime.utcnow()
         session.commit()
         return True
-        
+
     except SQLAlchemyError as e:
         session.rollback()
         logger.error(f"Failed to add to cart: {e}")
@@ -295,10 +302,11 @@ def get_cart_items(telegram_id: int) -> List[Dict]:
             # Convert to cart item objects for compatibility
             cart_items = []
             for item in cart.items:
-                cart_item = type('CartItem', (), {
-                    'product_id': item['product_id'],
-                    'quantity': item['quantity']
-                })()
+                cart_item = type(
+                    "CartItem",
+                    (),
+                    {"product_id": item["product_id"], "quantity": item["quantity"]},
+                )()
                 cart_items.append(cart_item)
             return cart_items
         return []
@@ -306,12 +314,17 @@ def get_cart_items(telegram_id: int) -> List[Dict]:
         session.close()
 
 
-def update_cart(telegram_id: int, items: List[Dict], delivery_method: str = None, delivery_address: str = None):
+def update_cart(
+    telegram_id: int,
+    items: List[Dict],
+    delivery_method: str = None,
+    delivery_address: str = None,
+):
     """Update cart items and delivery info"""
     session = get_session()
     try:
         cart = session.query(Cart).filter(Cart.telegram_id == telegram_id).first()
-        
+
         if cart:
             cart.items = items
             cart.delivery_method = delivery_method
@@ -322,12 +335,12 @@ def update_cart(telegram_id: int, items: List[Dict], delivery_method: str = None
                 telegram_id=telegram_id,
                 items=items,
                 delivery_method=delivery_method,
-                delivery_address=delivery_address
+                delivery_address=delivery_address,
             )
             session.add(cart)
-        
+
         session.commit()
-        
+
     except SQLAlchemyError as e:
         session.rollback()
         logger.error(f"Failed to update cart: {e}")
@@ -353,18 +366,22 @@ def clear_cart(telegram_id: int):
 
 
 # Order operations
-def create_order(customer_id: int, total_amount: float, delivery_method: str = 'pickup', 
-                delivery_address: str = None) -> Optional[Order]:
+def create_order(
+    customer_id: int,
+    total_amount: float,
+    delivery_method: str = "pickup",
+    delivery_address: str = None,
+) -> Optional[Order]:
     """Create new order with items"""
     session = get_session()
     try:
         # Generate order number
         order_number = generate_order_number()
-        
+
         # Calculate delivery charge
-        delivery_charge = 5.0 if delivery_method == 'delivery' else 0.0
+        delivery_charge = 5.0 if delivery_method == "delivery" else 0.0
         subtotal = total_amount - delivery_charge
-        
+
         # Create order
         order = Order(
             customer_id=customer_id,
@@ -373,15 +390,19 @@ def create_order(customer_id: int, total_amount: float, delivery_method: str = '
             delivery_address=delivery_address,
             delivery_charge=delivery_charge,
             subtotal=subtotal,
-            total=total_amount
+            total=total_amount,
         )
         session.add(order)
         session.flush()  # Get the order ID
-        
+
         # Get customer's cart to create order items
         customer = session.query(Customer).filter(Customer.id == customer_id).first()
         if customer:
-            cart = session.query(Cart).filter(Cart.telegram_id == customer.telegram_id).first()
+            cart = (
+                session.query(Cart)
+                .filter(Cart.telegram_id == customer.telegram_id)
+                .first()
+            )
             if cart and cart.items:
                 for item_data in cart.items:
                     order_item = OrderItem(
@@ -390,14 +411,14 @@ def create_order(customer_id: int, total_amount: float, delivery_method: str = '
                         product_options=item_data.get("options"),
                         quantity=item_data["quantity"],
                         unit_price=item_data["unit_price"],
-                        total_price=item_data["unit_price"] * item_data["quantity"]
+                        total_price=item_data["unit_price"] * item_data["quantity"],
                     )
                     session.add(order_item)
-        
+
         session.commit()
         session.refresh(order)
         return order
-        
+
     except SQLAlchemyError as e:
         session.rollback()
         logger.error(f"Failed to create order: {e}")
@@ -427,4 +448,4 @@ def get_all_orders() -> List[Order]:
     try:
         return session.query(Order).order_by(Order.created_at.desc()).all()
     finally:
-        session.close() 
+        session.close()
