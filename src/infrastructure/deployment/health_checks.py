@@ -7,18 +7,20 @@ and overall system health monitoring.
 
 import asyncio
 import logging
-import psutil
 import time
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
+from typing import Any
 
-from ..database.database_optimizations import DatabaseConnectionManager
-from ..cache.cache_manager import CacheManager
-from ..security.rate_limiter import RateLimiter
-from ..logging.logger_config import get_performance_metrics
-from ..logging.error_handler import get_error_statistics
+import httpx
+import psutil
+from sqlalchemy import text
+
+from src.infrastructure.cache.cache_manager import CacheManager
+from src.infrastructure.database.operations import get_engine
+from src.infrastructure.logging.error_handler import get_error_statistics
+from src.infrastructure.logging.logger_config import get_performance_metrics
 
 
 class HealthStatus(Enum):
@@ -37,7 +39,7 @@ class HealthCheckResult:
     message: str
     response_time: float
     timestamp: datetime
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
 
 class SystemHealthMonitor:
@@ -55,12 +57,12 @@ class SystemHealthMonitor:
             'error_rate': 5.0
         }
     
-    async def perform_all_health_checks(self) -> Dict[str, Any]:
+    async def perform_all_health_checks(self) -> dict[str, Any]:
         """Perform all health checks and return comprehensive status"""
         start_time = time.time()
         
         health_checks = await asyncio.gather(
-            self._check_database_health(),
+            self.check_database_health(),
             self._check_cache_health(),
             self._check_system_resources(),
             self._check_application_health(),
@@ -97,19 +99,16 @@ class SystemHealthMonitor:
             "timestamp": datetime.now().isoformat(),
             "uptime": str(datetime.now() - self.start_time),
             "total_check_time": round(total_time, 3),
-            "checks": {k: self._serialize_health_check(v) for k, v in results.items()},
+            "checks": {k: self.serialize_health_check(v) for k, v in results.items()},
             "summary": self._generate_health_summary(results)
         }
     
-    async def _check_database_health(self) -> HealthCheckResult:
+    async def check_database_health(self) -> HealthCheckResult:
         """Check database connectivity and performance"""
         start_time = time.time()
         
         try:
             # Try to get database connection manager
-            from ..database.operations import get_engine
-            from sqlalchemy import text
-            
             engine = get_engine()
             with engine.connect() as conn:
                 # Test basic connectivity
@@ -126,7 +125,6 @@ class SystemHealthMonitor:
                     "checked_in": pool.checkedin(),
                     "checked_out": pool.checkedout(),
                     "overflow": pool.overflow(),
-                    "invalid": pool.invalid()
                 }
                 
                 # Determine health based on response time and pool status
@@ -149,7 +147,7 @@ class SystemHealthMonitor:
                     metadata=pool_status
                 )
                 
-        except Exception as e:
+        except (IOError, OSError) as e:
             return HealthCheckResult(
                 service="database",
                 status=HealthStatus.CRITICAL,
@@ -170,17 +168,17 @@ class SystemHealthMonitor:
             test_key = "health_check_test"
             test_value = "test_value"
             
-            cache_manager.set(test_key, test_value, ttl=60)
-            retrieved_value = cache_manager.get(test_key)
+            cache_manager.general_cache.set(test_key, test_value, ttl=60)
+            retrieved_value = cache_manager.general_cache.get(test_key)
             
             if retrieved_value != test_value:
-                raise Exception("Cache set/get test failed")
+                raise RuntimeError("Cache set/get test failed")
             
             # Clean up test data
-            cache_manager.delete(test_key)
+            cache_manager.general_cache.delete(test_key)
             
             # Get cache statistics
-            stats = cache_manager.get_statistics()
+            stats = cache_manager.general_cache.get_stats()
             response_time = time.time() - start_time
             
             # Determine health based on hit rate
@@ -201,7 +199,7 @@ class SystemHealthMonitor:
                 metadata=stats
             )
             
-        except Exception as e:
+        except (IOError, OSError) as e:
             return HealthCheckResult(
                 service="cache",
                 status=HealthStatus.CRITICAL,
@@ -255,62 +253,59 @@ class SystemHealthMonitor:
                 metadata=system_metrics
             )
             
-        except Exception as e:
+        except (IOError, OSError) as e:
             return HealthCheckResult(
                 service="system",
                 status=HealthStatus.CRITICAL,
-                message=f"System health check failed: {str(e)}",
+                message=f"System resource check failed: {str(e)}",
                 response_time=time.time() - start_time,
                 timestamp=datetime.now(),
                 metadata={"error": str(e)}
             )
     
     async def _check_application_health(self) -> HealthCheckResult:
-        """Check application-specific health metrics"""
+        """Check application-level health (errors, performance)"""
         start_time = time.time()
         
         try:
-            # Get performance metrics
-            perf_metrics = get_performance_metrics()
+            # Check error rates
             error_stats = get_error_statistics()
-            
-            # Calculate error rate
-            total_requests = perf_metrics.get('total_requests', 0)
-            error_requests = error_stats.get('total_errors', 0)
-            error_rate = (error_requests / max(1, total_requests)) * 100
-            
-            app_metrics = {
-                "total_requests": total_requests,
-                "error_rate": error_rate,
-                "avg_response_time": perf_metrics.get('avg_response_time', 0),
-                "slow_requests": perf_metrics.get('slow_requests', 0),
-                "recent_errors": error_stats.get('recent_error_count', 0)
-            }
-            
+            total_errors = sum(error_stats.values())
+            # Assuming a way to get total requests, placeholder here
+            total_requests = get_performance_metrics().get("total_requests", 1)
+            error_rate = (total_errors / total_requests * 100) if total_requests > 0 else 0
+
+            # Check performance metrics
+            perf_metrics = get_performance_metrics()
+            avg_response_time = perf_metrics.get("average_response_time", 0)
+
             # Determine health
             issues = []
             if error_rate > self.alert_thresholds['error_rate']:
-                issues.append(f"High error rate: {error_rate:.1f}%")
-            if perf_metrics.get('avg_response_time', 0) > self.alert_thresholds['response_time']:
-                issues.append(f"Slow response time: {perf_metrics.get('avg_response_time', 0):.2f}s")
-            
+                issues.append(f"High error rate: {error_rate:.2f}%")
+            if avg_response_time > self.alert_thresholds['response_time']:
+                issues.append(f"Slow response time: {avg_response_time:.2f}s")
+
             if issues:
                 status = HealthStatus.DEGRADED
                 message = "; ".join(issues)
             else:
                 status = HealthStatus.HEALTHY
                 message = "Application is healthy"
-            
+
             return HealthCheckResult(
                 service="application",
                 status=status,
                 message=message,
                 response_time=time.time() - start_time,
                 timestamp=datetime.now(),
-                metadata=app_metrics
+                metadata={
+                    "error_stats": error_stats,
+                    "performance_metrics": perf_metrics
+                }
             )
-            
-        except Exception as e:
+
+        except (IOError, OSError) as e:
             return HealthCheckResult(
                 service="application",
                 status=HealthStatus.CRITICAL,
@@ -321,109 +316,104 @@ class SystemHealthMonitor:
             )
     
     async def _check_external_services(self) -> HealthCheckResult:
-        """Check external service dependencies"""
+        """Check connectivity to external services"""
         start_time = time.time()
-        
+        telegram_api_url = "https://api.telegram.org"
+
         try:
-            # Check Telegram API connectivity
-            import httpx
-            
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get("https://api.telegram.org/bot123:test/getMe")
-                # We expect this to fail with 401, but it means the API is reachable
-                
-            external_status = {
-                "telegram_api": "reachable",
-                "response_time": time.time() - start_time
-            }
-            
+            async with httpx.AsyncClient() as client:
+                response = await client.get(telegram_api_url, timeout=10)
+                response.raise_for_status()
+
             return HealthCheckResult(
-                service="external",
+                service="external_services",
                 status=HealthStatus.HEALTHY,
-                message="External services are reachable",
+                message="Telegram API is reachable",
                 response_time=time.time() - start_time,
                 timestamp=datetime.now(),
-                metadata=external_status
+                metadata={"telegram_api_status": "ok"}
+            )
+        except httpx.RequestError as e:
+            return HealthCheckResult(
+                service="external_services",
+                status=HealthStatus.UNHEALTHY,
+                message=f"Telegram API unreachable: {e}",
+                response_time=time.time() - start_time,
+                timestamp=datetime.now(),
+                metadata={"telegram_api_status": "unreachable"}
             )
             
-        except Exception as e:
-            return HealthCheckResult(
-                service="external",
-                status=HealthStatus.DEGRADED,
-                message=f"External service check failed: {str(e)}",
-                response_time=time.time() - start_time,
-                timestamp=datetime.now(),
-                metadata={"error": str(e)}
-            )
-    
-    def _serialize_health_check(self, result: HealthCheckResult) -> Dict[str, Any]:
-        """Serialize health check result for JSON output"""
+    def serialize_health_check(self, result: HealthCheckResult) -> dict[str, Any]:
+        """Serialize HealthCheckResult to a dictionary"""
         return {
+            "service": result.service,
             "status": result.status.value,
             "message": result.message,
             "response_time": round(result.response_time, 3),
             "timestamp": result.timestamp.isoformat(),
             "metadata": result.metadata
         }
-    
-    def _generate_health_summary(self, results: Dict[str, HealthCheckResult]) -> Dict[str, Any]:
-        """Generate a summary of health check results"""
-        status_counts = {}
-        total_response_time = 0
+
+    def _generate_health_summary(self, results: dict[str, HealthCheckResult]) -> dict[str, Any]:
+        """Generate a summary of all health checks"""
+        summary = {
+            "healthy_services": [],
+            "degraded_services": [],
+            "unhealthy_services": [],
+            "critical_services": [],
+        }
         
         for result in results.values():
-            status = result.status.value
-            status_counts[status] = status_counts.get(status, 0) + 1
-            total_response_time += result.response_time
-        
-        return {
-            "total_checks": len(results),
-            "status_distribution": status_counts,
-            "average_response_time": round(total_response_time / max(1, len(results)), 3),
-            "critical_issues": status_counts.get("critical", 0),
-            "degraded_services": status_counts.get("degraded", 0)
-        }
+            if result.status == HealthStatus.HEALTHY:
+                summary["healthy_services"].append(result.service)
+            elif result.status == HealthStatus.DEGRADED:
+                summary["degraded_services"].append(result.service)
+            elif result.status == HealthStatus.UNHEALTHY:
+                summary["unhealthy_services"].append(result.service)
+            else:
+                summary["critical_services"].append(result.service)
+                
+        return summary
 
 
 # Global health monitor instance
 health_monitor = SystemHealthMonitor()
 
 
-async def get_health_status() -> Dict[str, Any]:
-    """Get current system health status"""
-    return await health_monitor.perform_all_health_checks()
+async def get_health_status() -> dict[str, Any]:
+    """Get overall health status of the application"""
+    monitor = SystemHealthMonitor()
+    return await monitor.perform_all_health_checks()
 
 
-async def get_liveness_check() -> Dict[str, Any]:
-    """Simple liveness check for basic health"""
+async def get_liveness_check() -> dict[str, Any]:
+    """Basic check to see if the application is running"""
     return {
         "status": "alive",
         "timestamp": datetime.now().isoformat(),
-        "uptime": str(datetime.now() - health_monitor.start_time)
     }
 
 
-async def get_readiness_check() -> Dict[str, Any]:
-    """Readiness check for deployment readiness"""
-    # Check critical services only
-    db_check = await health_monitor._check_database_health()
-    cache_check = await health_monitor._check_cache_health()
-    
-    if db_check.status == HealthStatus.CRITICAL or cache_check.status == HealthStatus.CRITICAL:
+async def get_readiness_check() -> dict[str, Any]:
+    """Check if the application is ready to handle requests"""
+    try:
+        # Check database connection
+        engine = get_engine()
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+
+        # Check other critical services if needed
+        return {
+            "status": "ready",
+            "timestamp": datetime.now().isoformat(),
+        }
+
+    except Exception as e:
+        logging.getLogger(__name__).error(
+            "Readiness check failed: %s", e, exc_info=True
+        )
         return {
             "status": "not_ready",
             "timestamp": datetime.now().isoformat(),
-            "issues": [
-                f"Database: {db_check.message}" if db_check.status == HealthStatus.CRITICAL else None,
-                f"Cache: {cache_check.message}" if cache_check.status == HealthStatus.CRITICAL else None
-            ]
-        }
-    
-    return {
-        "status": "ready",
-        "timestamp": datetime.now().isoformat(),
-        "services": {
-            "database": db_check.status.value,
-            "cache": cache_check.status.value
-        }
-    } 
+            "error": str(e),
+        } 

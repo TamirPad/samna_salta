@@ -5,10 +5,9 @@ Handles shopping cart operations using Clean Architecture patterns.
 """
 
 import logging
-from typing import List, Optional
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import CallbackQueryHandler, ContextTypes
+from telegram import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import Application, CallbackQueryHandler, ContextTypes
 
 from src.application.dtos.cart_dtos import (
     AddToCartRequest,
@@ -36,7 +35,7 @@ class CartHandler:
 
     @error_handler("add_to_cart")
     async def handle_add_to_cart(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+        self, update: Update, _: ContextTypes.DEFAULT_TYPE
     ) -> None:
         """Handle adding items to cart"""
         query = update.callback_query
@@ -45,7 +44,7 @@ class CartHandler:
         user_id = update.effective_user.id
         callback_data = query.data
 
-        self._logger.info(f"🛒 ADD TO CART: User {user_id} clicked: {callback_data}")
+        self._logger.info("🛒 ADD TO CART: User %s clicked: %s", user_id, callback_data)
 
         try:
             # Parse callback data to extract product information
@@ -53,14 +52,14 @@ class CartHandler:
 
             if not product_info:
                 self._logger.error(
-                    f"❌ INVALID CALLBACK: Could not parse {callback_data}"
+                    "❌ INVALID CALLBACK: Could not parse %s", callback_data
                 )
                 await query.edit_message_text(
                     "❌ Invalid product selection. Please try again."
                 )
                 return
 
-            self._logger.info(f"📦 PARSED PRODUCT: {product_info}")
+            self._logger.info("📦 PARSED PRODUCT: %s", product_info)
 
             # Get cart management use case
             cart_use_case = self._container.get_cart_management_use_case()
@@ -73,7 +72,7 @@ class CartHandler:
                 options=product_info.get("options", {}),
             )
 
-            self._logger.info(f"📝 ADD REQUEST: {add_request}")
+            self._logger.info("📝 ADD REQUEST: %s", add_request)
 
             # Add to cart
             response = await cart_use_case.add_to_cart(add_request)
@@ -84,7 +83,10 @@ class CartHandler:
                 cart_total = cart_summary.total if cart_summary else 0.0
 
                 self._logger.info(
-                    f"✅ ADD SUCCESS: {product_info['display_name']} added. Cart: {item_count} items, ₪{cart_total:.2f}"
+                    "✅ ADD SUCCESS: %s added. Cart: %d items, ₪%.2f",
+                    product_info['display_name'],
+                    item_count,
+                    cart_total,
                 )
 
                 await query.edit_message_text(
@@ -95,16 +97,19 @@ class CartHandler:
                     reply_markup=self._get_post_add_keyboard(),
                 )
             else:
-                self._logger.error(f"❌ ADD FAILED: {response.error_message}")
+                self._logger.error("❌ ADD FAILED: %s", response.error_message)
                 await query.edit_message_text(
                     f"❌ Failed to add {product_info['display_name']} to cart\n\n"
                     f"Error: {response.error_message}",
                     reply_markup=self._get_back_to_menu_keyboard(),
                 )
 
-        except Exception as e:
+        except BusinessLogicError as e:
             self._logger.error(
-                f"💥 ADD TO CART ERROR: User {user_id}, Callback: {callback_data}, Error: {e}",
+                "💥 ADD TO CART ERROR: User %s, Callback: %s, Error: %s",
+                user_id,
+                callback_data,
+                e,
                 exc_info=True,
             )
             await query.edit_message_text(
@@ -112,9 +117,9 @@ class CartHandler:
                 reply_markup=self._get_back_to_menu_keyboard(),
             )
 
-    def _parse_callback_data(self, callback_data: str) -> dict:
+    def _parse_callback_data(self, callback_data: str) -> dict | None:
         """Parse callback data to extract product information"""
-        self._logger.debug(f"🔍 PARSING CALLBACK: {callback_data}")
+        self._logger.debug("🔍 PARSING CALLBACK: %s", callback_data)
 
         # Direct add patterns (add_product_name)
         if callback_data.startswith("add_"):
@@ -124,45 +129,48 @@ class CartHandler:
         # Product selection patterns (kubaneh_classic, samneh_smoked, etc.)
         parts = callback_data.split("_")
 
-        if len(parts) >= 2:
-            product_type = parts[0]
+        if len(parts) < 2:
+            self._logger.warning("⚠️ UNKNOWN CALLBACK PATTERN: %s", callback_data)
+            return None
 
-            # Kubaneh patterns: kubaneh_classic, kubaneh_seeded, etc.
-            if product_type == "kubaneh":
-                kubaneh_type = parts[1] if len(parts) > 1 else "classic"
+        product_type = parts[0]
 
-                return {
-                    "product_id": 1,  # Kubaneh product ID
-                    "display_name": f"Kubaneh ({kubaneh_type.title()})",
-                    "options": {"type": kubaneh_type},
-                }
+        # Kubaneh patterns: kubaneh_classic, kubaneh_seeded, etc.
+        if product_type == "kubaneh":
+            kubaneh_type = parts[1] if len(parts) > 1 else "classic"
 
-            # Samneh patterns: samneh_smoked, samneh_not_smoked
-            elif product_type == "samneh":
-                smoking = "smoked" if parts[1] == "smoked" else "not_smoked"
+            return {
+                "product_id": 1,  # Kubaneh product ID
+                "display_name": f"Kubaneh ({kubaneh_type.title()})",
+                "options": {"type": kubaneh_type},
+            }
 
-                return {
-                    "product_id": 2,  # Samneh product ID
-                    "display_name": f"Samneh ({smoking.replace('_', ' ').title()})",
-                    "options": {"smoking": smoking.replace("_", " ")},
-                }
+        # Samneh patterns: samneh_smoked, samneh_not_smoked
+        if product_type == "samneh":
+            smoking = "smoked" if parts[1] == "smoked" else "not_smoked"
 
-            # Red Bisbas patterns: red_bisbas_small, red_bisbas_large
-            elif product_type == "red" and len(parts) > 1 and parts[1] == "bisbas":
-                size = parts[2] if len(parts) > 2 else "small"
+            return {
+                "product_id": 2,  # Samneh product ID
+                "display_name": f"Samneh ({smoking.replace('_', ' ').title()})",
+                "options": {"smoking": smoking.replace("_", " ")},
+            }
 
-                return {
-                    "product_id": 3,  # Red Bisbas product ID
-                    "display_name": f"Red Bisbas ({size.title()})",
-                    "options": {"size": size},
-                }
+        # Red Bisbas patterns: red_bisbas_small, red_bisbas_large
+        if product_type == "red" and len(parts) > 1 and parts[1] == "bisbas":
+            size = parts[2] if len(parts) > 2 else "small"
 
-        self._logger.warning(f"⚠️ UNKNOWN CALLBACK PATTERN: {callback_data}")
+            return {
+                "product_id": 3,  # Red Bisbas product ID
+                "display_name": f"Red Bisbas ({size.title()})",
+                "options": {"size": size},
+            }
+
+        self._logger.warning("⚠️ UNKNOWN CALLBACK PATTERN: %s", callback_data)
         return None
 
-    def _get_product_info_by_name(self, product_name: str) -> dict:
+    def _get_product_info_by_name(self, product_name: str) -> dict | None:
         """Get product info by name"""
-        self._logger.debug(f"🔍 PRODUCT NAME LOOKUP: {product_name}")
+        self._logger.debug("🔍 PRODUCT NAME LOOKUP: %s", product_name)
 
         # Product mapping with proper IDs
         product_map = {
@@ -200,9 +208,9 @@ class CartHandler:
 
         result = product_map.get(product_name)
         if result:
-            self._logger.debug(f"✅ PRODUCT FOUND: {result}")
+            self._logger.debug("✅ PRODUCT FOUND: %s", result)
         else:
-            self._logger.warning(f"⚠️ PRODUCT NOT FOUND: {product_name}")
+            self._logger.warning("⚠️ PRODUCT NOT FOUND: %s", product_name)
 
         return result
 
@@ -217,14 +225,14 @@ class CartHandler:
 
     @error_handler("cart_view")
     async def handle_view_cart(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+        self, update: Update, _: ContextTypes.DEFAULT_TYPE
     ) -> None:
         """Handle viewing cart contents"""
         query = update.callback_query
         await query.answer()
 
         user_id = update.effective_user.id
-        self._logger.info(f"🛒 VIEW CART: User {user_id}")
+        self._logger.info("🛒 VIEW CART: User %s", user_id)
 
         try:
             # Get cart management use case
@@ -266,323 +274,248 @@ class CartHandler:
             # Display cart contents
             await self._display_cart_contents(query, get_cart_response)
 
-        except Exception as e:
-            self._logger.error(f"💥 VIEW CART ERROR: {e}", exc_info=True)
+        except BusinessLogicError as e:
+            self._logger.warning("VIEW CART ERROR: User %s, Error: %s", user_id, e)
             await query.edit_message_text(
-                text="❌ Error loading cart. Please try again.",
+                "🛒 Your cart is empty or there was an error.",
                 reply_markup=self._get_back_to_menu_keyboard(),
             )
 
     @error_handler("send_order")
     async def handle_send_order(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+        self, update: Update, _: ContextTypes.DEFAULT_TYPE
     ) -> None:
-        """Handle sending order from cart"""
+        """Handle sending the order"""
         query = update.callback_query
         await query.answer()
 
         user_id = update.effective_user.id
-        self._logger.info(f"📝🚀 SEND ORDER INITIATED: User {user_id}")
+        self._logger.info("📤 SEND ORDER: User %s", user_id)
 
         try:
-            # STEP 1: Get order creation use case
-            self._logger.info("📝 STEP 1: Getting order creation use case...")
-            order_creation_use_case = self._container.get_order_creation_use_case()
-            if not order_creation_use_case:
-                self._logger.error("💥 ORDER CREATION USE CASE NOT FOUND!")
-                await query.edit_message_text(
-                    "❌ Order system not available. Please try again later."
-                )
-                return
-            self._logger.info("✅ STEP 1: Order creation use case obtained")
-
-            # STEP 2: Check cart contents first
-            self._logger.info("📝 STEP 2: Checking cart contents...")
+            # Get cart use case
             cart_use_case = self._container.get_cart_management_use_case()
+
+            # Get order use case
+            order_use_case = self._container.get_order_creation_use_case()
+
+            # Get cart to ensure it exists and is not empty
             cart_response = await cart_use_case.get_cart(user_id)
 
-            if not cart_response.success:
-                self._logger.error(
-                    f"❌ STEP 2: Cart check failed: {cart_response.error_message}"
-                )
+            if not cart_response.success or not cart_response.cart_summary.items:
+                self._logger.warning("⚠️ SEND ORDER: Cart empty or invalid for User %s", user_id)
                 await query.edit_message_text(
-                    text=f"❌ Cart Error: {cart_response.error_message}",
+                    "🛒 Your cart is empty. Add items before sending an order.",
                     reply_markup=self._get_back_to_menu_keyboard(),
                 )
                 return
 
-            if not cart_response.cart_summary or not cart_response.cart_summary.items:
-                self._logger.error("❌ STEP 2: Cart is empty!")
-                await query.edit_message_text(
-                    text="🛒 Your cart is empty. Please add some items first!",
-                    reply_markup=self._get_back_to_menu_keyboard(),
-                )
-                return
+            self._logger.info("📝 CREATING ORDER from cart for User %s...", user_id)
 
-            self._logger.info(
-                f"✅ STEP 2: Cart has {len(cart_response.cart_summary.items)} items"
-            )
-
-            # STEP 3: Create order request
-            self._logger.info("📝 STEP 3: Creating order request...")
+            # Create order request from cart summary
             cart_summary = cart_response.cart_summary
             order_request = CreateOrderRequest(
                 telegram_id=user_id,
-                delivery_method=cart_summary.delivery_method or "pickup",
-                delivery_address=cart_summary.delivery_address,
-            )
-            self._logger.info(
-                f"✅ STEP 3: Order request created - Method: {order_request.delivery_method}"
+                items=[
+                    {"product_id": item.product_id, "quantity": item.quantity, "options": item.options}
+                    for item in cart_summary.items
+                ],
+                subtotal=cart_summary.total,
+                total=cart_summary.total,  # Assume total is same as subtotal for now
             )
 
-            # STEP 4: Create the order
-            self._logger.info("📝 STEP 4: Creating order via use case...")
-            order_response = await order_creation_use_case.create_order(order_request)
+            # Create order
+            order_response = await order_use_case.create_order(order_request)
 
-            if not order_response.success:
-                self._logger.error(
-                    f"❌ STEP 4: Order creation failed: {order_response.error_message}"
-                )
+            if order_response.success:
+                order_info = order_response.order_summary
+                order_confirmation_text = self._format_order_confirmation(order_info)
+
+                self._logger.info("✅ ORDER SENT: User %s, Order #%s", user_id, order_info.order_number)
+
                 await query.edit_message_text(
-                    text=f"❌ Order Failed: {order_response.error_message}",
-                    reply_markup=self._get_back_to_menu_keyboard(),
+                    order_confirmation_text,
+                    parse_mode="HTML",
+                    reply_markup=get_main_menu_keyboard(),
                 )
-                return
 
-            self._logger.info(
-                f"✅ STEP 4: Order created successfully - Order #{order_response.order_info.order_number}"
-            )
-
-            # STEP 5: Check admin notification service
-            self._logger.info("📝 STEP 5: Checking admin notification service...")
-            admin_service = self._container.get_admin_notification_service()
-            if admin_service:
-                self._logger.info("✅ STEP 5: Admin notification service is available")
+                # Clear the cart after sending the order
+                await cart_use_case.clear_cart(user_id)
+                self._logger.info("🛒 CART CLEARED for User %s", user_id)
             else:
-                self._logger.warning(
-                    "⚠️ STEP 5: Admin notification service NOT available"
+                self._logger.error("❌ SEND ORDER FAILED for User %s: %s", user_id, order_response.error_message)
+                await query.edit_message_text(
+                    "❌ There was a problem sending your order. Please try again.",
+                    reply_markup=get_cart_keyboard(),
                 )
 
-            # STEP 6: Display success message
-            self._logger.info("📝 STEP 6: Displaying success message...")
-            success_message = self._format_order_confirmation(order_response.order_info)
-
-            await query.edit_message_text(
-                text=success_message,
-                parse_mode="HTML",
-                reply_markup=self._get_back_to_menu_keyboard(),
-            )
-
-            self._logger.info(
-                f"🎉 ORDER COMPLETED: Order #{order_response.order_info.order_number} for User {user_id}"
-            )
-
-        except Exception as e:
+        except BusinessLogicError as e:
             self._logger.error(
-                f"💥 SEND ORDER ERROR: User {user_id}, Error: {e}", exc_info=True
+                "💥 SEND ORDER ERROR: User %s, Error: %s", user_id, e, exc_info=True
             )
             await query.edit_message_text(
-                text="❌ An error occurred while processing your order. Please try again.",
+                f"❌ Error creating order: {e}",
+                reply_markup=get_cart_keyboard(cart_response.cart_summary),
+            )
+        except Exception as e:
+            self._logger.critical(
+                "💥 UNEXPECTED SEND ORDER ERROR: User %s, Error: %s", user_id, e, exc_info=True
+            )
+            await query.edit_message_text(
+                "❌ An unexpected error occurred. Please try again.",
                 reply_markup=self._get_back_to_menu_keyboard(),
             )
 
     def _format_order_confirmation(self, order_info) -> str:
-        """Format order confirmation message"""
-        self._logger.info(
-            f"📄 FORMATTING ORDER CONFIRMATION: Order #{order_info.order_number}"
+        """Formats the order confirmation message."""
+        items_text = "\n".join(
+            [
+                f"  - {item.quantity}x {item.product_name} @ {format_price(item.unit_price)}"
+                for item in order_info.items
+            ]
+        )
+        return (
+            "✅ <b>Order Sent!</b>\n\n"
+            "Thank you for your order! We will contact you shortly to confirm the details.\n\n"
+            f"📝 <b>Order Summary</b>\n"
+            f"<b>Order #:</b> {order_info.order_number}\n"
+            f"<b>Total:</b> {format_price(order_info.total)}\n\n"
+            "<b>Items:</b>\n"
+            f"{items_text}"
         )
 
-        delivery_emoji = "🚚" if order_info.delivery_method == "delivery" else "🏪"
-
-        message = f"""
-🎉 <b>ORDER CONFIRMED!</b>
-
-📋 <b>Order Details:</b>
-🔢 Order #: <code>{order_info.order_number}</code>
-⏳ Status: <b>{order_info.status.title()}</b>
-📅 Date: {order_info.created_at.strftime('%d/%m/%Y %H:%M')}
-
-👤 <b>Customer:</b>
-👨‍💼 Name: <b>{order_info.customer_name}</b>
-📞 Phone: <code>{order_info.customer_phone}</code>
-
-🛒 <b>Your Items:</b>"""
-
-        for item in order_info.items:
-            options_text = ""
-            if item.options:
-                options_list = [f"{k}: {v}" for k, v in item.options.items()]
-                options_text = f" ({', '.join(options_list)})"
-
-            message += f"\n• {item.quantity}x {item.product_name}{options_text} - ₪{item.total_price:.2f}"
-
-        message += f"""
-
-{delivery_emoji} <b>Delivery:</b>
-📦 Method: <b>{order_info.delivery_method.title()}</b>"""
-
-        if order_info.delivery_address:
-            message += f"\n📍 Address: {order_info.delivery_address}"
-
-        message += f"""
-
-💰 <b>Payment Summary:</b>
-💵 Subtotal: ₪{order_info.subtotal:.2f}
-🚚 Delivery: ₪{order_info.delivery_charge:.2f}
-💳 <b>Total: ₪{order_info.total:.2f}</b>
-
-✅ Your order has been received and will be processed shortly!
-🕒 We'll keep you updated on the status.
-
-Thank you for choosing Samna Salta! 🥧✨
-"""
-        return message
-
     async def _display_cart_contents(
-        self, query, cart_response: GetCartResponse
+        self, query: CallbackQuery, cart_response: GetCartResponse
     ) -> None:
-        """Display cart contents with options"""
-        if not cart_response.cart_items:
-            message = """
-🛒 <b>Your Cart</b>
+        """Display cart contents and action buttons"""
+        user_id = query.effective_user.id
 
-Your cart is empty!
-Browse our delicious menu to add some items.
-"""
-            keyboard = [
-                [InlineKeyboardButton("🍞 Browse Menu", callback_data="menu_main")],
-                [InlineKeyboardButton("🔙 Back", callback_data="menu_main")],
-            ]
-        else:
-            # Calculate totals
-            subtotal = sum(item.total_price for item in cart_response.cart_items)
-            delivery_charge = (
-                5.0 if cart_response.delivery_method == "delivery" else 0.0
+        if not cart_response.success or not cart_response.cart_items:
+            self._logger.info("🛒 CART is empty for User %s", user_id)
+            await query.edit_message_text(
+                text="🛒 <b>Your Cart is Empty</b> 🛒\n\n"
+                "Add some delicious items from our menu!",
+                parse_mode="HTML",
+                reply_markup=self._get_back_to_menu_keyboard(),
             )
-            total = subtotal + delivery_charge
+            return
 
-            delivery_emoji = "🚚" if cart_response.delivery_method == "delivery" else "🏪"
+        self._logger.info("🛒 DISPLAYING cart for User %s", user_id)
 
-            message = f"""
-🛒 <b>Your Cart ({len(cart_response.cart_items)} items)</b>
+        if not cart_response.cart_summary or not cart_response.cart_summary.items:
+            await query.edit_message_text(
+                text="🛒 Your cart is empty!",
+                reply_markup=self._get_back_to_menu_keyboard(),
+            )
+            return
 
-<b>Items:</b>"""
+        items_text = [
+            (
+                f"• {item.quantity}x {item.product_name} "
+                f"({format_price(item.unit_price)}) - {format_price(item.total_price)}"
+            )
+            for item in cart_response.cart_items
+        ]
+        cart_items_text = "\n".join(items_text)
 
-            for item in cart_response.cart_items:
-                options_text = ""
-                if item.options:
-                    options_list = [f"{k}: {v}" for k, v in item.options.items()]
-                    options_text = f" ({', '.join(options_list)})"
+        text = (
+            "🛒 <b>Your Cart</b>\n\n"
+            f"{cart_items_text}\n\n"
+            f"<b>Total: {format_price(cart_response.cart_total)}</b>"
+        )
 
-                message += f"\n• {item.quantity}x {item.product_name}{options_text} - ₪{item.total_price:.2f}"
-
-            delivery_method_display = (
-                cart_response.delivery_method or "pickup"
-            ).title()
-            message += f"""
-
-{delivery_emoji} <b>Delivery:</b> {delivery_method_display}"""
-
-            if cart_response.delivery_address:
-                message += f"\n📍 Address: {cart_response.delivery_address}"
-
-            message += f"""
-
-💰 <b>Summary:</b>
-💵 Subtotal: ₪{subtotal:.2f}
-🚚 Delivery: ₪{delivery_charge:.2f}
-💳 <b>Total: ₪{total:.2f}</b>
-"""
-
-            keyboard = [
-                [InlineKeyboardButton("📤 Send Order", callback_data="cart_send_order")],
-                [InlineKeyboardButton("🍞 Add More Items", callback_data="menu_main")],
-                [InlineKeyboardButton("🗑️ Clear Cart", callback_data="cart_clear")],
-                [InlineKeyboardButton("🔙 Back to Menu", callback_data="menu_main")],
-            ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            text=message, parse_mode="HTML", reply_markup=reply_markup
+            text=text,
+            parse_mode="HTML",
+            reply_markup=get_cart_keyboard(cart_response.cart_summary),
         )
 
     def _get_back_to_menu_keyboard(self) -> InlineKeyboardMarkup:
-        """Get keyboard to go back to main menu"""
-        keyboard = [[InlineKeyboardButton("🔙 Back to Menu", callback_data="menu_main")]]
+        """Get a keyboard with a 'Back to Menu' button"""
+        keyboard = [
+            [InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="menu_main")]
+        ]
         return InlineKeyboardMarkup(keyboard)
 
     @error_handler("clear_cart")
     async def handle_clear_cart(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+        self, update: Update, _: ContextTypes.DEFAULT_TYPE
     ) -> None:
-        """Handle clearing cart contents"""
+        """Handle clearing the cart"""
         query = update.callback_query
         await query.answer()
 
         user_id = update.effective_user.id
-        self._logger.info(f"🗑️ CLEAR CART: User {user_id}")
+        self._logger.info("🗑️ CLEAR CART: User %s", user_id)
 
         try:
             # Get cart management use case
             cart_use_case = self._container.get_cart_management_use_case()
 
             # Clear cart
-            response = await cart_use_case.clear_cart(user_id)
+            clear_response = await cart_use_case.clear_cart(user_id)
 
-            if response.success:
-                self._logger.info(f"✅ CART CLEARED: User {user_id}")
+            if clear_response.success:
+                self._logger.info("✅ CART CLEARED for User %s", user_id)
                 await query.edit_message_text(
-                    "🗑️ <b>Cart Cleared!</b>\n\n"
-                    "Your cart has been emptied successfully.\n"
-                    "Browse our menu to add new items.",
-                    parse_mode="HTML",
+                    "🗑️ Your cart has been cleared.",
                     reply_markup=self._get_back_to_menu_keyboard(),
                 )
             else:
-                self._logger.error(f"❌ CLEAR CART FAILED: {response.error_message}")
+                self._logger.error("❌ CLEAR CART FAILED for User %s: %s", user_id, clear_response.error_message)
                 await query.edit_message_text(
-                    f"❌ Failed to clear cart\n\n"
-                    f"Error: {response.error_message}",
-                    reply_markup=self._get_back_to_menu_keyboard(),
+                    f"❌ Could not clear cart: {clear_response.error_message}",
+                    reply_markup=get_cart_keyboard(),
                 )
 
-        except Exception as e:
-            self._logger.error(f"💥 CLEAR CART ERROR: {e}", exc_info=True)
+        except BusinessLogicError as e:
             await query.edit_message_text(
-                text="❌ Error clearing cart. Please try again.",
+                f"❌ Error clearing cart: {e}",
+                reply_markup=self._get_back_to_menu_keyboard(),
+            )
+        except Exception as e:
+            self._logger.critical(
+                "💥 UNEXPECTED CLEAR CART ERROR: User %s, Error: %s",
+                user_id,
+                e,
+                exc_info=True,
+            )
+            await query.edit_message_text(
+                "❌ An unexpected error occurred. Please try again.",
                 reply_markup=self._get_back_to_menu_keyboard(),
             )
 
 
-def register_cart_handlers(application):
-    """Register cart handlers with the application"""
+def register_cart_handlers(application: Application):
+    """Register all cart-related handlers"""
     cart_handler = CartHandler()
 
-    # Register callback query handlers for cart operations
+    # Callback query handlers for cart actions
     application.add_handler(
         CallbackQueryHandler(cart_handler.handle_view_cart, pattern="^cart_view$")
     )
-
+    application.add_handler(
+        CallbackQueryHandler(cart_handler.handle_clear_cart, pattern="^cart_clear$")
+    )
     application.add_handler(
         CallbackQueryHandler(
             cart_handler.handle_send_order, pattern="^cart_send_order$"
         )
     )
 
-    application.add_handler(
-        CallbackQueryHandler(cart_handler.handle_clear_cart, pattern="^cart_clear$")
-    )
-
-    # Register add to cart handlers for direct add patterns
+    # General product add handler
     application.add_handler(
         CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^add_")
     )
 
-    # Register add to cart handlers for product selection patterns
+    # Specific product add handlers (for items with options)
     application.add_handler(
-        CallbackQueryHandler(
-            cart_handler.handle_add_to_cart, pattern="^(kubaneh_|samneh_|red_bisbas_)"
-        )
+        CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^kubaneh_")
     )
-
-    logger.info("✅ Cart handlers registered successfully")
+    application.add_handler(
+        CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^samneh_")
+    )
+    application.add_handler(
+        CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^red_bisbas_")
+    )
+    logger.info("🛒 Cart handlers registered")

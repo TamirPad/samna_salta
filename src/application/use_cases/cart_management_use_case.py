@@ -8,25 +8,13 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from ...domain.repositories.cart_repository import CartRepository
-from ...domain.repositories.product_repository import ProductRepository
-from ...domain.value_objects.money import Money
-from ...domain.value_objects.product_id import ProductId
-from ...domain.value_objects.telegram_id import TelegramId
+from src.application.dtos.order_dtos import OrderItemInfo
+from src.domain.repositories.cart_repository import CartRepository
+from src.domain.repositories.product_repository import ProductRepository
+from src.domain.value_objects.product_id import ProductId
+from src.domain.value_objects.telegram_id import TelegramId
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class CartItemInfo:
-    """Cart item information"""
-
-    product_id: int
-    product_name: str
-    quantity: int
-    unit_price: float
-    total_price: float
-    options: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -53,7 +41,7 @@ class UpdateCartRequest:
 class CartSummary:
     """Cart summary information"""
 
-    items: List[CartItemInfo]
+    items: List[OrderItemInfo]
     subtotal: float
     delivery_charge: float
     total: float
@@ -92,53 +80,19 @@ class CartManagementUseCase:
     async def add_to_cart(self, request: AddToCartRequest) -> CartOperationResponse:
         """Add item to customer's cart"""
         self._logger.info(
-            f"🛒 CART USE CASE: Adding to cart - User: {request.telegram_id}, Product: {request.product_id}, Qty: {request.quantity}"
+            "🛒 CART USE CASE: Adding to cart - User: %s, Product: %s, Qty: %s",
+            request.telegram_id,
+            request.product_id,
+            request.quantity,
         )
 
         try:
-            # Validate telegram ID
-            telegram_id = TelegramId(request.telegram_id)
-            self._logger.debug(f"✅ TELEGRAM ID VALIDATED: {telegram_id.value}")
-
-            # Validate product exists and is active
-            product_id = ProductId(request.product_id)
-            self._logger.debug(f"🔍 LOOKING UP PRODUCT: {product_id.value}")
-
-            product = await self._product_repository.find_by_id(product_id)
-
-            if not product:
-                self._logger.warning(f"❌ PRODUCT NOT FOUND: {product_id.value}")
-                return CartOperationResponse(
-                    success=False, error_message="Product not found"
-                )
-
-            self._logger.info(
-                f"📦 PRODUCT FOUND: {product.name} (ID: {product.id}, Active: {product.is_active})"
-            )
-
-            if not product.is_active:
-                self._logger.warning(
-                    f"⚠️ PRODUCT INACTIVE: {product.name} is not available"
-                )
-                return CartOperationResponse(
-                    success=False, error_message="Product is currently unavailable"
-                )
-
-            # Validate quantity
-            if request.quantity <= 0:
-                self._logger.warning(f"❌ INVALID QUANTITY: {request.quantity}")
-                return CartOperationResponse(
-                    success=False, error_message="Quantity must be greater than 0"
-                )
-
-            self._logger.info(
-                f"✅ VALIDATION PASSED: Adding {request.quantity} x {product.name}"
-            )
+            telegram_id, product = await self._validate_add_to_cart_request(request)
 
             # Add to cart
             success = await self._cart_repository.add_item(
                 telegram_id=telegram_id,
-                product_id=product_id,
+                product_id=product.id,
                 quantity=request.quantity,
                 options=request.options or {},
             )
@@ -156,43 +110,64 @@ class CartManagementUseCase:
             # Get updated cart summary
             cart_summary = await self._get_cart_summary(telegram_id)
             self._logger.info(
-                f"📊 CART SUMMARY: {len(cart_summary.items)} items, total: {cart_summary.total}"
+                "📊 CART SUMMARY: %d items, total: %s",
+                len(cart_summary.items),
+                cart_summary.total,
             )
 
             return CartOperationResponse(success=True, cart_summary=cart_summary)
 
         except ValueError as e:
-            self._logger.error(f"💥 VALIDATION ERROR adding to cart: {e}")
+            self._logger.error("💥 VALIDATION ERROR adding to cart: %s", e)
             return CartOperationResponse(
                 success=False, error_message="Invalid request data"
             )
-        except Exception as e:
-            self._logger.error(f"💥 UNEXPECTED ERROR adding to cart: {e}", exc_info=True)
+        except (TypeError, AttributeError) as e:
+            self._logger.error("💥 UNEXPECTED ERROR adding to cart: %s", e, exc_info=True)
             return CartOperationResponse(
                 success=False, error_message="Failed to add item to cart"
             )
 
+    async def _validate_add_to_cart_request(self, request: AddToCartRequest):
+        """Validate the add to cart request"""
+        telegram_id = TelegramId(request.telegram_id)
+        product_id = ProductId(request.product_id)
+        product = await self._product_repository.find_by_id(product_id)
+
+        if not product:
+            raise ValueError("Product not found")
+
+        if not product.is_active:
+            raise ValueError("Product is currently unavailable")
+
+        if request.quantity <= 0:
+            raise ValueError("Quantity must be greater than 0")
+
+        return telegram_id, product
+
     async def get_cart(self, telegram_id: int) -> CartOperationResponse:
         """Get customer's cart summary"""
         self._logger.info(
-            f"👀 GET CART USE CASE: Retrieving cart for user {telegram_id}"
+            "👀 GET CART USE CASE: Retrieving cart for user %s", telegram_id
         )
 
         try:
             telegram_id_vo = TelegramId(telegram_id)
-            self._logger.debug(f"✅ TELEGRAM ID VALIDATED: {telegram_id_vo.value}")
+            self._logger.debug("✅ TELEGRAM ID VALIDATED: %s", telegram_id_vo.value)
 
             cart_summary = await self._get_cart_summary(telegram_id_vo)
 
             self._logger.info(
-                f"📊 GET CART SUCCESS: {len(cart_summary.items)} items, total: {cart_summary.total}"
+                "📊 GET CART SUCCESS: %d items, total: %s",
+                len(cart_summary.items),
+                cart_summary.total,
             )
 
             return CartOperationResponse(success=True, cart_summary=cart_summary)
 
-        except Exception as e:
+        except (ValueError, TypeError) as e:
             self._logger.error(
-                f"💥 GET CART ERROR for user {telegram_id}: {e}", exc_info=True
+                "💥 GET CART ERROR for user %s: %s", telegram_id, e, exc_info=True
             )
             return CartOperationResponse(
                 success=False, error_message="Failed to retrieve cart"
@@ -201,7 +176,9 @@ class CartManagementUseCase:
     async def update_cart(self, request: UpdateCartRequest) -> CartOperationResponse:
         """Update cart with new items and delivery information"""
         self._logger.info(
-            f"🔄 UPDATE CART USE CASE: User {request.telegram_id}, {len(request.items)} items"
+            "🔄 UPDATE CART USE CASE: User %s, %d items",
+            request.telegram_id,
+            len(request.items),
         )
 
         try:
@@ -225,20 +202,22 @@ class CartManagementUseCase:
             cart_summary = await self._get_cart_summary(telegram_id)
 
             self._logger.info(
-                f"✅ UPDATE CART SUCCESS: {len(cart_summary.items)} items, total: {cart_summary.total}"
+                "✅ UPDATE CART SUCCESS: %d items, total: %s",
+                len(cart_summary.items),
+                cart_summary.total,
             )
 
             return CartOperationResponse(success=True, cart_summary=cart_summary)
 
-        except Exception as e:
-            self._logger.error(f"💥 UPDATE CART ERROR: {e}", exc_info=True)
+        except (ValueError, TypeError) as e:
+            self._logger.error("💥 UPDATE CART ERROR: %s", e, exc_info=True)
             return CartOperationResponse(
                 success=False, error_message="Failed to update cart"
             )
 
     async def clear_cart(self, telegram_id: int) -> CartOperationResponse:
         """Clear customer's cart"""
-        self._logger.info(f"🗑️ CLEAR CART USE CASE: User {telegram_id}")
+        self._logger.info("🗑️ CLEAR CART USE CASE: User %s", telegram_id)
 
         try:
             telegram_id_vo = TelegramId(telegram_id)
@@ -251,77 +230,54 @@ class CartManagementUseCase:
                     success=False, error_message="Failed to clear cart"
                 )
 
-            self._logger.info(f"✅ CLEAR CART SUCCESS: User {telegram_id}")
+            self._logger.info("✅ CART CLEARED: User %s", telegram_id)
 
-            return CartOperationResponse(
-                success=True,
-                cart_summary=CartSummary(
-                    items=[], subtotal=0.0, delivery_charge=0.0, total=0.0
-                ),
-            )
+            return CartOperationResponse(success=True, cart_summary=None)
 
-        except Exception as e:
-            self._logger.error(f"💥 CLEAR CART ERROR: {e}", exc_info=True)
+        except (ValueError, TypeError) as e:
+            self._logger.error("💥 CLEAR CART ERROR: %s", e, exc_info=True)
             return CartOperationResponse(
                 success=False, error_message="Failed to clear cart"
             )
 
     async def _get_cart_summary(self, telegram_id: TelegramId) -> CartSummary:
-        """Get cart summary with calculations"""
-        self._logger.debug(f"📊 CALCULATING CART SUMMARY: User {telegram_id.value}")
+        """Get cart summary from repository and calculate totals"""
+        self._logger.info("📊 CALCULATING CART SUMMARY: User %s", telegram_id.value)
 
         cart_data = await self._cart_repository.get_cart_items(telegram_id)
+        if not cart_data or not cart_data.get("items"):
+            self._logger.info("  -> Empty cart, returning default summary")
+            return CartSummary(items=[], subtotal=0, delivery_charge=0, total=0)
 
-        if not cart_data:
-            self._logger.debug(
-                f"📭 EMPTY CART SUMMARY: User {telegram_id.value} has no cart data"
-            )
-            return CartSummary(items=[], subtotal=0.0, delivery_charge=0.0, total=0.0)
+        cart_items = cart_data["items"]
+        self._logger.info("  -> Found %d items in cart", len(cart_items))
 
-        # Calculate totals
+        summary_items: List[OrderItemInfo] = []
         subtotal = 0.0
-        cart_items = []
 
-        self._logger.debug(f"📋 PROCESSING {len(cart_data.get('items', []))} cart items")
-
-        for i, item_data in enumerate(cart_data.get("items", [])):
+        for item_data in cart_items:
             item_total = item_data["quantity"] * item_data["unit_price"]
             subtotal += item_total
-
-            cart_item = CartItemInfo(
-                product_id=item_data["product_id"],
-                product_name=item_data["product_name"],
-                quantity=item_data["quantity"],
-                unit_price=item_data["unit_price"],
-                total_price=item_total,
-                options=item_data.get("options", {}),
-            )
-            cart_items.append(cart_item)
-
-            self._logger.debug(
-                f"💰 ITEM {i}: {cart_item.product_name} x{cart_item.quantity} = {item_total}"
+            summary_items.append(
+                OrderItemInfo.from_dict(item_data, total_price=item_total)
             )
 
-        # Calculate delivery charge
-        delivery_charge = 0.0
-        delivery_method = cart_data.get("delivery_method")
-        if delivery_method == "delivery":
-            delivery_charge = 5.0  # 5 ILS delivery charge
-            self._logger.debug(f"🚚 DELIVERY CHARGE: {delivery_charge}")
-
+        delivery_method = cart_data.get("delivery_method", "pickup")
+        delivery_charge = 5.0 if delivery_method == "delivery" else 0.0
         total = subtotal + delivery_charge
 
-        summary = CartSummary(
-            items=cart_items,
+        self._logger.info(
+            "  -> Summary: Subtotal=%.2f, Delivery=%.2f, Total=%.2f",
+            subtotal,
+            delivery_charge,
+            total,
+        )
+
+        return CartSummary(
+            items=summary_items,
             subtotal=subtotal,
             delivery_charge=delivery_charge,
             total=total,
             delivery_method=delivery_method,
             delivery_address=cart_data.get("delivery_address"),
         )
-
-        self._logger.info(
-            f"📊 CART SUMMARY COMPLETE: {len(cart_items)} items, subtotal={subtotal}, delivery={delivery_charge}, total={total}"
-        )
-
-        return summary

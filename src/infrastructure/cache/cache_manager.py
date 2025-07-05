@@ -2,12 +2,16 @@
 Caching layer for improved performance
 """
 
-import json
 import logging
+import threading
 import time
-from dataclasses import asdict
 from functools import wraps
 from typing import Any, Dict, List, Optional
+
+from src.infrastructure.database.database_optimizations import (
+    OptimizedQueries,
+    get_database_manager,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +38,8 @@ class InMemoryCache:
             if entry["expires_at"] > time.time():
                 self._stats["hits"] += 1
                 return entry["value"]
-            else:
-                # Remove expired entry
-                del self._cache[key]
+            # Remove expired entry
+            del self._cache[key]
 
         self._stats["misses"] += 1
         return None
@@ -171,15 +174,17 @@ class CacheManager:
         }
 
 
-# Global cache manager instance
 _cache_manager: Optional[CacheManager] = None
+_cache_manager_lock = threading.Lock()
 
 
-def get_cache_manager() -> CacheManager:
-    """Get the global cache manager instance"""
-    global _cache_manager
+def get_cache_manager() -> "CacheManager":
+    """Get the global cache manager instance, ensuring thread safety."""
     if _cache_manager is None:
-        _cache_manager = CacheManager()
+        with _cache_manager_lock:
+            # Check again inside the lock to ensure thread safety
+            if _cache_manager is None:
+                _cache_manager = CacheManager()
     return _cache_manager
 
 
@@ -247,104 +252,74 @@ class CacheWarmer:
         self._logger = logging.getLogger(self.__class__.__name__)
 
     def warm_products_cache(self):
-        """Warm up products cache with frequently accessed data"""
+        """Warm the cache with all active products"""
+        self._logger.info("Warming up products cache...")
         try:
-            from ..database.database_optimizations import (
-                OptimizedQueries,
-                get_database_manager,
-            )
-
             db_manager = get_database_manager()
-            queries = OptimizedQueries(db_manager)
-
-            # Cache products by category
-            categories = ["bread", "spread", "spice", "beverage"]
-            for category in categories:
-                products = queries.get_active_products_by_category(category)
-                self.cache_manager.set_products_by_category(category, products)
-
-                # Cache individual products
-                for product in products:
-                    self.cache_manager.set_product(product.id, product)
-
-            self._logger.info("Products cache warmed up successfully")
-
-        except Exception as e:
-            self._logger.error(f"Failed to warm products cache: {e}")
+            optimized_queries = OptimizedQueries(db_manager)
+            products = optimized_queries.get_all_active_products()
+            for product in products:
+                self.cache_manager.set_product(product.id, product)
+            self._logger.info("Warmed up cache with %d products", len(products))
+        except (IOError, OSError) as e:
+            self._logger.error("Error warming products cache: %s", e)
 
     def warm_popular_data_cache(self):
-        """Warm up cache with popular/frequently accessed data"""
+        """Warm the cache with popular data (e.g., popular products)"""
+        self._logger.info("Warming up popular data cache...")
         try:
-            from ..database.database_optimizations import (
-                OptimizedQueries,
-                get_database_manager,
-            )
-
             db_manager = get_database_manager()
-            queries = OptimizedQueries(db_manager)
-
-            # Cache popular products
-            popular_products = queries.get_popular_products(limit=20)
+            optimized_queries = OptimizedQueries(db_manager)
+            popular_products = optimized_queries.get_popular_products(limit=20)
             self.cache_manager.general_cache.set(
-                "popular_products", popular_products, ttl=1800
-            )  # 30 minutes
-
-            self._logger.info("Popular data cache warmed up successfully")
-
-        except Exception as e:
-            self._logger.error(f"Failed to warm popular data cache: {e}")
+                "popular_products", popular_products, ttl=3600
+            )
+            self._logger.info("Warmed up cache with %d popular products", len(popular_products))
+        except (IOError, OSError) as e:
+            self._logger.error("Error warming popular data cache: %s", e)
 
 
 # Scheduled cache maintenance
-import threading
-import time as time_module
-
-
 class CacheMaintenance:
-    """Background cache maintenance tasks"""
+    """Background task for cache maintenance"""
 
-    def __init__(self, cache_manager: CacheManager):
-        self.cache_manager = cache_manager
-        self._logger = logging.getLogger(self.__class__.__name__)
+    def __init__(self, cache_manager: CacheManager, interval: int = 60):
+        self._cache_manager = cache_manager
+        self._interval = interval
         self._stop_event = threading.Event()
-        self._maintenance_thread = None
+        self._thread: Optional[threading.Thread] = None
+        self._logger = logging.getLogger(self.__class__.__name__)
 
     def start_maintenance(self):
-        """Start background cache maintenance"""
-        if self._maintenance_thread is None or not self._maintenance_thread.is_alive():
-            self._maintenance_thread = threading.Thread(
-                target=self._maintenance_loop, daemon=True
-            )
-            self._maintenance_thread.start()
-            self._logger.info("Cache maintenance started")
+        """Start the background maintenance task"""
+        if self._thread and self._thread.is_alive():
+            self._logger.warning("Maintenance task already running")
+            return
+
+        self._stop_event.clear()
+        self._thread = threading.Thread(target=self._maintenance_loop, daemon=True)
+        self._thread.start()
+        self._logger.info("Cache maintenance task started")
 
     def stop_maintenance(self):
-        """Stop background cache maintenance"""
+        """Stop the background maintenance task"""
         self._stop_event.set()
-        if self._maintenance_thread:
-            self._maintenance_thread.join(timeout=5)
-        self._logger.info("Cache maintenance stopped")
+        if self._thread:
+            self._thread.join()
+        self._logger.info("Cache maintenance task stopped")
 
     def _maintenance_loop(self):
-        """Main maintenance loop"""
+        """The main loop for cache maintenance"""
         while not self._stop_event.is_set():
+            self._logger.info("Running cache maintenance...")
             try:
-                # Cleanup expired entries every 5 minutes
-                cleaned = self.cache_manager.cleanup_all_expired()
-                total_cleaned = sum(cleaned.values())
+                stats = self._cache_manager.cleanup_all_expired()
+                self._logger.info("Cache cleanup stats: %s", stats)
+            except (IOError, OSError) as e:
+                self._logger.error("Error during cache maintenance: %s", e)
+            time.sleep(self._interval)
 
-                if total_cleaned > 0:
-                    self._logger.info(
-                        f"Cleaned up {total_cleaned} expired cache entries"
-                    )
-
-                # Log cache statistics every hour
-                stats = self.cache_manager.get_all_stats()
-                self._logger.debug(f"Cache stats: {stats}")
-
-                # Wait 5 minutes before next cleanup
-                self._stop_event.wait(300)
-
-            except Exception as e:
-                self._logger.error(f"Cache maintenance error: {e}")
-                self._stop_event.wait(60)  # Wait 1 minute on error
+    def schedule_maintenance(self):
+        """Schedule periodic cache maintenance"""
+        # This can be integrated with a task scheduler like APScheduler
+        self._logger.info("Cache maintenance scheduler started")

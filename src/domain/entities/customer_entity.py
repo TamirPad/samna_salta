@@ -1,3 +1,4 @@
+# pylint: disable=too-many-instance-attributes
 """
 Customer domain entity
 
@@ -8,11 +9,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
-from ..value_objects.customer_id import CustomerId
-from ..value_objects.customer_name import CustomerName
-from ..value_objects.delivery_address import DeliveryAddress
-from ..value_objects.phone_number import PhoneNumber
-from ..value_objects.telegram_id import TelegramId
+from src.domain.value_objects.customer_id import CustomerId
+from src.domain.value_objects.customer_name import CustomerName
+from src.domain.value_objects.delivery_address import DeliveryAddress
+from src.domain.value_objects.phone_number import PhoneNumber
+from src.domain.value_objects.telegram_id import TelegramId
 
 
 @dataclass
@@ -70,7 +71,8 @@ class Customer:
 
     def __str__(self) -> str:
         admin_str = " (Admin)" if self.is_admin else ""
-        return f"Customer(id={self.id}, name={self.full_name}, phone={self.phone_number}{admin_str})"
+        return (f"Customer(id={self.id}, name={self.full_name}, "
+                f"phone={self.phone_number}{admin_str})")
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, Customer):

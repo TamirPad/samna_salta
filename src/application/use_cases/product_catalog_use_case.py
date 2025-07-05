@@ -6,12 +6,11 @@ Handles product browsing, search, and information retrieval.
 
 import logging
 from dataclasses import dataclass
-from typing import List, Optional
 
-from ...domain.entities.customer_entity import Customer
-from ...domain.repositories.product_repository import ProductRepository
-from ...domain.value_objects.product_id import ProductId
-from ...domain.value_objects.product_name import ProductName
+from src.domain.repositories.product_repository import ProductRepository
+from src.domain.value_objects.product_id import ProductId
+from src.domain.value_objects.product_name import ProductName
+from src.infrastructure.utilities.helpers import is_hilbeh_available
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +19,10 @@ logger = logging.getLogger(__name__)
 class ProductCatalogRequest:
     """Request for product catalog operations"""
 
-    category: Optional[str] = None
-    search_term: Optional[str] = None
-    product_id: Optional[int] = None
-    product_name: Optional[str] = None
+    category: str | None = None
+    search_term: str | None = None
+    product_id: int | None = None
+    product_name: str | None = None
 
 
 @dataclass
@@ -36,7 +35,7 @@ class ProductInfo:
     base_price: float
     category: str
     is_active: bool
-    options: Optional[dict] = None
+    options: dict | None = None
 
 
 @dataclass
@@ -44,9 +43,9 @@ class ProductCatalogResponse:
     """Response for product catalog operations"""
 
     success: bool
-    products: List[ProductInfo] = None
-    product: Optional[ProductInfo] = None
-    error_message: Optional[str] = None
+    products: list[ProductInfo] | None = None
+    product: ProductInfo | None = None
+    error_message: str | None = None
 
 
 class ProductCatalogUseCase:
@@ -81,9 +80,9 @@ class ProductCatalogUseCase:
 
             return ProductCatalogResponse(success=True, products=product_infos)
 
-        except Exception as e:
+        except (ValueError, AttributeError) as e:
             self._logger.error(
-                f"Error getting products by category {request.category}: {e}"
+                "Error getting products by category %s: %s", request.category, e
             )
             return ProductCatalogResponse(
                 success=False, error_message="Failed to retrieve products"
@@ -117,13 +116,13 @@ class ProductCatalogUseCase:
             )
 
         except ValueError as e:
-            self._logger.error(f"Invalid product name {request.product_name}: {e}")
+            self._logger.error("Invalid product name %s: %s", request.product_name, e)
             return ProductCatalogResponse(
                 success=False, error_message="Invalid product name"
             )
-        except Exception as e:
+        except AttributeError as e:
             self._logger.error(
-                f"Error getting product by name {request.product_name}: {e}"
+                "Error getting product by name %s: %s", request.product_name, e
             )
             return ProductCatalogResponse(
                 success=False, error_message="Failed to retrieve product"
@@ -137,8 +136,8 @@ class ProductCatalogUseCase:
 
             return ProductCatalogResponse(success=True, products=product_infos)
 
-        except Exception as e:
-            self._logger.error(f"Error getting all active products: {e}")
+        except (ValueError, AttributeError) as e:
+            self._logger.error("Error getting all active products: %s", e)
             return ProductCatalogResponse(
                 success=False, error_message="Failed to retrieve products"
             )
@@ -166,7 +165,6 @@ class ProductCatalogUseCase:
 
             # Special handling for time-sensitive products like Hilbeh
             if product.name.lower() == "hilbeh":
-                from ...infrastructure.utilities.helpers import is_hilbeh_available
 
                 if not is_hilbeh_available():
                     return ProductCatalogResponse(
@@ -178,8 +176,8 @@ class ProductCatalogUseCase:
                 success=True, product=self._map_to_product_info(product)
             )
 
-        except Exception as e:
-            self._logger.error(f"Error checking availability: {e}")
+        except (ValueError, AttributeError) as e:
+            self._logger.error("Error checking availability: %s", e)
             return ProductCatalogResponse(
                 success=False, error_message="Failed to check availability"
             )

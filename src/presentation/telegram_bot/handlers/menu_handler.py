@@ -6,12 +6,13 @@ Handles menu browsing using use cases and dependency injection.
 
 import logging
 
-from telegram import Update
-from telegram.ext import CallbackQueryHandler, ContextTypes
+from telegram import CallbackQuery, Update
+from telegram.ext import Application, CallbackQueryHandler, ContextTypes
 
-from ....application.use_cases.product_catalog_use_case import ProductCatalogRequest
-from ....infrastructure.container.dependency_injection import get_container
-from ..keyboards.menu import (
+from src.application.use_cases.product_catalog_use_case import ProductCatalogRequest
+from src.infrastructure.container.dependency_injection import get_container
+from src.infrastructure.utilities.exceptions import BusinessLogicError
+from src.presentation.telegram_bot.keyboards.menu import (
     get_direct_add_keyboard,
     get_hilbeh_menu_keyboard,
     get_kubaneh_menu_keyboard,
@@ -23,6 +24,7 @@ from ..keyboards.menu import (
 logger = logging.getLogger(__name__)
 
 
+# pylint: disable=too-few-public-methods
 class MenuHandler:
     """Clean Architecture menu handler"""
 
@@ -32,7 +34,7 @@ class MenuHandler:
         self._logger = logging.getLogger(self.__class__.__name__)
 
     async def handle_menu_callback(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+        self, update: Update, _: ContextTypes.DEFAULT_TYPE
     ):
         """Handle menu-related callbacks"""
         query = update.callback_query
@@ -43,7 +45,7 @@ class MenuHandler:
         username = update.effective_user.username or "unknown"
 
         self._logger.info(
-            f"🎯 MENU CALLBACK: User {user_id} ({username}) clicked: {data}"
+            "🎯 MENU CALLBACK: User %s (%s) clicked: %s", user_id, username, data
         )
 
         try:
@@ -64,24 +66,27 @@ class MenuHandler:
             elif data == "menu_white_coffee":
                 await self._show_white_coffee_menu(query)
             else:
-                self._logger.warning(f"⚠️ UNKNOWN MENU CALLBACK: {data}")
+                self._logger.warning("⚠️ UNKNOWN MENU CALLBACK: %s", data)
                 await query.edit_message_text("Menu functionality available!")
 
-        except Exception as e:
+        except BusinessLogicError as e:
             self._logger.error(
-                f"💥 MENU CALLBACK ERROR: User {user_id}, Data: {data}, Error: {e}",
+                "💥 MENU CALLBACK ERROR: User %s, Data: %s, Error: %s",
+                user_id,
+                data,
+                e,
                 exc_info=True,
             )
             await query.edit_message_text("An error occurred. Please try again.")
 
-    async def _show_main_menu(self, query):
+    async def _show_main_menu(self, query: CallbackQuery):
         """Show the main menu"""
         self._logger.debug("📋 SHOWING: Main menu")
         await query.edit_message_text(
             "What would you like to order today?", reply_markup=get_main_menu_keyboard()
         )
 
-    async def _show_kubaneh_menu(self, query):
+    async def _show_kubaneh_menu(self, query: CallbackQuery):
         """Show Kubaneh sub-menu"""
         self._logger.debug("📋 SHOWING: Kubaneh menu")
         text = (
@@ -97,7 +102,7 @@ class MenuHandler:
             text, reply_markup=get_kubaneh_menu_keyboard(), parse_mode="Markdown"
         )
 
-    async def _show_samneh_menu(self, query):
+    async def _show_samneh_menu(self, query: CallbackQuery):
         """Show Samneh sub-menu"""
         self._logger.debug("📋 SHOWING: Samneh menu")
         text = (
@@ -111,7 +116,7 @@ class MenuHandler:
             text, reply_markup=get_samneh_menu_keyboard(), parse_mode="Markdown"
         )
 
-    async def _show_red_bisbas_menu(self, query):
+    async def _show_red_bisbas_menu(self, query: CallbackQuery):
         """Show Red Bisbas menu"""
         self._logger.debug("📋 SHOWING: Red Bisbas menu")
         text = (
@@ -123,7 +128,7 @@ class MenuHandler:
             text, reply_markup=get_red_bisbas_menu_keyboard(), parse_mode="Markdown"
         )
 
-    async def _show_hilbeh_menu(self, query):
+    async def _show_hilbeh_menu(self, query: CallbackQuery):
         """Show Hilbeh menu with availability check"""
         self._logger.debug("📋 SHOWING: Hilbeh menu")
         try:
@@ -147,14 +152,14 @@ class MenuHandler:
                 text, reply_markup=get_hilbeh_menu_keyboard(), parse_mode="Markdown"
             )
 
-        except Exception as e:
-            self._logger.error(f"💥 Error checking Hilbeh availability: {e}")
+        except BusinessLogicError as e:
+            self._logger.error("💥 Error checking Hilbeh availability: %s", e)
             await query.edit_message_text(
                 "Error checking availability. Please try again.",
                 reply_markup=get_main_menu_keyboard(),
             )
 
-    async def _show_hawaij_soup_menu(self, query):
+    async def _show_hawaij_soup_menu(self, query: CallbackQuery):
         """Show Hawaij soup spice menu"""
         self._logger.debug("📋 SHOWING: Hawaij soup menu")
         text = (
@@ -169,7 +174,7 @@ class MenuHandler:
             parse_mode="Markdown",
         )
 
-    async def _show_hawaij_coffee_menu(self, query):
+    async def _show_hawaij_coffee_menu(self, query: CallbackQuery):
         """Show Hawaij coffee spice menu"""
         self._logger.debug("📋 SHOWING: Hawaij coffee menu")
         text = (
@@ -184,7 +189,7 @@ class MenuHandler:
             parse_mode="Markdown",
         )
 
-    async def _show_white_coffee_menu(self, query):
+    async def _show_white_coffee_menu(self, query: CallbackQuery):
         """Show White coffee menu"""
         self._logger.debug("📋 SHOWING: White coffee menu")
         text = (
@@ -200,7 +205,7 @@ class MenuHandler:
         )
 
 
-def register_menu_handlers(application):
+def register_menu_handlers(application: Application):
     """Register menu handlers"""
     handler = MenuHandler()
 

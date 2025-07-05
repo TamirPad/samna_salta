@@ -7,10 +7,10 @@ Defines the contract for customer data access operations.
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
-from ..entities.customer_entity import Customer
-from ..value_objects.customer_id import CustomerId
-from ..value_objects.phone_number import PhoneNumber
-from ..value_objects.telegram_id import TelegramId
+from src.domain.entities.customer_entity import Customer
+from src.domain.value_objects.customer_id import CustomerId
+from src.domain.value_objects.phone_number import PhoneNumber
+from src.domain.value_objects.telegram_id import TelegramId
 
 
 class CustomerRepository(ABC):
@@ -32,7 +32,6 @@ class CustomerRepository(ABC):
         Returns:
             The saved customer with updated fields (e.g., ID, timestamps)
         """
-        pass
 
     @abstractmethod
     async def find_by_id(self, customer_id: CustomerId) -> Optional[Customer]:
@@ -45,7 +44,6 @@ class CustomerRepository(ABC):
         Returns:
             The customer if found, None otherwise
         """
-        pass
 
     @abstractmethod
     async def find_by_telegram_id(self, telegram_id: TelegramId) -> Optional[Customer]:
@@ -58,7 +56,6 @@ class CustomerRepository(ABC):
         Returns:
             The customer if found, None otherwise
         """
-        pass
 
     @abstractmethod
     async def find_by_phone_number(
@@ -73,7 +70,6 @@ class CustomerRepository(ABC):
         Returns:
             The customer if found, None otherwise
         """
-        pass
 
     @abstractmethod
     async def find_all(self) -> List[Customer]:
@@ -83,7 +79,6 @@ class CustomerRepository(ABC):
         Returns:
             List of all customers
         """
-        pass
 
     @abstractmethod
     async def delete(self, customer_id: CustomerId) -> bool:
@@ -96,7 +91,6 @@ class CustomerRepository(ABC):
         Returns:
             True if deleted successfully, False otherwise
         """
-        pass
 
     @abstractmethod
     async def exists_by_telegram_id(self, telegram_id: TelegramId) -> bool:
@@ -109,7 +103,6 @@ class CustomerRepository(ABC):
         Returns:
             True if customer exists, False otherwise
         """
-        pass
 
     @abstractmethod
     async def exists_by_phone_number(self, phone_number: PhoneNumber) -> bool:
@@ -122,4 +115,3 @@ class CustomerRepository(ABC):
         Returns:
             True if customer exists, False otherwise
         """
-        pass

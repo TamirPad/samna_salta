@@ -5,23 +5,21 @@ Handles the business logic for updating order statuses and notifications.
 """
 
 import logging
-from datetime import datetime
-from typing import List, Optional
 
-from ...domain.repositories.customer_repository import CustomerRepository
-from ...domain.repositories.order_repository import OrderRepository
-from ...domain.value_objects.customer_id import CustomerId
-from ...infrastructure.services.admin_notification_service import (
+from src.domain.repositories.customer_repository import CustomerRepository
+from src.domain.repositories.order_repository import OrderRepository
+from src.domain.value_objects.customer_id import CustomerId
+from src.infrastructure.services.admin_notification_service import (
     AdminNotificationService,
 )
-from ...infrastructure.services.customer_notification_service import (
+from src.infrastructure.services.customer_notification_service import (
     CustomerNotificationService,
 )
-from ...infrastructure.utilities.exceptions import (
+from src.infrastructure.utilities.exceptions import (
     BusinessLogicError,
     OrderNotFoundError,
 )
-from ..dtos.order_dtos import OrderInfo, OrderItemInfo
+from src.application.dtos.order_dtos import OrderInfo, OrderItemInfo
 
 
 class OrderStatusManagementUseCase:
@@ -50,8 +48,8 @@ class OrderStatusManagementUseCase:
         self,
         order_repository: OrderRepository,
         customer_repository: CustomerRepository,
-        admin_notification_service: Optional[AdminNotificationService] = None,
-        customer_notification_service: Optional[CustomerNotificationService] = None,
+        admin_notification_service: AdminNotificationService | None = None,
+        customer_notification_service: CustomerNotificationService | None = None,
     ):
         self._order_repository = order_repository
         self._customer_repository = customer_repository
@@ -64,7 +62,10 @@ class OrderStatusManagementUseCase:
     ) -> OrderInfo:
         """Update order status with validation and notifications"""
         self._logger.info(
-            f"📝 STATUS UPDATE: Order {order_id} → {new_status} by Admin {admin_telegram_id}"
+            "📝 STATUS UPDATE: Order %s → %s by Admin %s",
+            order_id,
+            new_status,
+            admin_telegram_id,
         )
 
         try:
@@ -79,7 +80,8 @@ class OrderStatusManagementUseCase:
             if not self._is_valid_status_transition(old_status, new_status):
                 raise BusinessLogicError(
                     f"Invalid status transition: {old_status} → {new_status}. "
-                    f"Valid transitions from {old_status}: {', '.join(self.STATUS_TRANSITIONS.get(old_status, []))}"
+                    f"Valid transitions from {old_status}: "
+                    f"{', '.join(self.STATUS_TRANSITIONS.get(old_status, []))}"
                 )
 
             # Update status
@@ -105,7 +107,10 @@ class OrderStatusManagementUseCase:
             order_info = self._create_order_info(updated_order, customer)
 
             self._logger.info(
-                f"✅ STATUS UPDATED: Order #{order_info.order_number} {old_status} → {new_status}"
+                "✅ STATUS UPDATED: Order #%s %s → %s",
+                order_info.order_number,
+                old_status,
+                new_status,
             )
 
             # Send notifications
@@ -113,15 +118,25 @@ class OrderStatusManagementUseCase:
 
             return order_info
 
-        except Exception as e:
+        except (BusinessLogicError, OrderNotFoundError) as e:
             self._logger.error(
-                f"💥 STATUS UPDATE ERROR: Order {order_id}, {e}", exc_info=True
+                "💥 STATUS UPDATE ERROR: Order %s, %s", order_id, e, exc_info=True
             )
             raise
+        except (ValueError, TypeError) as e:
+            self._logger.error(
+                "💥 UNEXPECTED STATUS UPDATE ERROR: Order %s, %s",
+                order_id,
+                e,
+                exc_info=True,
+            )
+            raise BusinessLogicError(
+                "An unexpected error occurred while updating the order."
+            ) from e
 
-    async def get_orders_by_status(self, status: str) -> List[OrderInfo]:
+    async def get_orders_by_status(self, status: str) -> list[OrderInfo]:
         """Get all orders with a specific status"""
-        self._logger.info(f"📋 GETTING ORDERS BY STATUS: {status}")
+        self._logger.info("📋 GETTING ORDERS BY STATUS: %s", status)
 
         try:
             # This would require a new repository method
@@ -140,18 +155,20 @@ class OrderStatusManagementUseCase:
                     order_info = self._create_order_info(order_data, customer)
                     order_infos.append(order_info)
 
-            self._logger.info(f"📊 FOUND {len(order_infos)} ORDERS with status {status}")
+            self._logger.info(
+                "📊 FOUND %d ORDERS with status %s", len(order_infos), status
+            )
             return order_infos
 
-        except Exception as e:
-            self._logger.error(f"💥 GET ORDERS BY STATUS ERROR: {e}", exc_info=True)
+        except (ValueError, TypeError) as e:
+            self._logger.error("💥 GET ORDERS BY STATUS ERROR: %s", e, exc_info=True)
             raise
 
-    async def get_pending_orders(self) -> List[OrderInfo]:
+    async def get_pending_orders(self) -> list[OrderInfo]:
         """Get all pending orders that need attention"""
         return await self.get_orders_by_status("pending")
 
-    async def get_active_orders(self) -> List[OrderInfo]:
+    async def get_active_orders(self) -> list[OrderInfo]:
         """Get all active orders (confirmed, preparing, ready)"""
         active_statuses = ["confirmed", "preparing", "ready"]
         all_orders = await self._order_repository.get_all_orders()
@@ -179,16 +196,16 @@ class OrderStatusManagementUseCase:
     def _create_order_info(self, order_data: dict, customer) -> OrderInfo:
         """Create OrderInfo from order data and customer"""
         # Convert items to OrderItemInfo objects
-        order_items = []
-        for item_data in order_data.get("items", []):
-            order_item = OrderItemInfo(
-                product_name=item_data["product_name"],
-                quantity=item_data["quantity"],
-                unit_price=item_data["unit_price"],
-                total_price=item_data["total_price"],
-                options=item_data.get("options", {}),
+        order_items = [
+            OrderItemInfo(
+                product_name=item["product_name"],
+                quantity=item["quantity"],
+                unit_price=item["unit_price"],
+                total_price=item["total_price"],
+                options=item.get("options", {}),
             )
-            order_items.append(order_item)
+            for item in order_data["items"]
+        ]
 
         return OrderInfo(
             order_id=order_data["id"],
@@ -196,36 +213,26 @@ class OrderStatusManagementUseCase:
             customer_name=customer.full_name.value,
             customer_phone=customer.phone_number.value,
             items=order_items,
-            delivery_method=order_data.get("delivery_method", "pickup"),
+            delivery_method=order_data["delivery_method"],
             delivery_address=order_data.get("delivery_address"),
-            subtotal=order_data.get("subtotal", 0.0),
-            delivery_charge=order_data.get("delivery_charge", 0.0),
-            total=order_data.get("total", 0.0),
-            status=order_data.get("status", "pending"),
-            created_at=order_data.get("created_at", datetime.utcnow()),
+            subtotal=order_data["subtotal"],
+            delivery_charge=order_data["delivery_charge"],
+            total=order_data["total"],
+            status=order_data["status"],
+            created_at=order_data["created_at"],
+            notes=order_data.get("notes"),
         )
 
     async def _send_status_notifications(self, order_info: OrderInfo, old_status: str):
-        """Send notifications for status updates"""
-        try:
-            # Send admin notification
-            if self._admin_notification_service:
-                await self._admin_notification_service.notify_order_status_update(
-                    order_info, old_status
-                )
-                self._logger.info(
-                    f"📨 ADMIN STATUS NOTIFICATION SENT: Order #{order_info.order_number}"
-                )
+        """Send notifications for status update"""
+        # Notify customer
+        if self._customer_notification_service:
+            await self._customer_notification_service.notify_order_status_update(
+                order_info
+            )
 
-            # Send customer notification
-            if self._customer_notification_service:
-                await self._customer_notification_service.notify_order_status_update(
-                    order_info, old_status
-                )
-                self._logger.info(
-                    f"📨 CUSTOMER STATUS NOTIFICATION SENT: Order #{order_info.order_number}"
-                )
-
-        except Exception as e:
-            self._logger.error(f"⚠️ NOTIFICATION ERROR: {e}")
-            # Don't fail status update if notifications fail
+        # Notify admins
+        if self._admin_notification_service:
+            await self._admin_notification_service.notify_order_status_update(
+                order_info, old_status
+            )

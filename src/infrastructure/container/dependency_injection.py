@@ -5,7 +5,7 @@ Manages the instantiation and lifecycle of dependencies for Clean Architecture.
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from telegram import Bot
 
@@ -44,7 +44,7 @@ class DependencyContainer:
     """
 
     def __init__(self, bot: Bot = None):
-        self._instances: Dict[str, Any] = {}
+        self._instances: dict[str, Any] = {}
         self._logger = logging.getLogger(self.__class__.__name__)
         self._bot = bot
         self._setup_dependencies()
@@ -214,29 +214,44 @@ class DependencyContainer:
 
 
 # Global container instance
-_container: DependencyContainer = None
+class ContainerSingleton:
+    """Singleton for the dependency container"""
+
+    _instance: DependencyContainer | None = None
+
+    @classmethod
+    def get_instance(cls) -> DependencyContainer:
+        """Get the singleton instance"""
+        if cls._instance is None:
+            cls._instance = DependencyContainer()
+        return cls._instance
+
+    @classmethod
+    def initialize(cls, bot: Bot = None) -> DependencyContainer:
+        """Initialize the singleton instance"""
+        if cls._instance:
+            cls._instance.cleanup()
+        cls._instance = DependencyContainer(bot=bot)
+        return cls._instance
+
+    @classmethod
+    def reset(cls):
+        """Reset the singleton instance"""
+        if cls._instance:
+            cls._instance.cleanup()
+        cls._instance = None
 
 
 def get_container() -> DependencyContainer:
     """Get the global dependency container instance"""
-    global _container
-    if _container is None:
-        _container = DependencyContainer()
-    return _container
+    return ContainerSingleton.get_instance()
 
 
 def initialize_container(bot: Bot = None) -> DependencyContainer:
     """Initialize the global dependency container with bot instance"""
-    global _container
-    if _container:
-        _container.cleanup()
-    _container = DependencyContainer(bot=bot)
-    return _container
+    return ContainerSingleton.initialize(bot=bot)
 
 
 def reset_container():
     """Reset the global container (useful for testing)"""
-    global _container
-    if _container:
-        _container.cleanup()
-    _container = None
+    ContainerSingleton.reset()

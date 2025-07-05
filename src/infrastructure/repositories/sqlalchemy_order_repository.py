@@ -6,16 +6,16 @@ Concrete implementation of OrderRepository using SQLAlchemy ORM.
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy.exc import SQLAlchemyError
 
-from ...domain.repositories.order_repository import OrderRepository
-from ...domain.value_objects.customer_id import CustomerId
-from ...domain.value_objects.order_id import OrderId
-from ...domain.value_objects.telegram_id import TelegramId
-from ..database.models import Customer, Order, OrderItem
-from ..database.operations import get_session
+from src.domain.repositories.order_repository import OrderRepository
+from src.domain.value_objects.customer_id import CustomerId
+from src.domain.value_objects.order_id import OrderId
+from src.domain.value_objects.telegram_id import TelegramId
+from src.infrastructure.database.models import Customer, Order, OrderItem
+from src.infrastructure.database.operations import get_session
 
 
 class SQLAlchemyOrderRepository(OrderRepository):
@@ -25,10 +25,10 @@ class SQLAlchemyOrderRepository(OrderRepository):
         self._logger = logging.getLogger(self.__class__.__name__)
 
     async def create_order(
-        self, order_data: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+        self, order_data: dict[str, Any]
+    ) -> dict[str, Any] | None:
         """Create a new order"""
-        self._logger.info(f"📝 CREATE ORDER: Customer {order_data.get('customer_id')}")
+        self._logger.info("📝 CREATE ORDER: Customer %s", order_data.get('customer_id'))
 
         try:
             session = get_session()
@@ -50,7 +50,7 @@ class SQLAlchemyOrderRepository(OrderRepository):
                 session.add(order)
                 session.flush()  # Get order ID
 
-                self._logger.info(f"🆕 ORDER CREATED: #{order_number}, ID={order.id}")
+                self._logger.info("🆕 ORDER CREATED: #%s, ID=%s", order_number, order.id)
 
                 # Create order items
                 for item_data in order_data.get("items", []):
@@ -82,22 +82,22 @@ class SQLAlchemyOrderRepository(OrderRepository):
                     "updated_at": order.updated_at,
                 }
 
-                self._logger.info(f"✅ ORDER CREATION SUCCESS: #{order_number}")
+                self._logger.info("✅ ORDER CREATION SUCCESS: #%s", order_number)
                 return result
 
             finally:
                 session.close()
 
         except SQLAlchemyError as e:
-            self._logger.error(f"💥 DATABASE ERROR creating order: {e}")
+            self._logger.error("💥 DATABASE ERROR creating order: %s", e)
             raise
         except Exception as e:
-            self._logger.error(f"💥 UNEXPECTED ERROR creating order: {e}")
+            self._logger.error("💥 UNEXPECTED ERROR creating order: %s", e)
             raise
 
-    async def get_order_by_id(self, order_id: OrderId) -> Optional[Dict[str, Any]]:
+    async def get_order_by_id(self, order_id: OrderId) -> dict[str, Any] | None:
         """Get order by ID"""
-        self._logger.info(f"🔍 GET ORDER BY ID: {order_id.value}")
+        self._logger.info("🔍 GET ORDER BY ID: %s", order_id.value)
 
         try:
             session = get_session()
@@ -105,7 +105,7 @@ class SQLAlchemyOrderRepository(OrderRepository):
                 order = session.query(Order).filter(Order.id == order_id.value).first()
 
                 if not order:
-                    self._logger.info(f"📭 ORDER NOT FOUND: ID {order_id.value}")
+                    self._logger.info("📭 ORDER NOT FOUND: ID %s", order_id.value)
                     return None
 
                 # Get order items
@@ -139,24 +139,24 @@ class SQLAlchemyOrderRepository(OrderRepository):
                     ],
                 }
 
-                self._logger.info(f"✅ ORDER FOUND: #{order.order_number}")
+                self._logger.info("✅ ORDER FOUND: #%s", order.order_number)
                 return result
 
             finally:
                 session.close()
 
         except SQLAlchemyError as e:
-            self._logger.error(f"💥 DATABASE ERROR getting order by ID: {e}")
+            self._logger.error("💥 DATABASE ERROR getting order by ID: %s", e)
             raise
         except Exception as e:
-            self._logger.error(f"💥 UNEXPECTED ERROR getting order by ID: {e}")
+            self._logger.error("💥 UNEXPECTED ERROR getting order by ID: %s", e)
             raise
 
     async def get_orders_by_customer(
         self, customer_id: CustomerId
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get orders by customer ID"""
-        self._logger.info(f"📋 GET ORDERS BY CUSTOMER: {customer_id.value}")
+        self._logger.info("📋 GET ORDERS BY CUSTOMER: %s", customer_id.value)
 
         try:
             session = get_session()
@@ -202,7 +202,7 @@ class SQLAlchemyOrderRepository(OrderRepository):
                     result.append(order_data)
 
                 self._logger.info(
-                    f"✅ FOUND {len(result)} ORDERS for customer {customer_id.value}"
+                    "✅ FOUND %d ORDERS for customer %s", len(result), customer_id.value
                 )
                 return result
 
@@ -210,17 +210,17 @@ class SQLAlchemyOrderRepository(OrderRepository):
                 session.close()
 
         except SQLAlchemyError as e:
-            self._logger.error(f"💥 DATABASE ERROR getting orders by customer: {e}")
+            self._logger.error("💥 DATABASE ERROR getting orders by customer: %s", e)
             raise
         except Exception as e:
-            self._logger.error(f"💥 UNEXPECTED ERROR getting orders by customer: {e}")
+            self._logger.error("💥 UNEXPECTED ERROR getting orders by customer: %s", e)
             raise
 
     async def get_orders_by_telegram_id(
         self, telegram_id: TelegramId
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get orders by telegram ID"""
-        self._logger.info(f"📋 GET ORDERS BY TELEGRAM ID: {telegram_id.value}")
+        self._logger.info("📋 GET ORDERS BY TELEGRAM ID: %s", telegram_id.value)
 
         try:
             session = get_session()
@@ -234,7 +234,7 @@ class SQLAlchemyOrderRepository(OrderRepository):
 
                 if not customer:
                     self._logger.info(
-                        f"📭 CUSTOMER NOT FOUND: Telegram ID {telegram_id.value}"
+                        "📭 CUSTOMER NOT FOUND: Telegram ID %s", telegram_id.value
                     )
                     return []
 
@@ -246,15 +246,15 @@ class SQLAlchemyOrderRepository(OrderRepository):
                 session.close()
 
         except SQLAlchemyError as e:
-            self._logger.error(f"💥 DATABASE ERROR getting orders by telegram ID: {e}")
+            self._logger.error("💥 DATABASE ERROR getting orders by telegram ID: %s", e)
             raise
         except Exception as e:
-            self._logger.error(f"💥 UNEXPECTED ERROR getting orders by telegram ID: {e}")
+            self._logger.error("💥 UNEXPECTED ERROR getting orders by telegram ID: %s", e)
             raise
 
     async def update_order_status(self, order_id: OrderId, status: str) -> bool:
         """Update order status"""
-        self._logger.info(f"🔄 UPDATE ORDER STATUS: ID {order_id.value} -> {status}")
+        self._logger.info("🔄 UPDATE ORDER STATUS: ID %s -> %s", order_id.value, status)
 
         try:
             session = get_session()
@@ -262,17 +262,15 @@ class SQLAlchemyOrderRepository(OrderRepository):
                 order = session.query(Order).filter(Order.id == order_id.value).first()
 
                 if not order:
-                    self._logger.warning(f"⚠️ ORDER NOT FOUND: ID {order_id.value}")
+                    self._logger.warning("📭 ORDER NOT FOUND: ID %s", order_id.value)
                     return False
 
-                old_status = order.status
                 order.status = status
                 order.updated_at = datetime.utcnow()
-
                 session.commit()
 
                 self._logger.info(
-                    f"✅ STATUS UPDATED: Order #{order.order_number} {old_status} -> {status}"
+                    "✅ ORDER STATUS UPDATED: #%s -> %s", order.order_number, status
                 )
                 return True
 
@@ -280,27 +278,32 @@ class SQLAlchemyOrderRepository(OrderRepository):
                 session.close()
 
         except SQLAlchemyError as e:
-            self._logger.error(f"💥 DATABASE ERROR updating order status: {e}")
+            self._logger.error("💥 DATABASE ERROR updating order status: %s", e)
             raise
         except Exception as e:
-            self._logger.error(f"💥 UNEXPECTED ERROR updating order status: {e}")
+            self._logger.error("💥 UNEXPECTED ERROR updating order status: %s", e)
             raise
 
     async def get_all_orders(
-        self, limit: int = 100, status: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
-        """Get all orders with optional filtering"""
-        self._logger.info(f"📋 GET ALL ORDERS: limit={limit}, status={status}")
+        self, limit: int = 100, status: str | None = None
+    ) -> list[dict[str, Any]]:
+        """
+        Get all orders with optional status filter
+        """
+        if status:
+            self._logger.info("📋 GET ALL ORDERS (limit=%d, status=%s)", limit, status)
+        else:
+            self._logger.info("📋 GET ALL ORDERS (limit=%d)", limit)
 
         try:
             session = get_session()
             try:
-                query = session.query(Order)
+                query = session.query(Order).order_by(Order.created_at.desc())
 
                 if status:
                     query = query.filter(Order.status == status)
 
-                orders = query.order_by(Order.created_at.desc()).limit(limit).all()
+                orders = query.limit(limit).all()
 
                 result = []
                 for order in orders:
@@ -309,11 +312,18 @@ class SQLAlchemyOrderRepository(OrderRepository):
                         .filter(OrderItem.order_id == order.id)
                         .all()
                     )
+                    customer = (
+                        session.query(Customer)
+                        .filter(Customer.id == order.customer_id)
+                        .first()
+                    )
 
                     order_data = {
                         "id": order.id,
                         "order_number": order.order_number,
                         "customer_id": order.customer_id,
+                        "customer_name": customer.full_name if customer else "N/A",
+                        "customer_phone": customer.phone_number if customer else "N/A",
                         "delivery_method": order.delivery_method,
                         "delivery_address": order.delivery_address,
                         "delivery_charge": order.delivery_charge,
@@ -335,55 +345,50 @@ class SQLAlchemyOrderRepository(OrderRepository):
                     }
                     result.append(order_data)
 
-                self._logger.info(f"✅ FOUND {len(result)} ORDERS")
+                self._logger.info("✅ FOUND %d ORDERS", len(result))
                 return result
 
             finally:
                 session.close()
 
         except SQLAlchemyError as e:
-            self._logger.error(f"💥 DATABASE ERROR getting all orders: {e}")
+            self._logger.error("💥 DATABASE ERROR getting all orders: %s", e)
             raise
         except Exception as e:
-            self._logger.error(f"💥 UNEXPECTED ERROR getting all orders: {e}")
+            self._logger.error("💥 UNEXPECTED ERROR getting all orders: %s", e)
             raise
 
     async def delete_order(self, order_id: OrderId) -> bool:
-        """Delete an order"""
-        self._logger.info(f"🗑️ DELETE ORDER: ID {order_id.value}")
+        """Delete an order and its items"""
+        self._logger.info("🗑️ DELETE ORDER: ID %s", order_id.value)
 
         try:
             session = get_session()
             try:
-                order = session.query(Order).filter(Order.id == order_id.value).first()
-
-                if not order:
-                    self._logger.warning(f"⚠️ ORDER NOT FOUND: ID {order_id.value}")
-                    return False
-
-                # Delete order items first
+                # First, delete order items
                 session.query(OrderItem).filter(
                     OrderItem.order_id == order_id.value
-                ).delete()
+                ).delete(synchronize_session=False)
 
-                # Delete order
-                session.delete(order)
-                session.commit()
-
-                self._logger.info(f"✅ ORDER DELETED: #{order.order_number}")
-                return True
-
+                # Then, delete the order
+                order = session.query(Order).filter(Order.id == order_id.value).first()
+                if order:
+                    session.delete(order)
+                    session.commit()
+                    self._logger.info("✅ ORDER DELETED: ID %s", order_id.value)
+                    return True
+                self._logger.warning("📭 ORDER NOT FOUND for deletion: %s", order_id.value)
+                return False
             finally:
                 session.close()
 
         except SQLAlchemyError as e:
-            self._logger.error(f"💥 DATABASE ERROR deleting order: {e}")
+            self._logger.error("💥 DATABASE ERROR deleting order: %s", e)
             raise
         except Exception as e:
-            self._logger.error(f"💥 UNEXPECTED ERROR deleting order: {e}")
+            self._logger.error("💥 UNEXPECTED ERROR deleting order: %s", e)
             raise
 
     def _generate_order_number(self) -> str:
-        """Generate unique order number"""
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        return f"SS{timestamp}"
+        """Generate a unique order number"""
+        return f"ORD-{datetime.now().strftime('%Y%m%d%H%M%S%f')}"

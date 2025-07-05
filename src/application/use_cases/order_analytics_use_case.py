@@ -7,11 +7,10 @@ Provides business insights and analytics for order management.
 import logging
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from ...domain.repositories.customer_repository import CustomerRepository
-from ...domain.repositories.order_repository import OrderRepository
-from ..dtos.order_dtos import OrderInfo, OrderItemInfo
+from src.domain.repositories.customer_repository import CustomerRepository
+from src.domain.repositories.order_repository import OrderRepository
 
 
 class OrderAnalyticsUseCase:
@@ -25,13 +24,13 @@ class OrderAnalyticsUseCase:
         self._logger = logging.getLogger(self.__class__.__name__)
 
     async def get_daily_summary(
-        self, date: Optional[datetime] = None
-    ) -> Dict[str, Any]:
+        self, date: datetime | None = None
+    ) -> dict[str, Any]:
         """Get daily order summary"""
         if not date:
             date = datetime.now()
 
-        self._logger.info(f"📊 GENERATING DAILY SUMMARY: {date.strftime('%Y-%m-%d')}")
+        self._logger.info("📊 GENERATING DAILY SUMMARY: %s", date.strftime('%Y-%m-%d'))
 
         try:
             # Get all orders (in a real system, you'd filter by date)
@@ -72,15 +71,17 @@ class OrderAnalyticsUseCase:
             }
 
             self._logger.info(
-                f"📈 DAILY SUMMARY: {total_orders} orders, ₪{total_revenue:.2f} revenue"
+                "📈 DAILY SUMMARY: %d orders, ₪%.2f revenue",
+                total_orders,
+                total_revenue,
             )
             return summary
 
-        except Exception as e:
-            self._logger.error(f"💥 DAILY SUMMARY ERROR: {e}", exc_info=True)
+        except (TypeError, ValueError, ZeroDivisionError) as e:
+            self._logger.error("💥 DAILY SUMMARY ERROR: %s", e, exc_info=True)
             raise
 
-    async def get_weekly_trends(self) -> Dict[str, Any]:
+    async def get_weekly_trends(self) -> dict[str, Any]:
         """Get weekly ordering trends"""
         self._logger.info("📊 GENERATING WEEKLY TRENDS")
 
@@ -119,17 +120,19 @@ class OrderAnalyticsUseCase:
             }
 
             self._logger.info(
-                f"📈 WEEKLY TRENDS: {total_weekly_orders} orders, ₪{total_weekly_revenue:.2f}"
+                "📈 WEEKLY TRENDS: %d orders, ₪%.2f",
+                total_weekly_orders,
+                total_weekly_revenue,
             )
             return trends
 
-        except Exception as e:
-            self._logger.error(f"💥 WEEKLY TRENDS ERROR: {e}", exc_info=True)
+        except (TypeError, ValueError) as e:
+            self._logger.error("💥 WEEKLY TRENDS ERROR: %s", e, exc_info=True)
             raise
 
-    async def get_popular_products(self, limit: int = 10) -> List[Dict[str, Any]]:
+    async def get_popular_products(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get most popular products by order frequency"""
-        self._logger.info(f"📊 ANALYZING POPULAR PRODUCTS (top {limit})")
+        self._logger.info("📊 ANALYZING POPULAR PRODUCTS (top %d)", limit)
 
         try:
             all_orders = await self._order_repository.get_all_orders()
@@ -167,15 +170,15 @@ class OrderAnalyticsUseCase:
             )[:limit]
 
             self._logger.info(
-                f"📈 TOP PRODUCTS: {len(popular_products)} products analyzed"
+                "📈 TOP PRODUCTS: %d products analyzed", len(popular_products)
             )
             return popular_products
 
-        except Exception as e:
-            self._logger.error(f"💥 POPULAR PRODUCTS ERROR: {e}", exc_info=True)
+        except (TypeError, ValueError) as e:
+            self._logger.error("💥 POPULAR PRODUCTS ERROR: %s", e, exc_info=True)
             raise
 
-    async def get_customer_insights(self) -> Dict[str, Any]:
+    async def get_customer_insights(self) -> dict[str, Any]:
         """Get customer behavior insights"""
         self._logger.info("📊 ANALYZING CUSTOMER INSIGHTS")
 
@@ -195,18 +198,12 @@ class OrderAnalyticsUseCase:
             repeat_customers = len(
                 [cid for cid, orders in customer_orders.items() if len(orders) > 1]
             )
-
-            # Average orders per customer
             avg_orders_per_customer = (
                 len(all_orders) / active_customers if active_customers > 0 else 0
             )
 
             # Customer lifetime value
-            customer_values = {}
-            for customer_id, orders in customer_orders.items():
-                total_value = sum(order.get("total", 0) for order in orders)
-                customer_values[customer_id] = total_value
-
+            customer_values = self._calculate_customer_lifetime_value(customer_orders)
             avg_customer_value = (
                 sum(customer_values.values()) / len(customer_values)
                 if customer_values
@@ -237,15 +234,27 @@ class OrderAnalyticsUseCase:
             }
 
             self._logger.info(
-                f"📈 CUSTOMER INSIGHTS: {active_customers} active, {repeat_customers} repeat"
+                "📈 CUSTOMER INSIGHTS: %d active, %d repeat",
+                active_customers,
+                repeat_customers,
             )
             return insights
 
-        except Exception as e:
-            self._logger.error(f"💥 CUSTOMER INSIGHTS ERROR: {e}", exc_info=True)
+        except (TypeError, ValueError, ZeroDivisionError) as e:
+            self._logger.error("💥 CUSTOMER INSIGHTS ERROR: %s", e, exc_info=True)
             raise
 
-    async def get_business_overview(self) -> Dict[str, Any]:
+    def _calculate_customer_lifetime_value(
+        self, customer_orders: dict[int, list]
+    ) -> dict[int, float]:
+        """Calculate the lifetime value for each customer."""
+        customer_values = {}
+        for customer_id, orders in customer_orders.items():
+            total_value = sum(order.get("total", 0) for order in orders)
+            customer_values[customer_id] = total_value
+        return customer_values
+
+    async def get_business_overview(self) -> dict[str, Any]:
         """Get comprehensive business overview"""
         self._logger.info("📊 GENERATING BUSINESS OVERVIEW")
 
@@ -280,56 +289,71 @@ class OrderAnalyticsUseCase:
             }
 
             self._logger.info(
-                f"📈 BUSINESS OVERVIEW: {total_lifetime_orders} total orders, ₪{total_lifetime_revenue:.2f}"
+                "📈 BUSINESS OVERVIEW: %d total orders, ₪%.2f",
+                total_lifetime_orders,
+                total_lifetime_revenue,
             )
             return overview
 
-        except Exception as e:
-            self._logger.error(f"💥 BUSINESS OVERVIEW ERROR: {e}", exc_info=True)
+        except (TypeError, ValueError, ZeroDivisionError) as e:
+            self._logger.error("💥 BUSINESS OVERVIEW ERROR: %s", e, exc_info=True)
             raise
 
-    def format_analytics_report(self, overview: Dict[str, Any]) -> str:
-        """Format analytics data into a readable report"""
+    def format_analytics_report(self, overview: dict[str, Any]) -> str:
+        """Format a comprehensive analytics report into a readable string"""
+        self._logger.info("📄 FORMATTING ANALYTICS REPORT")
+
         try:
+            # Daily Summary
             daily = overview["daily_summary"]
+            report_lines = ["📊 <b>BUSINESS ANALYTICS REPORT</b>"]
+            report_lines.append(
+                f"📅 Generated: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+            )
+            report_lines.append("\n<b>TODAY'S PERFORMANCE:</b>")
+            report_lines.append(f"📋 Orders: {daily['total_orders']}")
+            report_lines.append(f"💰 Revenue: ₪{daily['total_revenue']:.2f}")
+            report_lines.append(f"📊 Avg Order: ₪{daily['average_order_value']:.2f}")
+
+            # Weekly Trends
             weekly = overview["weekly_trends"]
+            report_lines.append("\n<b>WEEKLY TRENDS:</b>")
+            report_lines.append(f"📋 Total Orders: {weekly['total_weekly_orders']}")
+            report_lines.append(
+                f"💰 Total Revenue: ₪{weekly['total_weekly_revenue']:.2f}"
+            )
+            report_lines.append(
+                f"📊 Daily Average: {weekly['daily_average_orders']:.1f} orders"
+            )
+
+            # Popular Products
             products = overview["popular_products"]
-            customers = overview["customer_insights"]
-
-            report = f"""
-📊 <b>BUSINESS ANALYTICS REPORT</b>
-📅 Generated: {datetime.now().strftime('%d/%m/%Y %H:%M')}
-
-📈 <b>TODAY'S PERFORMANCE:</b>
-📋 Orders: {daily['total_orders']}
-💰 Revenue: ₪{daily['total_revenue']:.2f}
-📊 Avg Order: ₪{daily['average_order_value']:.2f}
-
-📅 <b>WEEKLY TRENDS:</b>
-📋 Total Orders: {weekly['total_weekly_orders']}
-💰 Total Revenue: ₪{weekly['total_weekly_revenue']:.2f}
-📊 Daily Average: {weekly['daily_average_orders']:.1f} orders
-
-🏆 <b>TOP PRODUCTS:</b>"""
-
+            report_lines.append("\n🏆 <b>TOP PRODUCTS:</b>")
             for i, product in enumerate(products[:3], 1):
-                report += (
-                    f"\n{i}. {product['product_name']}: {product['order_count']} orders"
+                report_lines.append(
+                    f"{i}. {product['product_name']}: {product['order_count']} orders"
                 )
 
-            report += f"""
+            # Customer Insights
+            customers = overview["customer_insights"]
+            report_lines.append("\n👥 <b>CUSTOMER INSIGHTS:</b>")
+            report_lines.append(f"👨‍💼 Total Customers: {customers['total_customers']}")
+            report_lines.append(f"🔄 Repeat Rate: {customers['repeat_customer_rate']:.1f}%")
+            report_lines.append(
+                f"💰 Avg Customer Value: ₪{customers['avg_customer_lifetime_value']:.2f}"
+            )
 
-👥 <b>CUSTOMER INSIGHTS:</b>
-👨‍💼 Total Customers: {customers['total_customers']}
-🔄 Repeat Rate: {customers['repeat_customer_rate']:.1f}%
-💰 Avg Customer Value: ₪{customers['avg_customer_lifetime_value']:.2f}
+            # Lifetime Totals
+            report_lines.append("\n📋 <b>LIFETIME TOTALS:</b>")
+            report_lines.append(f"📊 Total Orders: {overview['total_lifetime_orders']}")
+            report_lines.append(f"💰 Total Revenue: ₪{overview['total_lifetime_revenue']:.2f}")
 
-📋 <b>LIFETIME TOTALS:</b>
-📊 Total Orders: {overview['total_lifetime_orders']}
-💰 Total Revenue: ₪{overview['total_lifetime_revenue']:.2f}
-"""
-            return report
+            report_lines.append(
+                f"📊 Avg LTV: ₪{overview['customer_insights']['avg_customer_lifetime_value']:.2f}"
+            )
 
-        except Exception as e:
-            self._logger.error(f"💥 REPORT FORMATTING ERROR: {e}")
-            return "Error formatting analytics report."
+            return "\n".join(report_lines)
+
+        except (KeyError, TypeError) as e:
+            self._logger.error("💥 REPORT FORMATTING ERROR: %s", e, exc_info=True)
+            return "Error: Could not generate analytics report."

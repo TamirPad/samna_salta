@@ -6,14 +6,17 @@ import logging
 import time
 from contextlib import contextmanager
 from typing import Any, Dict, Optional
+import shutil
+import threading
 
 from sqlalchemy import Index, create_engine, event
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 
-from ..configuration.config import get_config
-from .models import Base, Cart, Customer, Order, OrderItem, Product
+from src.infrastructure.configuration.config import get_config
+from src.infrastructure.database.models import Base, Cart, Customer, Order, OrderItem, Product
 
 logger = logging.getLogger(__name__)
 
@@ -24,12 +27,26 @@ class DatabaseConnectionManager:
     and performance monitoring
     """
 
+    _instance: Optional["DatabaseConnectionManager"] = None
+    _lock = threading.Lock()
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            with cls._lock:
+                if not cls._instance:
+                    cls._instance = super().__new__(cls)
+        return cls._instance
+
     def __init__(self):
-        self._engine: Optional[Engine] = None
-        self._SessionLocal = None
-        self._setup_engine()
-        self._setup_indexes()
-        self._setup_performance_monitoring()
+        if not hasattr(self, "_initialized"):
+            with self._lock:
+                if not hasattr(self, "_initialized"):
+                    self._engine: Optional[Engine] = None
+                    self._session_local = None
+                    self._setup_engine()
+                    self._setup_indexes()
+                    self._setup_performance_monitoring()
+                    self._initialized = True
 
     def _setup_engine(self):
         """Setup database engine with connection pooling"""
@@ -47,7 +64,7 @@ class DatabaseConnectionManager:
         # Production vs Development settings
         if config.environment == "production":
             # PostgreSQL settings for production
-            if config.database_url.startswith("postgresql"):
+            if config.database_url.startswith("postgresql"):  # pylint: disable=no-member
                 pool_settings.update(
                     {
                         "pool_size": 20,
@@ -67,11 +84,11 @@ class DatabaseConnectionManager:
 
         self._engine = create_engine(config.database_url, **pool_settings)
 
-        self._SessionLocal = sessionmaker(
+        self._session_local = sessionmaker(
             autocommit=False, autoflush=False, bind=self._engine
         )
 
-        logger.info(f"Database engine configured for {config.environment}")
+        logger.info("Database engine configured for %s", config.environment)
 
     def _setup_indexes(self):
         """Setup database indexes for improved query performance"""
@@ -99,32 +116,32 @@ class DatabaseConnectionManager:
 
             logger.info("Database indexes configured")
 
-        except Exception as e:
-            logger.warning(f"Error setting up indexes: {e}")
+        except RuntimeError as e:
+            logger.warning("Error setting up indexes: %s", e)
 
     def _setup_performance_monitoring(self):
         """Setup performance monitoring for database operations"""
 
         @event.listens_for(Engine, "before_cursor_execute")
         def receive_before_cursor_execute(
-            conn, cursor, statement, parameters, context, executemany
+            _conn, _cursor, _statement, _parameters, context, _executemany
         ):
-            context._query_start_time = time.time()
+            setattr(context, "query_start_time", time.time())
 
         @event.listens_for(Engine, "after_cursor_execute")
         def receive_after_cursor_execute(
-            conn, cursor, statement, parameters, context, executemany
+            _conn, _cursor, statement, _parameters, context, _executemany
         ):
-            total = time.time() - context._query_start_time
+            total = time.time() - getattr(context, "query_start_time", 0)
 
             # Log slow queries (> 100ms)
             if total > 0.1:
                 logger.warning(
-                    f"Slow query detected: {total:.3f}s - {statement[:100]}..."
+                    "Slow query detected: %.3fs - %s...", total, statement[:100]
                 )
 
             # Log all queries in debug mode
-            logger.debug(f"Query executed in {total:.3f}s: {statement[:50]}...")
+            logger.debug("Query executed in %.3fs: %s...", total, statement[:50])
 
     @property
     def engine(self) -> Engine:
@@ -134,7 +151,7 @@ class DatabaseConnectionManager:
     @contextmanager
     def get_session(self):
         """Get database session with automatic cleanup"""
-        session = self._SessionLocal()
+        session = self._session_local()
         try:
             yield session
             session.commit()
@@ -160,16 +177,9 @@ class DatabaseConnectionManager:
         }
 
 
-# Global database manager instance
-_db_manager: Optional[DatabaseConnectionManager] = None
-
-
-def get_database_manager() -> DatabaseConnectionManager:
+def get_database_manager() -> "DatabaseConnectionManager":
     """Get the global database manager instance"""
-    global _db_manager
-    if _db_manager is None:
-        _db_manager = DatabaseConnectionManager()
-    return _db_manager
+    return DatabaseConnectionManager()
 
 
 # Optimized query functions
@@ -187,6 +197,11 @@ class OptimizedQueries:
                 .filter(Product.category == category, Product.is_active.is_(True))
                 .all()
             )
+
+    def get_all_active_products(self):
+        """Optimized query for all active products"""
+        with self.db_manager.get_session() as session:
+            return session.query(Product).filter(Product.is_active.is_(True)).all()
 
     def get_customer_order_history(self, customer_id: int, limit: int = 10):
         """Optimized query for customer order history"""
@@ -227,79 +242,57 @@ def check_database_health() -> Dict[str, Any]:
             # Basic connectivity test
             session.execute("SELECT 1")
 
-            # Get table counts
-            customer_count = session.query(Customer).count()
-            product_count = session.query(Product).count()
-            order_count = session.query(Order).count()
+        # Connection pool status
+        pool_info = db_manager.get_connection_info()
 
-            # Get connection pool info
-            pool_info = db_manager.get_connection_info()
-
-            return {
-                "status": "healthy",
-                "tables": {
-                    "customers": customer_count,
-                    "products": product_count,
-                    "orders": order_count,
-                },
-                "connection_pool": pool_info,
-                "timestamp": time.time(),
-            }
-
-    except Exception as e:
-        logger.error(f"Database health check failed: {e}")
         return {
-            "status": "unhealthy",
-            "error": str(e),
-            "timestamp": time.time(),
+            "status": "ok",
+            "database": db_manager.engine.url.database,
+            "pool_info": pool_info,
         }
+    except OperationalError as e:
+        logger.error("Database health check failed: %s", e)
+        return {"status": "error", "error": str(e)}
+    except Exception as e:
+        logger.critical("An unexpected error occurred during health check: %s", e)
+        return {"status": "error", "error": "An unexpected error occurred"}
 
 
 # Migration utilities
 def run_database_migrations():
-    """Run database migrations and optimizations"""
+    """Run database migrations using Alembic"""
+    # This is a placeholder for a more robust migration script
+    # For a real application, use Alembic or a similar tool
     logger.info("Running database migrations...")
-
-    db_manager = get_database_manager()
-
     try:
-        # Create tables
-        db_manager.create_all_tables()
-
-        # Apply indexes
-        with db_manager.get_session() as session:
-            # Add any custom migrations here
-            pass
-
-        logger.info("Database migrations completed successfully")
-
+        # Placeholder for migration logic
+        pass
     except Exception as e:
-        logger.error(f"Database migration failed: {e}")
+        logger.error("Error running migrations: %s", e)
         raise
 
 
-# Backup utilities
 def create_database_backup(backup_path: str) -> bool:
-    """Create database backup (SQLite only)"""
-    config = get_config()
+    """Create a backup of the database file."""
+    db_manager = get_database_manager()
+    db_url = db_manager.engine.url
 
-    if not config.database_url.startswith("sqlite"):
-        logger.warning("Backup only supported for SQLite databases")
+    if db_url.drivername != "sqlite":
+        logger.warning("Database backup is only supported for SQLite.")
+        return False
+
+    db_path = db_url.database
+    if not db_path:
+        logger.error("Database path not found in configuration.")
         return False
 
     try:
-        import shutil
-        import sqlite3
-
-        # Extract database path from URL
-        db_path = config.database_url.replace("sqlite:///", "")
-
-        # Create backup
-        shutil.copy2(db_path, backup_path)
-
-        logger.info(f"Database backup created: {backup_path}")
+        shutil.copyfile(db_path, backup_path)
+        logger.info("Database backup created at %s", backup_path)
         return True
-
+    except IOError as e:
+        logger.error("Failed to create database backup: %s", e)
+        return False
     except Exception as e:
-        logger.error(f"Database backup failed: {e}")
+        logger.critical("An unexpected error occurred during backup: %s", e)
         return False

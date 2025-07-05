@@ -6,6 +6,7 @@ import json
 import logging
 import logging.handlers
 import sys
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
@@ -97,16 +98,20 @@ class QAEnhancedFormatter(logging.Formatter):
         # Add exception info if present
         if record.exc_info:
             log_entry["exception"] = self.formatException(record.exc_info)
-            log_entry["exception_type"] = record.exc_info[0].__name__ if record.exc_info[0] else None
+            exc_info = record.exc_info[0]
+            if exc_info:
+                log_entry["exception_type"] = exc_info.__name__
 
         # Add extra fields
         if hasattr(record, "__dict__"):
             for key, value in record.__dict__.items():
                 if key not in [
-                    "name", "msg", "args", "levelname", "levelno", "pathname", "filename",
-                    "module", "lineno", "funcName", "created", "msecs", "relativeCreated",
-                    "thread", "threadName", "processName", "process", "exc_info", "exc_text",
-                    "stack_info", "user_id", "operation_time", "memory_usage", "query_count",
+                    "name", "msg", "args", "levelname", "levelno",
+                    "pathname", "filename", "module", "lineno",
+                    "funcName", "created", "msecs", "relativeCreated",
+                    "thread", "threadName", "processName", "process",
+                    "exc_info", "exc_text", "stack_info", "user_id",
+                    "operation_time", "memory_usage", "query_count",
                     "cache_hit", "response_size"
                 ]:
                     if not key.startswith('_'):
@@ -115,6 +120,7 @@ class QAEnhancedFormatter(logging.Formatter):
         return json.dumps(log_entry, default=str, ensure_ascii=False)
 
 
+@dataclass
 class ProductionLogger:
     """Production logging setup with file rotation and structured logging"""
 
@@ -129,7 +135,7 @@ class ProductionLogger:
 
         # Configure root logger
         root_logger = logging.getLogger()
-        root_logger.setLevel(getattr(logging, config.log_level.upper()))
+        root_logger.setLevel(config.log_level.upper())  # pylint: disable=no-member
 
         # Clear existing handlers
         root_logger.handlers.clear()
@@ -177,9 +183,14 @@ class ProductionLogger:
         security_handler.setLevel(logging.WARNING)
 
         # Add filter for security events
+        @dataclass
         class SecurityFilter(logging.Filter):
+            """Filter for security events"""
             def filter(self, record):
                 return "SECURITY EVENT" in record.getMessage()
+
+            def __repr__(self):
+                return "SecurityFilter()"
 
         security_handler.addFilter(SecurityFilter())
         root_logger.addHandler(security_handler)
@@ -195,7 +206,9 @@ class ProductionLogger:
         performance_handler.setLevel(logging.INFO)
 
         # Add filter for performance events
+        @dataclass
         class PerformanceFilter(logging.Filter):
+            """Filter for performance events"""
             def filter(self, record):
                 return (
                     hasattr(record, "operation_time")
@@ -203,6 +216,9 @@ class ProductionLogger:
                     or hasattr(record, "memory_usage")
                     or hasattr(record, "query_count")
                 )
+
+            def __repr__(self):
+                return "PerformanceFilter()"
 
         performance_handler.addFilter(PerformanceFilter())
         root_logger.addHandler(performance_handler)
@@ -218,7 +234,9 @@ class ProductionLogger:
         qa_handler.setLevel(logging.DEBUG)
 
         # Add filter for QA events
+        @dataclass
         class QAFilter(logging.Filter):
+            """Filter for QA events"""
             def filter(self, record):
                 return (
                     hasattr(record, "user_id")
@@ -228,16 +246,20 @@ class ProductionLogger:
                     or "repository" in record.getMessage().lower()
                 )
 
+            def __repr__(self):
+                return "QAFilter()"
+
         qa_handler.addFilter(QAFilter())
         root_logger.addHandler(qa_handler)
 
         # Configure specific loggers
         ProductionLogger._configure_specific_loggers()
 
-        logging.info(
+        logger = logging.getLogger(__name__)
+        logger.info(
             "Enhanced QA logging configured successfully",
             extra={
-                "environment": config.environment, 
+                "environment": config.environment,
                 "log_level": config.log_level,
                 "qa_enhanced": True
             },
@@ -249,77 +271,64 @@ class ProductionLogger:
 
         # Telegram bot logger
         telegram_logger = logging.getLogger("telegram")
-        telegram_logger.setLevel(logging.INFO)  # More verbose for QA
-
-        # HTTP requests logger
-        httpx_logger = logging.getLogger("httpx")
-        httpx_logger.setLevel(logging.INFO)  # More verbose for QA
+        telegram_logger.setLevel(logging.INFO)
 
         # Database logger
-        db_logger = logging.getLogger("sqlalchemy.engine")
-        db_logger.setLevel(logging.INFO)  # More verbose for QA
+        db_logger = logging.getLogger("sqlalchemy")
+        db_logger.setLevel(logging.WARNING)
 
-        # Application loggers
-        app_logger = logging.getLogger("src")
-        app_logger.setLevel(logging.DEBUG)  # Most verbose for QA
+        # Application-specific loggers
+        logging.getLogger("app.use_cases").setLevel(logging.DEBUG)
+        logging.getLogger("app.repositories").setLevel(logging.DEBUG)
+        logging.getLogger("app.handlers").setLevel(logging.DEBUG)
 
 
+@dataclass
 class PerformanceLogger:
-    """Performance monitoring logger with enhanced QA metrics"""
+    """Context manager for logging performance of code blocks"""
 
     def __init__(self, operation_name: str):
         self.operation_name = operation_name
         self.start_time = None
-        self.logger = logging.getLogger(f"performance.{operation_name}")
+        self.logger = logging.getLogger("performance")
 
     def __enter__(self):
         self.start_time = datetime.utcnow()
-        self.logger.info(f"Starting operation: {self.operation_name}")
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.start_time:
             duration = (datetime.utcnow() - self.start_time).total_seconds()
-
-            log_level = logging.INFO
-            if duration > 5.0:  # Slow operation
-                log_level = logging.WARNING
-
-            self.logger.log(
-                log_level,
-                f"Operation completed: {self.operation_name}",
+            self.logger.info(
+                "Performance metric",
                 extra={
-                    "operation_time": duration,
-                    "slow_operation": duration > 5.0,
                     "operation_name": self.operation_name,
+                    "duration_seconds": duration,
                     "success": exc_type is None,
-                    "exception_type": exc_type.__name__ if exc_type else None
-                }
+                },
             )
 
 
+@dataclass
 class AuditLogger:
-    """Audit logger for tracking important business events"""
+    """Logger for critical audit events"""
 
     @staticmethod
     def log_customer_registration(telegram_id: int, phone_number: str):
         """Log customer registration event"""
-        logging.info(
-            "Customer registered",
-            extra={
-                "event_type": "customer_registration",
-                "telegram_id": telegram_id,
-                "phone_hash": hash(phone_number) % 10000,  # Anonymized phone
-            },
+        logger = logging.getLogger("security")
+        logger.warning(
+            "SECURITY EVENT: New customer registered",
+            extra={"telegram_id": telegram_id, "phone_number": phone_number},
         )
 
     @staticmethod
     def log_order_placed(order_id: int, customer_id: int, total_amount: float):
         """Log order placement event"""
-        logging.info(
-            "Order placed",
+        logger = logging.getLogger("security")
+        logger.warning(
+            "SECURITY EVENT: New order placed",
             extra={
-                "event_type": "order_placed",
                 "order_id": order_id,
                 "customer_id": customer_id,
                 "total_amount": total_amount,
@@ -327,74 +336,69 @@ class AuditLogger:
         )
 
     @staticmethod
-    def log_admin_action(admin_id: int, action: str, details: Dict[str, Any] = None):
-        """Log admin actions"""
-        logging.info(
-            f"Admin action: {action}",
-            extra={
-                "event_type": "admin_action",
-                "admin_id": admin_id,
-                "action": action,
-                "details": details or {},
-            },
+    def log_admin_action(admin_id: int,
+                         action: str,
+                         details: Dict[str, Any] = None):
+        """Log administrative action"""
+        logger = logging.getLogger("security")
+        logger.warning(
+            "SECURITY EVENT: Admin action - %s",
+            action,
+            extra={"admin_id": admin_id, "details": details or {}},
         )
 
 
+@dataclass
 class QALogger:
-    """QA-specific logging utilities"""
+    """Logger for detailed QA and business process analysis"""
 
     @staticmethod
-    def log_user_action(user_id: int, action: str, details: Dict[str, Any] = None):
-        """Log user actions for QA analysis"""
-        logger = logging.getLogger("qa.user_actions")
+    def log_user_action(user_id: int,
+                        action: str,
+                        details: Dict[str, Any] = None):
+        """Log a specific user action for QA analysis"""
+        logger = logging.getLogger("qa_analysis")
         logger.info(
-            f"User action: {action}",
-            extra={
-                "user_id": user_id,
-                "action": action,
-                "details": details or {},
-                "qa_event": "user_action"
-            }
+            "User action: %s",
+            action,
+            extra={"user_id": user_id, "action": action,
+                   "details": details or {}},
         )
 
     @staticmethod
-    def log_performance_metric(operation: str, duration: float, details: Dict[str, Any] = None):
-        """Log performance metrics for QA analysis"""
-        logger = logging.getLogger("qa.performance")
-        logger.info(
-            f"Performance metric: {operation}",
+    def log_performance_metric(operation: str,
+                               duration: float,
+                               details: Dict[str, Any] = None):
+        """Log a performance metric for QA analysis"""
+        logger = logging.getLogger("qa_analysis")
+        logger.debug(
+            "Performance: %s took %.4fs",
+            operation,
+            duration,
             extra={
                 "operation": operation,
-                "operation_time": duration,
+                "duration": duration,
                 "details": details or {},
-                "qa_event": "performance_metric"
-            }
+            },
         )
 
     @staticmethod
     def log_business_event(event_type: str, details: Dict[str, Any] = None):
-        """Log business events for QA analysis"""
-        logger = logging.getLogger("qa.business")
+        """Log a significant business event"""
+        logger = logging.getLogger("qa_analysis")
         logger.info(
-            f"Business event: {event_type}",
-            extra={
-                "event_type": event_type,
-                "details": details or {},
-                "qa_event": "business_event"
-            }
+            "Business event: %s",
+            event_type,
+            extra={"event_type": event_type, "details": details or {}},
         )
 
     @staticmethod
     def log_error_context(error: Exception, context: Dict[str, Any] = None):
-        """Log error context for QA analysis"""
-        logger = logging.getLogger("qa.errors")
+        """Log detailed context for an error"""
+        logger = logging.getLogger("qa_analysis")
         logger.error(
-            f"Error occurred: {str(error)}",
-            extra={
-                "error_type": type(error).__name__,
-                "error_message": str(error),
-                "context": context or {},
-                "qa_event": "error_context"
-            },
-            exc_info=True
+            "Error context: %s",
+            error,
+            extra={"error": str(error), "context": context or {}},
+            exc_info=True,
         )

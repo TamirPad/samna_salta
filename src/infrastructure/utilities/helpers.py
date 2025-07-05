@@ -4,6 +4,8 @@ Utility functions for the Samna Salta bot
 
 from datetime import datetime, time
 
+from ..configuration.config import get_config
+
 
 def format_price(price: float, currency: str = "ILS") -> str:
     """Format price with currency"""
@@ -12,8 +14,6 @@ def format_price(price: float, currency: str = "ILS") -> str:
 
 def is_hilbeh_available() -> bool:
     """Check if Hilbeh is available today"""
-    from ..configuration.config import get_config
-
     config = get_config()
     today = datetime.now().strftime("%A").lower()
 
@@ -30,8 +30,6 @@ def parse_time_range(time_range: str) -> tuple[time, time]:
 
 def is_within_business_hours() -> bool:
     """Check if current time is within business hours"""
-    from ..configuration.config import get_config
-
     config = get_config()
     start_time, end_time = parse_time_range(config.hilbeh_available_hours)
     current_time = datetime.now().time()
@@ -47,12 +45,11 @@ def sanitize_phone_number(phone: str) -> str:
     # Handle Israeli phone numbers
     if digits_only.startswith("972"):
         return f"+{digits_only}"
-    elif digits_only.startswith("0"):
+    if digits_only.startswith("0"):
         return f"+972{digits_only[1:]}"
-    elif len(digits_only) == 9:
+    if len(digits_only) == 9:
         return f"+972{digits_only}"
-    else:
-        return f"+{digits_only}"
+    return f"+{digits_only}"
 
 
 def validate_phone_number(phone: str) -> bool:

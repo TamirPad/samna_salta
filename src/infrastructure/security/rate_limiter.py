@@ -2,9 +2,9 @@
 Rate limiting and security enhancements
 """
 
-import hashlib
 import logging
 import re
+import threading
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass
@@ -45,6 +45,9 @@ class TokenBucket:
             self.tokens -= tokens
             return True
         return False
+
+    def __repr__(self) -> str:
+        return f"TokenBucket(capacity={self.capacity}, tokens={self.tokens:.2f})"
 
 
 class SlidingWindowRateLimiter:
@@ -88,9 +91,13 @@ class SlidingWindowRateLimiter:
         retry_after = int(oldest_request + rate_limit.time_window - now) + 1
 
         self._logger.warning(
-            f"Rate limit exceeded for user {user_id} on endpoint {endpoint}. "
-            f"Requests: {len(user_requests)}/{rate_limit.max_requests} "
-            f"in {rate_limit.time_window}s window"
+            "Rate limit exceeded for user %s on endpoint %s. "
+            "Requests: %d/%d in %ds window",
+            user_id,
+            endpoint,
+            len(user_requests),
+            rate_limit.max_requests,
+            rate_limit.time_window,
         )
 
         return False, retry_after
@@ -166,14 +173,14 @@ class SecurityValidator:
         for pattern in self.compiled_patterns:
             if pattern.search(text):
                 self._logger.warning(
-                    f"Malicious pattern detected in input: {text[:100]}..."
+                    "Malicious pattern detected in input: %s...", text[:100]
                 )
                 return False, "Invalid input detected"
 
         # Check for excessive special characters (potential obfuscation)
-        special_char_ratio = sum(
-            1 for c in text if not c.isalnum() and not c.isspace()
-        ) / len(text)
+        special_char_ratio = (
+            sum(1 for c in text if not c.isalnum() and not c.isspace()) / len(text)
+        )
         if special_char_ratio > 0.5:
             return False, "Input contains too many special characters"
 
@@ -242,207 +249,190 @@ class SecurityMonitor:
     def log_security_event(
         self, event_type: str, user_id: str, details: Dict[str, Any]
     ):
-        """Log a security event"""
+        """Log a security event and check for suspicious patterns"""
         event = {
             "timestamp": time.time(),
             "type": event_type,
             "user_id": user_id,
             "details": details,
         }
-
         self.security_events.append(event)
-
-        # Log to security logger
         self._logger.warning(
-            f"SECURITY EVENT: {event_type} - User: {user_id} - Details: {details}"
+            "SECURITY EVENT: [%s] User %s - Details: %s",
+            event_type,
+            user_id,
+            details,
         )
+        self._check_user_blocking(user_id)
 
-        # Check if user should be temporarily blocked
-        self._check_user_blocking(user_id, event_type)
-
-    def _check_user_blocking(self, user_id: str, event_type: str):
-        """Check if user should be temporarily blocked"""
+    def _check_user_blocking(self, user_id: str):
+        """Check if a user should be temporarily blocked"""
         now = time.time()
-        recent_events = [
-            event
-            for event in self.security_events
-            if event["user_id"] == user_id
-            and now - event["timestamp"] < 300  # Last 5 minutes
+        user_events = [
+            e
+            for e in self.security_events
+            if e["user_id"] == user_id and now - e["timestamp"] < 3600
         ]
 
-        # Block user if too many security events
-        if len(recent_events) >= 5:
-            block_duration = 3600  # 1 hour
-            self.blocked_users[user_id] = now + block_duration
-
-            self._logger.error(
-                f"User {user_id} temporarily blocked for {block_duration}s due to "
-                f"{len(recent_events)} security events in 5 minutes"
+        # Example blocking logic: block for 5 mins if > 5 invalid inputs in an hour
+        if len(user_events) > 5:
+            block_until = now + 300  # Block for 5 minutes
+            self.blocked_users[user_id] = block_until
+            self._logger.critical(
+                "User %s temporarily blocked until %s due to suspicious activity",
+                user_id,
+                time.ctime(block_until),
             )
 
     def is_user_blocked(self, user_id: str) -> Tuple[bool, Optional[int]]:
-        """Check if user is blocked"""
-        if user_id in self.blocked_users:
-            block_until = self.blocked_users[user_id]
-            if time.time() < block_until:
-                remaining = int(block_until - time.time())
-                return True, remaining
-            else:
-                # Block expired
-                del self.blocked_users[user_id]
-
+        """Check if a user is currently blocked"""
+        block_until = self.blocked_users.get(user_id)
+        if block_until and time.time() < block_until:
+            retry_after = int(block_until - time.time())
+            return True, retry_after
         return False, None
 
     def get_security_stats(self) -> Dict[str, Any]:
-        """Get security statistics"""
+        """Get security monitoring statistics"""
         now = time.time()
-
-        # Events in last hour
-        recent_events = [
-            event for event in self.security_events if now - event["timestamp"] < 3600
-        ]
-
-        # Group by event type
+        recent_events = [e for e in self.security_events if now - e["timestamp"] < 3600]
         event_types = defaultdict(int)
         for event in recent_events:
             event_types[event["type"]] += 1
 
         return {
-            "total_events_last_hour": len(recent_events),
-            "events_by_type": dict(event_types),
-            "blocked_users": len(self.blocked_users),
-            "total_events_recorded": len(self.security_events),
+            "total_events_logged": len(self.security_events),
+            "events_last_hour": event_types,
+            "currently_blocked_users": len(
+                [
+                    u
+                    for u, t in self.blocked_users.items()
+                    if t > now
+                ]
+            ),
         }
 
 
 class BotSecurityManager:
-    """Main security manager for the bot"""
+    """Comprehensive security manager for the bot"""
+
+    _instance: Optional["BotSecurityManager"] = None
+    _lock = threading.Lock()
 
     def __init__(self):
         # Rate limits configuration
         rate_limits = {
             "start": RateLimit(5, 60, "Start command"),
-            "menu": RateLimit(20, 60, "Menu browsing"),
-            "cart": RateLimit(15, 60, "Cart operations"),
-            "order": RateLimit(3, 300, "Order creation"),
-            "admin": RateLimit(10, 60, "Admin operations"),
-            "general": RateLimit(30, 60, "General bot interactions"),
+            "menu": RateLimit(10, 60, "Menu interaction"),
+            "cart": RateLimit(20, 60, "Cart operations"),
+            "order": RateLimit(5, 300, "Order creation"),
+            "general": RateLimit(30, 60, "General messages"),
         }
-
         self.rate_limiter = SlidingWindowRateLimiter(rate_limits)
         self.validator = SecurityValidator()
         self.monitor = SecurityMonitor()
-        self._logger = logging.getLogger(self.__class__.__name__)
+
+    @classmethod
+    def get_instance(cls) -> "BotSecurityManager":
+        """Get the singleton instance of the security manager"""
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    logger.info("Initializing BotSecurityManager singleton...")
+                    cls._instance = BotSecurityManager()
+        return cls._instance
 
     def check_request_allowed(
         self, user_id: int, endpoint: str
     ) -> Tuple[bool, Optional[str]]:
-        """
-        Check if request is allowed (rate limiting + security)
-
-        Returns:
-            (is_allowed, error_message)
-        """
-        user_str = str(user_id)
-
-        # Check if user is blocked
-        is_blocked, block_remaining = self.monitor.is_user_blocked(user_str)
+        """Check rate limits and if user is blocked"""
+        # Check blocking first
+        is_blocked, retry_after_block = self.monitor.is_user_blocked(str(user_id))
         if is_blocked:
-            return (
-                False,
-                f"You are temporarily blocked. Try again in {block_remaining} seconds.",
-            )
+            return False, f"You are temporarily blocked. Please try again in {retry_after_block}s."
 
         # Check rate limiting
-        is_allowed, retry_after = self.rate_limiter.is_allowed(user_str, endpoint)
+        is_allowed, retry_after_limit = self.rate_limiter.is_allowed(
+            str(user_id), endpoint
+        )
         if not is_allowed:
-            self.monitor.log_security_event(
-                "rate_limit_exceeded",
-                user_str,
-                {"endpoint": endpoint, "retry_after": retry_after},
-            )
-            return False, f"Too many requests. Try again in {retry_after} seconds."
+            return False, f"Rate limit exceeded. Please try again in {retry_after_limit}s."
 
         return True, None
 
     def validate_message(
         self, user_id: int, message: str
     ) -> Tuple[bool, Optional[str]]:
-        """Validate user message"""
-        user_str = str(user_id)
-
-        # Check Telegram ID
+        """Validate incoming user message"""
+        # Suspicious ID check
         if self.validator.is_suspicious_telegram_id(user_id):
             self.monitor.log_security_event(
-                "suspicious_telegram_id", user_str, {"telegram_id": user_id}
+                "suspicious_telegram_id", str(user_id), {"id": user_id}
             )
-            return False, "Invalid user ID"
+            return False, "Invalid user ID."
 
-        # Validate message content
-        is_valid, error = self.validator.validate_user_input(message, max_length=2000)
+        # Input validation
+        is_valid, error = self.validator.validate_user_input(message)
         if not is_valid:
             self.monitor.log_security_event(
-                "malicious_input", user_str, {"message": message[:100], "error": error}
+                "invalid_input", str(user_id), {"message": message[:100]}
             )
             return False, error
 
         return True, None
 
     def sanitize_message(self, message: str) -> str:
-        """Sanitize user message"""
+        """Sanitize a user message"""
         return self.validator.sanitize_input(message)
 
     def get_security_report(self) -> Dict[str, Any]:
-        """Get comprehensive security report"""
+        """Get combined security report"""
+        rate_limit_stats = {}
+        for user_id in self.rate_limiter.user_requests:
+            rate_limit_stats[user_id] = self.rate_limiter.get_user_stats(user_id)
+
         return {
-            "security_stats": self.monitor.get_security_stats(),
-            "rate_limiter_active_users": len(self.rate_limiter.user_requests),
+            "security_monitor_stats": self.monitor.get_security_stats(),
+            "rate_limit_stats": rate_limit_stats,
         }
 
 
-# Global security manager instance
-_security_manager: Optional[BotSecurityManager] = None
-
-
-def get_security_manager() -> BotSecurityManager:
-    """Get the global security manager instance"""
-    global _security_manager
-    if _security_manager is None:
-        _security_manager = BotSecurityManager()
-    return _security_manager
+def get_security_manager() -> "BotSecurityManager":
+    """Get the singleton instance of the security manager"""
+    return BotSecurityManager.get_instance()
 
 
 def security_check(endpoint: str = "general"):
     """
-    Decorator for adding security checks to handlers
-
-    Args:
-        endpoint: The endpoint name for rate limiting
+    Decorator for rate limiting and security checks on Telegram handlers.
     """
 
     def decorator(func):
-        async def wrapper(update, context, *args, **kwargs):
-            user_id = update.effective_user.id
-            security_manager = get_security_manager()
+        """Decorator function"""
 
-            # Check if request is allowed
-            is_allowed, error_msg = security_manager.check_request_allowed(
-                user_id, endpoint
-            )
-            if not is_allowed:
-                await update.message.reply_text(f"⚠️ {error_msg}")
+        async def wrapper(update, context, *args, **kwargs):
+            """Wrapper that performs security checks"""
+            if not update or not update.effective_user:
+                return await func(update, context, *args, **kwargs)
+
+            user_id = update.effective_user.id
+            manager = get_security_manager()
+
+            # Check rate limiting and blocking
+            is_allowed, error_msg = manager.check_request_allowed(user_id, endpoint)
+            if not is_allowed and error_msg:
+                await update.message.reply_text(error_msg)
                 return
 
-            # Validate message if present
+            # Validate message content if available
             if update.message and update.message.text:
-                is_valid, error_msg = security_manager.validate_message(
+                is_valid, error_msg = manager.validate_message(
                     user_id, update.message.text
                 )
-                if not is_valid:
-                    await update.message.reply_text(f"⚠️ {error_msg}")
+                if not is_valid and error_msg:
+                    await update.message.reply_text(error_msg)
                     return
 
-            # Call original function
             return await func(update, context, *args, **kwargs)
 
         return wrapper

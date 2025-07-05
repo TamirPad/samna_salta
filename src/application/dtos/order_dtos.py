@@ -27,7 +27,20 @@ class OrderItemInfo:
     quantity: int
     unit_price: float
     total_price: float
-    options: Dict[str, Any]
+    product_id: int | None = None
+    options: Dict[str, Any] | None = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any], total_price: float) -> "OrderItemInfo":
+        """Create OrderItemInfo from a dictionary."""
+        return cls(
+            product_name=data["product_name"],
+            quantity=data["quantity"],
+            unit_price=data["unit_price"],
+            total_price=total_price,
+            product_id=data.get("product_id"),
+            options=data.get("options", {}),
+        )
 
 
 @dataclass

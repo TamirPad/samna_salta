@@ -4,10 +4,12 @@ Configuration validation for production deployment
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
+import httpx
+from sqlalchemy import exc, text
 
 from ..configuration.config import Settings, get_config
-from .exceptions import ValidationError
+from ..database.operations import get_engine
 
 logger = logging.getLogger(__name__)
 
@@ -16,15 +18,15 @@ class ConfigValidator:
     """Validates configuration for production readiness"""
 
     def __init__(self):
-        self.errors: List[str] = []
-        self.warnings: List[str] = []
-        self.config: Optional[Settings] = None
+        self.errors: list[str] = []
+        self.warnings: list[str] = []
+        self.config: Settings | None = None
 
     def validate_all(self) -> bool:
         """Validate all configuration aspects"""
         try:
             self.config = get_config()
-        except Exception as e:
+        except (ValueError, TypeError) as e:
             self.errors.append(f"Failed to load configuration: {e}")
             return False
 
@@ -45,16 +47,16 @@ class ConfigValidator:
         """Validate Telegram bot configuration"""
         if not self.config.bot_token:
             self.errors.append("BOT_TOKEN is required")
-        elif not self.config.bot_token.startswith(
+        elif not self.config.bot_token.startswith(  # pylint: disable=no-member
             ("bot", "1", "2", "3", "4", "5", "6", "7", "8", "9")
         ):
             self.errors.append("BOT_TOKEN appears to be invalid format")
-        elif len(self.config.bot_token) < 40:
+        elif len(self.config.bot_token) < 40:  # pylint: disable=no-member
             self.errors.append("BOT_TOKEN appears too short")
 
         if not self.config.admin_chat_id:
             self.errors.append("ADMIN_CHAT_ID is required")
-        elif self.config.admin_chat_id <= 0:
+        elif self.config.admin_chat_id <= 0:  # pylint: disable=no-member
             self.errors.append("ADMIN_CHAT_ID must be a positive integer")
 
         # Check if bot token works (optional test)
@@ -63,8 +65,6 @@ class ConfigValidator:
     def _test_bot_token(self):
         """Test if bot token is valid by making a simple API call"""
         try:
-            import httpx
-
             response = httpx.get(
                 f"https://api.telegram.org/bot{self.config.bot_token}/getMe", timeout=10
             )
@@ -78,7 +78,7 @@ class ConfigValidator:
                     )
                 else:
                     self.warnings.append("Bot token validation failed")
-        except Exception as e:
+        except httpx.RequestError as e:
             self.warnings.append(f"Could not validate bot token: {e}")
 
     def _validate_database_configuration(self):
@@ -87,8 +87,8 @@ class ConfigValidator:
             self.errors.append("DATABASE_URL is required")
 
         # Check if database file exists for SQLite
-        if self.config.database_url.startswith("sqlite:"):
-            db_path = self.config.database_url.replace("sqlite:///", "")
+        if self.config.database_url.startswith("sqlite:"):  # pylint: disable=no-member
+            db_path = self.config.database_url.replace("sqlite:///", "")  # pylint: disable=no-member
             if not Path(db_path).parent.exists():
                 self.errors.append(
                     f"Database directory does not exist: {Path(db_path).parent}"
@@ -105,15 +105,11 @@ class ConfigValidator:
     def _test_database_connection(self):
         """Test database connection"""
         try:
-            from sqlalchemy import text
-
-            from ..database.operations import get_engine
-
             engine = get_engine()
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
             self.warnings.append("Database connection successful")
-        except Exception as e:
+        except exc.SQLAlchemyError as e:
             self.errors.append(f"Database connection failed: {e}")
 
     def _validate_environment_settings(self):
@@ -123,12 +119,12 @@ class ConfigValidator:
 
         if self.config.environment == "production":
             # Production-specific validations
-            if self.config.log_level.upper() == "DEBUG":
+            if self.config.log_level.upper() == "DEBUG":  # pylint: disable=no-member
                 self.warnings.append(
                     "DEBUG logging in production may impact performance"
                 )
 
-            if self.config.database_url.startswith("sqlite:"):
+            if self.config.database_url.startswith("sqlite:"):  # pylint: disable=no-member
                 self.warnings.append(
                     "SQLite database in production - consider PostgreSQL for better performance"
                 )
@@ -140,19 +136,19 @@ class ConfigValidator:
                 try:
                     Path(dir_name).mkdir(exist_ok=True)
                     self.warnings.append(f"Created missing directory: {dir_name}")
-                except Exception as e:
+                except OSError as e:
                     self.errors.append(
                         f"Cannot create required directory {dir_name}: {e}"
                     )
 
     def _validate_business_rules(self):
         """Validate business logic configuration"""
-        if self.config.delivery_charge < 0:
+        if self.config.delivery_charge < 0:  # pylint: disable=no-member
             self.errors.append("Delivery charge cannot be negative")
 
         if not self.config.currency:
             self.errors.append("Currency is required")
-        elif self.config.currency not in ["ILS", "USD", "EUR"]:
+        elif self.config.currency not in ["ILS", "USD", "EUR"]:  # pylint: disable=no-member
             self.warnings.append(f"Unusual currency: {self.config.currency}")
 
         # Validate Hilbeh availability days
@@ -165,20 +161,20 @@ class ConfigValidator:
             "saturday",
             "sunday",
         ]
-        for day in self.config.hilbeh_available_days:
+        for day in self.config.hilbeh_available_days:  # pylint: disable=no-member
             if day.lower() not in valid_days:
                 self.errors.append(f"Invalid day in hilbeh_available_days: {day}")
 
         # Validate business hours format
         try:
-            start, end = self.config.hilbeh_available_hours.split("-")
+            start, end = self.config.hilbeh_available_hours.split("-")  # pylint: disable=no-member
             for time_str in [start, end]:
                 hours, minutes = time_str.split(":")
                 if not (0 <= int(hours) <= 23 and 0 <= int(minutes) <= 59):
                     raise ValueError("Invalid time")
-        except Exception:
+        except ValueError as e:
             self.errors.append(
-                f"Invalid hilbeh_available_hours format: {self.config.hilbeh_available_hours}"
+                f"Invalid hilbeh_available_hours format: {self.config.hilbeh_available_hours}: {e}"
             )
 
     def _validate_file_permissions(self):
@@ -191,10 +187,10 @@ class ConfigValidator:
         for file_path, description in test_files:
             try:
                 Path(file_path).parent.mkdir(exist_ok=True)
-                Path(file_path).write_text("test")
+                Path(file_path).write_text("test", encoding="utf-8")
                 Path(file_path).unlink()
                 self.warnings.append(f"Write permission confirmed for {description}")
-            except Exception as e:
+            except (IOError, OSError) as e:
                 self.errors.append(f"No write permission for {description}: {e}")
 
     def _validate_security_settings(self):
@@ -202,15 +198,17 @@ class ConfigValidator:
         # Check if .env file has proper permissions (not readable by others)
         env_file = Path(".env")
         if env_file.exists():
-            permissions = oct(env_file.stat().st_mode)[-3:]
-            if permissions != "600":
-                self.warnings.append(
-                    f".env file has permissive permissions: {permissions} (should be 600)"
-                )
+            try:
+                if env_file.stat().st_mode & 0o077:
+                    self.warnings.append(
+                        ".env file may have insecure permissions (readable by others)"
+                    )
+            except (IOError, OSError) as e:
+                self.warnings.append(f"Could not check .env file permissions: {e}")
 
         # Check for development tokens in production
         if self.config.environment == "production":
-            if "test" in self.config.bot_token.lower():
+            if "test" in self.config.bot_token.lower():  # pylint: disable=no-member
                 self.warnings.append(
                     "Bot token contains 'test' - ensure this is a production token"
                 )
@@ -230,7 +228,7 @@ class ConfigValidator:
         else:
             logger.info("Configuration validation passed successfully")
 
-    def get_validation_report(self) -> Dict[str, Any]:
+    def get_validation_report(self) -> dict[str, Any]:
         """Get detailed validation report"""
         return {
             "valid": len(self.errors) == 0,
@@ -239,7 +237,7 @@ class ConfigValidator:
             "config_summary": {
                 "environment": self.config.environment if self.config else None,
                 "database_type": "sqlite"
-                if self.config and "sqlite" in self.config.database_url
+                if self.config and "sqlite" in self.config.database_url  # pylint: disable=no-member
                 else "other",
                 "bot_configured": bool(self.config and self.config.bot_token),
                 "admin_configured": bool(self.config and self.config.admin_chat_id),

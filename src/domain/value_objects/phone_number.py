@@ -42,16 +42,15 @@ class PhoneNumber:
         # Handle different Israeli phone number formats
         if cleaned.startswith("972"):
             return f"+{cleaned}"
-        elif cleaned.startswith("0"):
+        if cleaned.startswith("0"):
             return f"+972{cleaned[1:]}"
-        elif cleaned.startswith("+972"):
+        if cleaned.startswith("+972"):
             return cleaned
-        elif len(cleaned) == 9 and cleaned.startswith("5"):
+        if len(cleaned) == 9 and cleaned.startswith("5"):
             return f"+972{cleaned}"
-        elif len(cleaned) == 10 and cleaned.startswith("05"):
+        if len(cleaned) == 10 and cleaned.startswith("05"):
             return f"+972{cleaned[1:]}"
-        else:
-            return cleaned
+        return cleaned
 
     def _is_valid_israeli_number(self, phone: str) -> bool:
         """Validate Israeli phone number format"""

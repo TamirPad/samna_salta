@@ -2,36 +2,24 @@
 # exit on error
 set -o errexit
 
-# Print Python version for debugging
-echo "Python version being used:"
-python --version
-
-# Confirm we're using Python 3.13 as intended
-if python --version | grep -q "3.13"; then
-    echo "✅ Python 3.13 detected - perfect match for this project!"
-else
-    echo "⚠️  Expected Python 3.13, but got a different version"
-    echo "This project is optimized for Python 3.13+"
+# Create a virtual environment if it doesn't exist
+if [ ! -d "venv" ]; then
+  echo "Creating virtual environment..."
+  python -m venv venv
 fi
 
-# Install Poetry if not available
-if ! command -v poetry &> /dev/null; then
-    echo "Installing Poetry..."
-    curl -sSL https://install.python-poetry.org | python3 -
-    export PATH="$HOME/.local/bin:$PATH"
-fi
+# Activate the virtual environment
+source venv/bin/activate
 
-# Configure Poetry
-poetry config virtualenvs.create false
+# Upgrade pip and install poetry
+echo "Installing/updating dependencies..."
+pip install --upgrade pip
+pip install poetry
 
-# Install dependencies using Poetry
-echo "Installing dependencies with Poetry..."
-poetry install
+# Install project dependencies
+poetry install --no-interaction --no-ansi
 
 # Create data directory if it doesn't exist
 mkdir -p data
-
-# Set environment to production
-export ENVIRONMENT=production
 
 echo "Build completed successfully!" 

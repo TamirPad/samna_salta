@@ -12,7 +12,7 @@ from .error_handler import (
     ErrorSeverity,
     TelegramAPIError,
     ValidationError,
-    error_handler,
+    ErrorHandler,
     get_error_statistics,
     handle_errors,
 )
@@ -31,7 +31,7 @@ __all__ = [
     "ErrorSeverity",
     "TelegramAPIError",
     "ValidationError",
-    "error_handler",
+    "ErrorHandler",
     "get_error_statistics",
     "handle_errors",
     "get_performance_metrics",

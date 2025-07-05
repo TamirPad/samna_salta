@@ -5,7 +5,6 @@ Custom exceptions and error handling for the Samna Salta bot
 import logging
 import time
 import traceback
-from typing import Any, Dict, Optional
 
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -111,7 +110,6 @@ class HilbehNotAvailableError(BusinessLogicError):
 
 async def handle_error(
     update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
     error: Exception,
     operation: str = "unknown",
 ) -> None:
@@ -130,20 +128,22 @@ async def handle_error(
 
     if isinstance(error, SamnaSaltaError):
         # Handle our custom exceptions
-        logger.warning(f"Business error in {operation}: {error}", extra=error_context)
+        logger.warning("Business error in %s: %s", operation, error, extra=error_context)
 
         try:
             if update.message:
                 await update.message.reply_text(error.user_message)
             elif update.callback_query:
                 await update.callback_query.message.reply_text(error.user_message)
-        except Exception as reply_error:
-            logger.error(f"Failed to send error message: {reply_error}")
+        except (IOError, OSError) as reply_error:
+            logger.error("Failed to send error message: %s", reply_error)
 
     else:
         # Handle unexpected exceptions
         logger.error(
-            f"Unexpected error in {operation}: {error}",
+            "Unexpected error in %s: %s",
+            operation,
+            error,
             extra=error_context,
             exc_info=True,
         )
@@ -158,8 +158,8 @@ async def handle_error(
                 await update.message.reply_text(error_message)
             elif update.callback_query:
                 await update.callback_query.message.reply_text(error_message)
-        except Exception as reply_error:
-            logger.error(f"Failed to send error message: {reply_error}")
+        except (IOError, OSError) as reply_error:
+            logger.error("Failed to send error message: %s", reply_error)
 
 
 def error_handler(operation: str = "unknown"):
@@ -173,8 +173,8 @@ def error_handler(operation: str = "unknown"):
         ):
             try:
                 return await func(update, context, *args, **kwargs)
-            except Exception as e:
-                await handle_error(update, context, e, operation)
+            except SamnaSaltaError as e:
+                await handle_error(update, e, operation)
                 return None
 
         return wrapper
@@ -182,18 +182,19 @@ def error_handler(operation: str = "unknown"):
     return decorator
 
 
+# pylint: disable=too-few-public-methods
 class ErrorReporter:
     """Error reporting and monitoring class"""
 
     @staticmethod
-    def report_critical_error(error: Exception, context: Dict[str, Any]):
+    def report_critical_error(error: Exception):
         """Report critical errors to monitoring system"""
         # In production, integrate with monitoring services like Sentry
         logger.critical(
-            f"CRITICAL ERROR: {error}",
+            "CRITICAL ERROR: %s",
+            error,
             extra={
                 "error_type": type(error).__name__,
-                "context": context,
                 "traceback": traceback.format_exc(),
             },
         )
@@ -202,7 +203,9 @@ class ErrorReporter:
     def report_business_error(error: BusinessLogicError, user_id: int):
         """Report business logic errors for analysis"""
         logger.info(
-            f"Business error: {error.error_code} - {error}",
+            "Business error: %s - %s",
+            error.error_code,
+            error,
             extra={
                 "error_code": error.error_code,
                 "user_id": user_id,

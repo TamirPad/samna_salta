@@ -5,48 +5,36 @@ Handles the business logic for customer registration through the Telegram bot.
 """
 
 import logging
-from typing import Optional
+from dataclasses import dataclass
 
-from ...domain.entities.customer_entity import Customer
-from ...domain.repositories.customer_repository import CustomerRepository
-from ...domain.value_objects.customer_name import CustomerName
-from ...domain.value_objects.delivery_address import DeliveryAddress
-from ...domain.value_objects.phone_number import PhoneNumber
-from ...domain.value_objects.telegram_id import TelegramId
+from src.domain.entities.customer_entity import Customer
+from src.domain.repositories.customer_repository import CustomerRepository
+from src.domain.value_objects.customer_name import CustomerName
+from src.domain.value_objects.delivery_address import DeliveryAddress
+from src.domain.value_objects.phone_number import PhoneNumber
+from src.domain.value_objects.telegram_id import TelegramId
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass
 class CustomerRegistrationRequest:
     """Request object for customer registration"""
 
-    def __init__(
-        self,
-        telegram_id: int,
-        full_name: str,
-        phone_number: str,
-        delivery_address: Optional[str] = None,
-    ):
-        self.telegram_id = telegram_id
-        self.full_name = full_name
-        self.phone_number = phone_number
-        self.delivery_address = delivery_address
+    telegram_id: int
+    full_name: str
+    phone_number: str
+    delivery_address: str | None = None
 
 
+@dataclass
 class CustomerRegistrationResponse:
     """Response object for customer registration"""
 
-    def __init__(
-        self,
-        success: bool,
-        customer: Optional[Customer] = None,
-        error_message: Optional[str] = None,
-        is_returning_customer: bool = False,
-    ):
-        self.success = success
-        self.customer = customer
-        self.error_message = error_message
-        self.is_returning_customer = is_returning_customer
+    success: bool
+    customer: Customer | None = None
+    error_message: str | None = None
+    is_returning_customer: bool = False
 
 
 class CustomerRegistrationUseCase:
@@ -76,92 +64,115 @@ class CustomerRegistrationUseCase:
         Returns:
             CustomerRegistrationResponse with results
         """
+        response: CustomerRegistrationResponse
         try:
             # Validate input data
             validation_result = self._validate_request(request)
             if not validation_result.success:
-                return validation_result
+                response = validation_result
+            else:
+                # Create value objects with validation
+                telegram_id = TelegramId(request.telegram_id)
+                customer_name = CustomerName(request.full_name)
+                phone_number = PhoneNumber(request.phone_number)
+                delivery_address = (
+                    DeliveryAddress(request.delivery_address)
+                    if request.delivery_address
+                    else None
+                )
 
-            # Create value objects with validation
-            telegram_id = TelegramId(request.telegram_id)
-            customer_name = CustomerName(request.full_name)
-            phone_number = PhoneNumber(request.phone_number)
-            delivery_address = None
-            if request.delivery_address:
-                delivery_address = DeliveryAddress(request.delivery_address)
-
-            # Check if customer already exists by phone number
-            existing_customer = await self._customer_repository.find_by_phone_number(
-                phone_number
-            )
-            if existing_customer:
-                # Update telegram ID if it changed
-                if existing_customer.telegram_id.value != telegram_id.value:
-                    existing_customer.telegram_id = telegram_id
-                    updated_customer = await self._customer_repository.save(
-                        existing_customer
+                # Check if customer already exists by phone number
+                existing_customer = (
+                    await self._customer_repository.find_by_phone_number(phone_number)
+                )
+                if existing_customer:
+                    response = await self._handle_existing_customer(
+                        existing_customer, telegram_id
                     )
-                    self._logger.info(
-                        f"Updated telegram ID for existing customer {existing_customer.id}"
+                else:
+                    # Check if someone else is using this Telegram ID
+                    existing_telegram_user = (
+                        await self._customer_repository.find_by_telegram_id(
+                            telegram_id
+                        )
                     )
-                    return CustomerRegistrationResponse(
-                        success=True,
-                        customer=updated_customer,
-                        is_returning_customer=True,
-                    )
+                    if existing_telegram_user:
+                        error_msg = (
+                            "This Telegram account is already registered with a "
+                            "different phone number"
+                        )
+                        self._logger.warning(
+                            "Telegram ID %s already exists with different phone number",
+                            telegram_id.value,
+                        )
+                        response = CustomerRegistrationResponse(
+                            success=False, error_message=error_msg
+                        )
+                    else:
+                        # Create new customer
+                        new_customer = Customer(
+                            id=None,  # Will be assigned by repository
+                            telegram_id=telegram_id,
+                            full_name=customer_name,
+                            phone_number=phone_number,
+                            delivery_address=delivery_address,
+                        )
 
-                self._logger.info(
-                    f"Returning customer recognized: {existing_customer.id}"
-                )
-                return CustomerRegistrationResponse(
-                    success=True, customer=existing_customer, is_returning_customer=True
-                )
+                        # Validate business rules
+                        business_validation = self._validate_business_rules(
+                            new_customer
+                        )
+                        if not business_validation.success:
+                            response = business_validation
+                        else:
+                            # Save customer
+                            saved_customer = await self._customer_repository.save(
+                                new_customer
+                            )
 
-            # Check if someone else is using this Telegram ID
-            existing_telegram_user = (
-                await self._customer_repository.find_by_telegram_id(telegram_id)
-            )
-            if existing_telegram_user:
-                error_msg = "This Telegram account is already registered with a different phone number"
-                self._logger.warning(
-                    f"Telegram ID {telegram_id.value} already exists with different phone number"
-                )
-                return CustomerRegistrationResponse(
-                    success=False, error_message=error_msg
-                )
-
-            # Create new customer
-            new_customer = Customer(
-                id=None,  # Will be assigned by repository
-                telegram_id=telegram_id,
-                full_name=customer_name,
-                phone_number=phone_number,
-                delivery_address=delivery_address,
-            )
-
-            # Validate business rules
-            business_validation = self._validate_business_rules(new_customer)
-            if not business_validation.success:
-                return business_validation
-
-            # Save customer
-            saved_customer = await self._customer_repository.save(new_customer)
-
-            self._logger.info(f"New customer registered: {saved_customer.id}")
-            return CustomerRegistrationResponse(
-                success=True, customer=saved_customer, is_returning_customer=False
-            )
+                            self._logger.info(
+                                "New customer registered: %s", saved_customer.id
+                            )
+                            response = CustomerRegistrationResponse(
+                                success=True,
+                                customer=saved_customer,
+                                is_returning_customer=False,
+                            )
 
         except ValueError as e:
-            self._logger.error(f"Validation error in customer registration: {e}")
-            return CustomerRegistrationResponse(
+            self._logger.error("Validation error in customer registration: %s", e)
+            response = CustomerRegistrationResponse(
                 success=False, error_message=f"Invalid data: {str(e)}"
             )
-        except Exception as e:
-            self._logger.error(f"Unexpected error in customer registration: {e}")
-            return CustomerRegistrationResponse(
+        except (TypeError, AttributeError) as e:
+            self._logger.error("Unexpected error in customer registration: %s", e)
+            response = CustomerRegistrationResponse(
                 success=False, error_message="Registration failed due to system error"
             )
+
+        return response
+
+    async def _handle_existing_customer(
+        self, existing_customer: Customer, telegram_id: TelegramId
+    ) -> CustomerRegistrationResponse:
+        """Handle logic for existing customers."""
+        if existing_customer.telegram_id.value != telegram_id.value:
+            existing_customer.telegram_id = telegram_id
+            updated_customer = await self._customer_repository.save(existing_customer)
+            self._logger.info(
+                "Updated telegram ID for existing customer %s",
+                existing_customer.id,
+            )
+            return CustomerRegistrationResponse(
+                success=True,
+                customer=updated_customer,
+                is_returning_customer=True,
+            )
+
+        self._logger.info("Returning customer recognized: %s", existing_customer.id)
+        return CustomerRegistrationResponse(
+            success=True, customer=existing_customer, is_returning_customer=True
+        )
 
     def _validate_request(
         self, request: CustomerRegistrationRequest
@@ -201,7 +212,7 @@ class CustomerRegistrationUseCase:
 
     async def find_customer_by_telegram_id(
         self, telegram_id: int
-    ) -> Optional[Customer]:
+    ) -> Customer | None:
         """
         Find existing customer by Telegram ID
 
@@ -214,8 +225,8 @@ class CustomerRegistrationUseCase:
         try:
             telegram_id_vo = TelegramId(telegram_id)
             return await self._customer_repository.find_by_telegram_id(telegram_id_vo)
-        except Exception as e:
+        except ValueError as e:
             self._logger.error(
-                f"Error finding customer by telegram ID {telegram_id}: {e}"
+                "Error finding customer by telegram ID %s: %s", telegram_id, e
             )
             return None

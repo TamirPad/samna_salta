@@ -4,39 +4,52 @@ Database operations for the Samna Salta bot
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Callable, Optional
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
+from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm.attributes import flag_modified
 
-from ..configuration.config import get_config
-from .models import Base, Cart, Customer, Order, OrderItem, Product
+from src.infrastructure.configuration.config import get_config
+from src.infrastructure.database.models import Base, Cart, Customer, Order, OrderItem, Product
 
 logger = logging.getLogger(__name__)
 
 # Database engine and session
-_engine = None
-_SessionLocal = None
+class DatabaseSingleton:
+    """Singleton for the database engine and session"""
+
+    _ENGINE: Optional[Engine] = None
+    _session_factory: Optional[Callable[[], Session]] = None
+
+    @classmethod
+    def get_engine(cls) -> Engine:
+        """Get database engine"""
+        if cls._ENGINE is None:
+            config = get_config()
+            cls._ENGINE = create_engine(config.database_url)
+        return cls._ENGINE
+
+    @classmethod
+    def get_session(cls) -> Session:
+        """Get database session"""
+        if cls._session_factory is None:
+            cls._session_factory = sessionmaker(
+                autocommit=False, autoflush=False, bind=cls.get_engine()
+            )
+        return cls._session_factory()  # pylint: disable=not-callable
 
 
 def get_engine():
     """Get database engine"""
-    global _engine
-    if _engine is None:
-        config = get_config()
-        _engine = create_engine(config.database_url)
-    return _engine
+    return DatabaseSingleton.get_engine()
 
 
 def get_session() -> Session:
     """Get database session"""
-    global _SessionLocal
-    if _SessionLocal is None:
-        _SessionLocal = sessionmaker(
-            autocommit=False, autoflush=False, bind=get_engine()
-        )
-    return _SessionLocal()
+    return DatabaseSingleton.get_session()
 
 
 def init_db():
@@ -50,7 +63,7 @@ def init_db():
         init_default_products()
 
     except SQLAlchemyError as e:
-        logger.error(f"Failed to initialize database: {e}")
+        logger.error("Failed to initialize database: %s", e)
         raise
 
 
@@ -127,11 +140,11 @@ def init_default_products():
             session.add(product)
 
         session.commit()
-        logger.info(f"Initialized {len(products)} default products")
+        logger.info("Initialized %d default products", len(products))
 
     except SQLAlchemyError as e:
         session.rollback()
-        logger.error(f"Failed to initialize products: {e}")
+        logger.error("Failed to initialize products: %s", e)
         raise
     finally:
         session.close()
@@ -169,13 +182,13 @@ def get_or_create_customer(
 
     except SQLAlchemyError as e:
         session.rollback()
-        logger.error(f"Failed to get/create customer: {e}")
+        logger.error("Failed to get/create customer: %s", e)
         raise
     finally:
         session.close()
 
 
-def get_customer_by_telegram_id(telegram_id: int) -> Optional[Customer]:
+def get_customer_by_telegram_id(telegram_id: int) -> Customer | None:
     """Get customer by telegram ID"""
     session = get_session()
     try:
@@ -187,7 +200,7 @@ def get_customer_by_telegram_id(telegram_id: int) -> Optional[Customer]:
 
 
 # Product operations
-def get_all_products() -> List[Product]:
+def get_all_products() -> list[Product]:
     """Get all active products"""
     session = get_session()
     try:
@@ -196,7 +209,7 @@ def get_all_products() -> List[Product]:
         session.close()
 
 
-def get_product_by_name(name: str) -> Optional[Product]:
+def get_product_by_name(name: str) -> Product | None:
     """Get product by name"""
     session = get_session()
     try:
@@ -205,7 +218,7 @@ def get_product_by_name(name: str) -> Optional[Product]:
         session.close()
 
 
-def get_product_by_id(product_id: int) -> Optional[Product]:
+def get_product_by_id(product_id: int) -> Product | None:
     """Get product by ID"""
     session = get_session()
     try:
@@ -231,69 +244,67 @@ def get_or_create_cart(telegram_id: int) -> Cart:
 
     except SQLAlchemyError as e:
         session.rollback()
-        logger.error(f"Failed to get/create cart: {e}")
+        logger.error("Failed to get/create cart: %s", e)
         raise
     finally:
         session.close()
 
 
 def add_to_cart(
-    telegram_id: int, product_id: int, quantity: int = 1, options: dict = None
+    telegram_id: int, product_id: int, quantity: int = 1, options: dict | None = None
 ) -> bool:
-    """Add item to cart"""
+    """Add item to cart or update quantity if it exists"""
     session = get_session()
     try:
-        # Get the product
-        product = session.query(Product).filter(Product.id == product_id).first()
+        cart = get_or_create_cart(telegram_id)
+        product = get_product_by_id(product_id)
+
         if not product:
+            logger.warning("Product with ID %d not found", product_id)
             return False
 
-        # Get or create cart
-        cart = session.query(Cart).filter(Cart.telegram_id == telegram_id).first()
-        if not cart:
-            cart = Cart(telegram_id=telegram_id, items=[])
-            session.add(cart)
+        # Create a unique key for the item based on product_id and options
+        options_key = tuple(sorted(options.items())) if options else ()
+        
+        # Check if item with the same product_id and options already exists
+        existing_item = next(
+            (
+                item
+                for item in cart.items
+                if item.get("product_id") == product_id
+                and tuple(sorted(item.get("options", {}).items())) == options_key
+            ),
+            None,
+        )
 
-        # Current cart items
-        items = cart.items or []
-
-        # Check if item already exists in cart
-        item_key = f"{product_id}_{str(options) if options else 'none'}"
-        existing_item = None
-        for i, item in enumerate(items):
-            if item.get("product_id") == product_id and item.get("options") == options:
-                existing_item = i
-                break
-
-        if existing_item is not None:
-            # Update quantity
-            items[existing_item]["quantity"] += quantity
+        if existing_item:
+            # Update quantity if item exists
+            existing_item["quantity"] += quantity
         else:
-            # Add new item
-            items.append(
-                {
-                    "product_id": product_id,
-                    "product_name": product.name,
-                    "quantity": quantity,
-                    "unit_price": product.base_price,
-                    "options": options or {},
-                }
-            )
+            # Add new item to cart
+            new_item = {
+                "product_id": product_id,
+                "quantity": quantity,
+                "options": options,
+                "price": product.base_price,  # Store price at time of adding
+            }
+            cart.items.append(new_item)
 
-        cart.items = items
-        cart.updated_at = datetime.utcnow()
+        # Mark 'items' field as modified for JSON mutation tracking
+        flag_modified(cart, "items")
+
         session.commit()
         return True
 
     except SQLAlchemyError as e:
         session.rollback()
-        logger.error(f"Failed to add to cart: {e}")
+        logger.error("Failed to add to cart: %s", e)
         return False
     finally:
         session.close()
 
 
-def get_cart_items(telegram_id: int) -> List[Dict]:
+def get_cart_items(telegram_id: int) -> list[dict]:
     """Get cart items for user"""
     session = get_session()
     try:
@@ -316,50 +327,77 @@ def get_cart_items(telegram_id: int) -> List[Dict]:
 
 def update_cart(
     telegram_id: int,
-    items: List[Dict],
-    delivery_method: str = None,
-    delivery_address: str = None,
-):
-    """Update cart items and delivery info"""
+    items: list[dict],
+    delivery_method: str | None = None,
+    delivery_address: str | None = None,
+) -> bool:
+    """Update cart with new items and delivery info"""
     session = get_session()
     try:
-        cart = session.query(Cart).filter(Cart.telegram_id == telegram_id).first()
+        cart = get_or_create_cart(telegram_id)
 
-        if cart:
-            cart.items = items
+        # Update cart items
+        cart.items = items
+
+        # Update delivery info
+        if delivery_method:
             cart.delivery_method = delivery_method
+        if delivery_address:
             cart.delivery_address = delivery_address
-            cart.updated_at = datetime.utcnow()
-        else:
-            cart = Cart(
-                telegram_id=telegram_id,
-                items=items,
-                delivery_method=delivery_method,
-                delivery_address=delivery_address,
-            )
-            session.add(cart)
+
+        # Mark 'items' field as modified for JSON mutation tracking
+        flag_modified(cart, "items")
 
         session.commit()
+        return True
 
     except SQLAlchemyError as e:
         session.rollback()
-        logger.error(f"Failed to update cart: {e}")
-        raise
+        logger.error("Failed to update cart: %s", e)
+        return False
     finally:
         session.close()
 
 
-def clear_cart(telegram_id: int):
-    """Clear cart for user"""
+def clear_cart(telegram_id: int) -> bool:
+    """Clear all items from a cart"""
     session = get_session()
     try:
         cart = session.query(Cart).filter(Cart.telegram_id == telegram_id).first()
         if cart:
             session.delete(cart)
             session.commit()
+        return True
     except SQLAlchemyError as e:
         session.rollback()
-        logger.error(f"Failed to clear cart: {e}")
+        logger.error("Failed to clear cart: %s", e)
+        return False
+    finally:
+        session.close()
+
+
+def remove_from_cart(telegram_id: int, product_id: int) -> bool:
+    """Remove item from cart"""
+    session = get_session()
+    try:
+        cart = session.query(Cart).filter(Cart.telegram_id == telegram_id).first()
+        if not cart:
+            return False
+
+        # Find and remove item from cart
+        cart.items = [
+            item for item in cart.items if item.get("product_id") != product_id
+        ]
+
+        # Mark 'items' field as modified for JSON mutation tracking
+        flag_modified(cart, "items")
+
+        session.commit()
+        return True
+
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error("Failed to remove from cart: %s", e)
         raise
     finally:
         session.close()
@@ -370,8 +408,8 @@ def create_order(
     customer_id: int,
     total_amount: float,
     delivery_method: str = "pickup",
-    delivery_address: str = None,
-) -> Optional[Order]:
+    delivery_address: str | None = None,
+) -> Order | None:
     """Create new order with items"""
     session = get_session()
     try:
@@ -421,7 +459,7 @@ def create_order(
 
     except SQLAlchemyError as e:
         session.rollback()
-        logger.error(f"Failed to create order: {e}")
+        logger.error("Failed to create order: %s", e)
         return None
     finally:
         session.close()
@@ -433,7 +471,7 @@ def generate_order_number() -> str:
     return f"SS{timestamp}"
 
 
-def get_all_customers() -> List[Customer]:
+def get_all_customers() -> list[Customer]:
     """Get all customers"""
     session = get_session()
     try:
@@ -442,7 +480,7 @@ def get_all_customers() -> List[Customer]:
         session.close()
 
 
-def get_all_orders() -> List[Order]:
+def get_all_orders() -> list[Order]:
     """Get all orders"""
     session = get_session()
     try:

@@ -5,24 +5,22 @@ Security utilities for the Samna Salta bot
 import logging
 import time
 from functools import wraps
-from typing import Dict, Optional, Set
 
 from telegram import Update
 from telegram.ext import ContextTypes
 
 from ..configuration.config import get_config
+from .helpers import sanitize_phone_number, validate_phone_number
 
 logger = logging.getLogger(__name__)
 
 # Rate limiting storage (in production, use Redis)
-_rate_limit_storage: Dict[int, Dict[str, float]] = {}
-_blocked_users: Set[int] = set()
+_rate_limit_storage: dict[int, dict[str, float]] = {}
+_blocked_users: set[int] = set()
 
 
 class SecurityError(Exception):
     """Custom security exception"""
-
-    pass
 
 
 def rate_limit(max_requests: int = 10, window_seconds: int = 60):
@@ -38,7 +36,7 @@ def rate_limit(max_requests: int = 10, window_seconds: int = 60):
 
             # Check if user is blocked
             if user_id in _blocked_users:
-                logger.warning(f"Blocked user {user_id} attempted access")
+                logger.warning("Blocked user %s attempted access", user_id)
                 await update.message.reply_text(
                     "Access temporarily restricted. Please contact support."
                 )
@@ -61,7 +59,7 @@ def rate_limit(max_requests: int = 10, window_seconds: int = 60):
             total_requests = sum(user_requests.values())
 
             if total_requests >= max_requests:
-                logger.warning(f"Rate limit exceeded for user {user_id}")
+                logger.warning("Rate limit exceeded for user %s", user_id)
                 await update.message.reply_text(
                     "Too many requests. Please wait a moment before trying again."
                 )
@@ -88,7 +86,7 @@ def admin_required(func):
         config = get_config()
 
         if user_id != config.admin_chat_id:
-            logger.warning(f"Unauthorized admin access attempt by user {user_id}")
+            logger.warning("Unauthorized admin access attempt by user %s", user_id)
             await update.message.reply_text(
                 "❌ You don't have permission to access this feature."
             )
@@ -99,9 +97,7 @@ def admin_required(func):
     return wrapper
 
 
-def validate_input(
-    input_text: str, max_length: int = 500, allow_special_chars: bool = True
-) -> bool:
+def validate_input(input_text: str, max_length: int = 500) -> bool:
     """Validate user input for security"""
     if not input_text or len(input_text.strip()) == 0:
         return False
@@ -129,7 +125,7 @@ def validate_input(
     input_lower = input_text.lower()
     for pattern in suspicious_patterns:
         if pattern in input_lower:
-            logger.warning(f"Suspicious input detected: {pattern}")
+            logger.warning("Suspicious input detected: %s", pattern)
             return False
 
     return True
@@ -150,7 +146,10 @@ def sanitize_text(text: str) -> str:
 def log_security_event(event_type: str, user_id: int, details: str = ""):
     """Log security-related events"""
     logger.warning(
-        f"SECURITY EVENT: {event_type} | User: {user_id} | Details: {details}",
+        "SECURITY EVENT: %s | User: %s | Details: %s",
+        event_type,
+        user_id,
+        details,
         extra={
             "event_type": event_type,
             "user_id": user_id,
@@ -212,8 +211,6 @@ class InputValidator:
     @staticmethod
     def validate_phone(phone: str) -> tuple[bool, str]:
         """Validate phone number"""
-        from .helpers import sanitize_phone_number, validate_phone_number
-
         if not validate_phone_number(phone):
             return False, "Please enter a valid Israeli phone number"
 

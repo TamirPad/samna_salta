@@ -3,6 +3,7 @@ Configuration management for the Samna Salta bot
 """
 
 
+import threading
 from typing import List
 from pydantic import Field
 from pydantic_settings import BaseSettings
@@ -33,18 +34,21 @@ class Settings(BaseSettings):
     )
     hilbeh_available_hours: str = Field("09:00-18:00", env="HILBEH_AVAILABLE_HOURS")
 
-    class Config:
+    class Config:  # pylint: disable=too-few-public-methods
+        """Pydantic model configuration"""
         env_file = ".env"
         env_file_encoding = "utf-8"
 
 
-# Global settings instance
-_settings = None
+_settings_instance: Settings | None = None
+_settings_lock = threading.Lock()
 
 
 def get_config() -> Settings:
-    """Get the global settings instance"""
-    global _settings
-    if _settings is None:
-        _settings = Settings()
-    return _settings
+    """Get the global settings instance, ensuring thread safety."""
+    global _settings_instance
+    if _settings_instance is None:
+        with _settings_lock:
+            if _settings_instance is None:
+                _settings_instance = Settings()
+    return _settings_instance

@@ -5,10 +5,10 @@ Handles admin-specific operations including order management, status updates, an
 """
 
 import logging
-from typing import List, Optional
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
+    Application,
     CallbackQueryHandler,
     CommandHandler,
     ContextTypes,
@@ -17,11 +17,11 @@ from telegram.ext import (
     filters,
 )
 
-from src.application.dtos.order_dtos import OrderInfo
+from src.domain.value_objects.customer_id import CustomerId
+from src.domain.value_objects.telegram_id import TelegramId
 from src.infrastructure.container.dependency_injection import get_container
 from src.infrastructure.utilities.exceptions import (
     BusinessLogicError,
-    OrderNotFoundError,
     error_handler,
 )
 
@@ -40,11 +40,11 @@ class AdminHandler:
 
     @error_handler("admin_dashboard")
     async def handle_admin_command(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+        self, update: Update, _: ContextTypes.DEFAULT_TYPE
     ) -> None:
         """Handle /admin command - show admin dashboard"""
         user_id = update.effective_user.id
-        self._logger.info(f"👑 ADMIN DASHBOARD: User {user_id}")
+        self._logger.debug("👑 ADMIN DASHBOARD: User %s", user_id)
 
         # Check if user is admin
         if not await self._is_admin_user(user_id):
@@ -54,11 +54,11 @@ class AdminHandler:
             return
 
         # Show admin dashboard
-        await self._show_admin_dashboard(update, context)
+        await self._show_admin_dashboard(update, None)
 
     @error_handler("admin_dashboard")
     async def handle_admin_callback(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+        self, update: Update, _: ContextTypes.DEFAULT_TYPE
     ) -> None:
         """Handle admin dashboard callbacks"""
         query = update.callback_query
@@ -70,7 +70,7 @@ class AdminHandler:
             return
 
         data = query.data
-        self._logger.info(f"👑 ADMIN CALLBACK: {data} by User {user_id}")
+        self._logger.info("👑 ADMIN CALLBACK: %s by User %s", data, user_id)
 
         if data == "admin_pending_orders":
             await self._show_pending_orders(query)
@@ -79,7 +79,7 @@ class AdminHandler:
         elif data == "admin_all_orders":
             await self._show_all_orders(query)
         elif data == "admin_update_status":
-            await self._start_status_update(query, context)
+            await self._start_status_update(query)
         elif data == "admin_analytics":
             await self._show_analytics(query)
         elif data.startswith("admin_order_"):
@@ -92,41 +92,43 @@ class AdminHandler:
             new_status = parts[3]
             await self._update_order_status(query, order_id, new_status, user_id)
         elif data == "admin_back":
-            await self._show_admin_dashboard(update, context)
+            await self._show_admin_dashboard(update, None)
 
     async def _show_admin_dashboard(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+        self, update: Update, _: ContextTypes.DEFAULT_TYPE | None
     ) -> None:
         """Show main admin dashboard"""
         try:
             self._logger.info("📊 LOADING ADMIN DASHBOARD")
-            
+
             # Get order statistics
             order_status_use_case = (
                 self._container.get_order_status_management_use_case()
             )
-            
+
             if not order_status_use_case:
                 self._logger.error("❌ ORDER STATUS USE CASE NOT FOUND")
-                raise Exception("Order status management system not available")
-            
+                raise RuntimeError("Order status management system not available")
+
             self._logger.info("✅ ORDER STATUS USE CASE OBTAINED")
-            
+
             pending_orders = await order_status_use_case.get_pending_orders()
             active_orders = await order_status_use_case.get_active_orders()
-            
-            self._logger.info(f"📊 STATS: {len(pending_orders)} pending, {len(active_orders)} active")
 
-            dashboard_text = f"""
-👑 <b>ADMIN DASHBOARD</b>
+            self._logger.info(
+                "📊 STATS: %s pending, %s active",
+                len(pending_orders),
+                len(active_orders),
+            )
 
-📊 <b>Order Statistics:</b>
-⏳ Pending Orders: {len(pending_orders)}
-🔄 Active Orders: {len(active_orders)}
-📋 Total Today: {len(pending_orders) + len(active_orders)}
-
-🛠️ <b>Quick Actions:</b>
-"""
+            dashboard_text = (
+                "👑 <b>ADMIN DASHBOARD</b>\n\n"
+                "📊 <b>Order Statistics:</b>\n"
+                f"⏳ Pending Orders: {len(pending_orders)}\n"
+                f"🔄 Active Orders: {len(active_orders)}\n"
+                f"📋 Total Today: {len(pending_orders) + len(active_orders)}\n\n"
+                "🛠️ <b>Quick Actions:</b>"
+            )
 
             keyboard = [
                 [
@@ -145,7 +147,11 @@ class AdminHandler:
                         "🔄 Update Status", callback_data="admin_update_status"
                     ),
                 ],
-                [InlineKeyboardButton("📊 Analytics", callback_data="admin_analytics")],
+                [
+                    InlineKeyboardButton(
+                        "📊 Analytics", callback_data="admin_analytics"
+                    )
+                ],
             ]
 
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -159,28 +165,35 @@ class AdminHandler:
                     text=dashboard_text, parse_mode="HTML", reply_markup=reply_markup
                 )
 
+        except (BusinessLogicError, RuntimeError) as e:
+            self._logger.error("💥 DASHBOARD ERROR: %s", e, exc_info=True)
+            await self._send_error_to_user(update)
         except Exception as e:
-            self._logger.error(f"💥 DASHBOARD ERROR: {e}", exc_info=True)
-            try:
-                if update.callback_query:
-                    await update.callback_query.message.reply_text(
-                        "Error loading dashboard. Please try again."
-                    )
-                elif update.message:
-                    await update.message.reply_text(
-                        "Error loading dashboard. Please try again."
-                    )
-                else:
-                    # Fallback - try to get the message from the update
-                    message = getattr(update, 'message', None) or getattr(update, 'effective_message', None)
-                    if message:
-                        await message.reply_text(
-                            "Error loading dashboard. Please try again."
-                        )
-            except Exception as reply_error:
-                self._logger.error(f"💥 ERROR SENDING ERROR MESSAGE: {reply_error}")
+            self._logger.critical("💥 UNHANDLED DASHBOARD ERROR: %s", e, exc_info=True)
+            await self._send_error_to_user(update)
 
-    async def _show_analytics(self, query) -> None:
+    async def _send_error_to_user(self, update: Update):
+        """Sends a generic error message to the user."""
+        message_sender = None
+        if update.callback_query:
+            message_sender = update.callback_query.message
+        elif update.message:
+            message_sender = update.message
+
+        if message_sender:
+            try:
+                await message_sender.reply_text(
+                    "An error occurred. Please try again or contact support."
+                )
+            except Exception as e:
+                self._logger.error(
+                    "💥 CRITICAL: Failed to send error message to user %s: %s",
+                    update.effective_user.id,
+                    e,
+                    exc_info=True,
+                )
+
+    async def _show_analytics(self, query: CallbackQuery) -> None:
         """Show business analytics report"""
         try:
             self._logger.info("📊 GENERATING ANALYTICS REPORT")
@@ -205,11 +218,14 @@ class AdminHandler:
                 text=report, parse_mode="HTML", reply_markup=reply_markup
             )
 
-        except Exception as e:
-            self._logger.error(f"💥 ANALYTICS ERROR: {e}", exc_info=True)
+        except BusinessLogicError as e:
+            self._logger.error("💥 ANALYTICS ERROR: %s", e, exc_info=True)
             await query.message.reply_text("Error generating analytics report.")
+        except Exception as e:
+            self._logger.critical("💥 UNHANDLED ANALYTICS ERROR: %s", e, exc_info=True)
+            await query.message.reply_text("A critical error occurred.")
 
-    async def _show_pending_orders(self, query) -> None:
+    async def _show_pending_orders(self, query: CallbackQuery) -> None:
         """Show pending orders"""
         try:
             order_status_use_case = (
@@ -218,11 +234,10 @@ class AdminHandler:
             orders = await order_status_use_case.get_pending_orders()
 
             if not orders:
-                text = """
-⏳ <b>PENDING ORDERS</b>
-
-✅ No pending orders! All caught up.
-"""
+                text = (
+                    "⏳ <b>PENDING ORDERS</b>\n\n"
+                    "✅ No pending orders! All caught up."
+                )
                 keyboard = [
                     [
                         InlineKeyboardButton(
@@ -231,15 +246,17 @@ class AdminHandler:
                     ]
                 ]
             else:
-                text = f"""
-⏳ <b>PENDING ORDERS ({len(orders)})</b>
-
-📋 <b>Orders requiring attention:</b>
-"""
+                text = (
+                    f"⏳ <b>PENDING ORDERS ({len(orders)})</b>\n\n"
+                    "📋 <b>Orders requiring attention:</b>"
+                )
 
                 keyboard = []
                 for order in orders[:10]:  # Show max 10 orders
-                    order_summary = f"#{order.order_number} - {order.customer_name} - ₪{order.total:.2f}"
+                    order_summary = (
+                        f"#{order.order_number} - {order.customer_name} - "
+                        f"₪{order.total:.2f}"
+                    )
                     keyboard.append(
                         [
                             InlineKeyboardButton(
@@ -258,16 +275,17 @@ class AdminHandler:
                 )
 
             reply_markup = InlineKeyboardMarkup(keyboard)
+
             await query.edit_message_text(
-                text=text, parse_mode="HTML", reply_markup=reply_markup
+                text, parse_mode="HTML", reply_markup=reply_markup
             )
 
-        except Exception as e:
-            self._logger.error(f"💥 PENDING ORDERS ERROR: {e}", exc_info=True)
+        except BusinessLogicError as e:
+            self._logger.error("💥 PENDING ORDERS ERROR: %s", e, exc_info=True)
             await query.message.reply_text("Error loading pending orders.")
 
-    async def _show_active_orders(self, query) -> None:
-        """Show active orders (confirmed, preparing, ready)"""
+    async def _show_active_orders(self, query: CallbackQuery) -> None:
+        """Show active orders"""
         try:
             order_status_use_case = (
                 self._container.get_order_status_management_use_case()
@@ -275,11 +293,10 @@ class AdminHandler:
             orders = await order_status_use_case.get_active_orders()
 
             if not orders:
-                text = """
-🔄 <b>ACTIVE ORDERS</b>
-
-✅ No active orders at the moment.
-"""
+                text = (
+                    "🔄 <b>ACTIVE ORDERS</b>\n\n"
+                    "✅ No active orders at the moment."
+                )
                 keyboard = [
                     [
                         InlineKeyboardButton(
@@ -288,21 +305,15 @@ class AdminHandler:
                     ]
                 ]
             else:
-                text = f"""
-🔄 <b>ACTIVE ORDERS ({len(orders)})</b>
-
-📋 <b>Orders in progress:</b>
-"""
-
+                text = (
+                    f"🔄 <b>ACTIVE ORDERS ({len(orders)})</b>\n\n"
+                    "📋 <b>Current active orders:</b>"
+                )
                 keyboard = []
-                for order in orders[:10]:
-                    status_emoji = {
-                        "confirmed": "✅",
-                        "preparing": "👨‍🍳",
-                        "ready": "🛍️",
-                    }.get(order.status, "📋")
+                for order in orders[:10]:  # Show max 10 orders
                     order_summary = (
-                        f"{status_emoji} #{order.order_number} - {order.customer_name}"
+                        f"#{order.order_number} - {order.customer_name} - "
+                        f"{order.status.value}"
                     )
                     keyboard.append(
                         [
@@ -312,7 +323,6 @@ class AdminHandler:
                             )
                         ]
                     )
-
                 keyboard.append(
                     [
                         InlineKeyboardButton(
@@ -322,271 +332,220 @@ class AdminHandler:
                 )
 
             reply_markup = InlineKeyboardMarkup(keyboard)
+
             await query.edit_message_text(
-                text=text, parse_mode="HTML", reply_markup=reply_markup
+                text, parse_mode="HTML", reply_markup=reply_markup
             )
 
-        except Exception as e:
-            self._logger.error(f"💥 ACTIVE ORDERS ERROR: {e}", exc_info=True)
+        except BusinessLogicError as e:
+            self._logger.error("💥 ACTIVE ORDERS ERROR: %s", e, exc_info=True)
             await query.message.reply_text("Error loading active orders.")
 
-    async def _show_all_orders(self, query) -> None:
+    async def _show_all_orders(self, query: CallbackQuery) -> None:
         """Show all orders"""
-        try:
-            order_repository = self._container.get_order_repository()
-            all_orders_data = await order_repository.get_all_orders()
-
-            text = f"""
-📋 <b>ALL ORDERS ({len(all_orders_data)})</b>
-
-📊 <b>Recent orders:</b>
-"""
-
-            keyboard = []
-            # Show last 10 orders
-            for order_data in all_orders_data[-10:]:
-                status_emoji = {
-                    "pending": "⏳",
-                    "confirmed": "✅",
-                    "preparing": "👨‍🍳",
-                    "ready": "🛍️",
-                    "completed": "✅",
-                    "cancelled": "❌",
-                }.get(order_data.get("status"), "📋")
-
-                order_summary = f"{status_emoji} #{order_data['order_number']} - ₪{order_data.get('total', 0):.2f}"
-                keyboard.append(
-                    [
-                        InlineKeyboardButton(
-                            order_summary,
-                            callback_data=f"admin_order_{order_data['id']}",
-                        )
-                    ]
-                )
-
-            keyboard.append(
-                [
-                    InlineKeyboardButton(
-                        "🔙 Back to Dashboard", callback_data="admin_back"
-                    )
-                ]
-            )
-
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(
-                text=text, parse_mode="HTML", reply_markup=reply_markup
-            )
-
-        except Exception as e:
-            self._logger.error(f"💥 ALL ORDERS ERROR: {e}", exc_info=True)
-            await query.message.reply_text("Error loading orders.")
-
-    async def _show_order_details(self, query, order_id: int) -> None:
-        """Show detailed order information with status update options"""
-        try:
-            order_repository = self._container.get_order_repository()
-            customer_repository = self._container.get_customer_repository()
-
-            order_data = await order_repository.get_order_by_id(order_id)
-            if not order_data:
-                await query.message.reply_text("Order not found.")
-                return
-
-            from src.domain.value_objects.customer_id import CustomerId
-            customer = await customer_repository.find_by_id(CustomerId(order_data["customer_id"]))
-            if not customer:
-                await query.message.reply_text("Customer not found for this order.")
-                return
-
-            # Format order details
-            status_emoji = {
-                "pending": "⏳",
-                "confirmed": "✅",
-                "preparing": "👨‍🍳",
-                "ready": "🛍️",
-                "completed": "✅",
-                "cancelled": "❌",
-            }.get(order_data.get("status"), "📋")
-
-            delivery_emoji = (
-                "🚚" if order_data.get("delivery_method") == "delivery" else "🏪"
-            )
-
-            text = f"""
-📋 <b>ORDER DETAILS</b>
-
-🔢 Order #: <code>{order_data['order_number']}</code>
-{status_emoji} Status: <b>{order_data.get('status', 'pending').title()}</b>
-📅 Date: {order_data.get('created_at', 'Unknown').strftime('%d/%m/%Y %H:%M') if order_data.get('created_at') else 'Unknown'}
-
-👤 <b>Customer:</b>
-👨‍💼 Name: <b>{customer.full_name.value}</b>
-📞 Phone: <code>{customer.phone_number.value}</code>
-
-🛒 <b>Items:</b>"""
-
-            for item in order_data.get("items", []):
-                options_text = ""
-                if item.get("options"):
-                    options_list = [f"{k}: {v}" for k, v in item["options"].items()]
-                    options_text = f" ({', '.join(options_list)})"
-
-                text += f"\n• {item['quantity']}x {item['product_name']}{options_text} - ₪{item['total_price']:.2f}"
-
-            text += f"""
-
-{delivery_emoji} <b>Delivery:</b>
-📦 Method: <b>{order_data.get('delivery_method', 'pickup').title()}</b>"""
-
-            if order_data.get("delivery_address"):
-                text += f"\n📍 Address: {order_data['delivery_address']}"
-
-            text += f"""
-
-💰 <b>Payment:</b>
-💵 Subtotal: ₪{order_data.get('subtotal', 0):.2f}
-🚚 Delivery: ₪{order_data.get('delivery_charge', 0):.2f}
-💳 <b>Total: ₪{order_data.get('total', 0):.2f}</b>
-"""
-
-            # Create status update buttons based on current status
-            keyboard = []
-            current_status = order_data.get("status", "pending")
-
-            status_transitions = {
-                "pending": [("✅ Confirm", "confirmed"), ("❌ Cancel", "cancelled")],
-                "confirmed": [
-                    ("👨‍🍳 Start Preparing", "preparing"),
-                    ("❌ Cancel", "cancelled"),
-                ],
-                "preparing": [("🛍️ Ready", "ready"), ("❌ Cancel", "cancelled")],
-                "ready": [("✅ Complete", "completed")],
-                "completed": [],
-                "cancelled": [],
-            }
-
-            available_transitions = status_transitions.get(current_status, [])
-            if available_transitions:
-                text += "\n🔄 <b>Status Actions:</b>"
-                for button_text, new_status in available_transitions:
-                    keyboard.append(
-                        [
-                            InlineKeyboardButton(
-                                button_text,
-                                callback_data=f"admin_status_{order_id}_{new_status}",
-                            )
-                        ]
-                    )
-
-            keyboard.append(
-                [
-                    InlineKeyboardButton(
-                        "🔙 Back to Dashboard", callback_data="admin_back"
-                    )
-                ]
-            )
-
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(
-                text=text, parse_mode="HTML", reply_markup=reply_markup
-            )
-
-        except Exception as e:
-            self._logger.error(f"💥 ORDER DETAILS ERROR: {e}", exc_info=True)
-            await query.message.reply_text("Error loading order details.")
-
-    async def _update_order_status(
-        self, query, order_id: int, new_status: str, admin_telegram_id: int
-    ) -> None:
-        """Update order status"""
         try:
             order_status_use_case = (
                 self._container.get_order_status_management_use_case()
             )
+            orders = await order_status_use_case.get_all_orders()
 
-            updated_order = await order_status_use_case.update_order_status(
-                order_id=order_id,
-                new_status=new_status,
-                admin_telegram_id=admin_telegram_id,
+            if not orders:
+                text = "📋 <b>ALL ORDERS</b>\n\n✅ No orders found."
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            "🔙 Back to Dashboard", callback_data="admin_back"
+                        )
+                    ]
+                ]
+            else:
+                text = f"📋 <b>ALL ORDERS ({len(orders)})</b>"
+                keyboard = []
+                for order in orders[:15]:  # Show max 15
+                    order_summary = (
+                        f"#{order.order_number} - {order.customer_name} - "
+                        f"{order.status.value}"
+                    )
+                    keyboard.append(
+                        [
+                            InlineKeyboardButton(
+                                order_summary,
+                                callback_data=f"admin_order_{order.order_id}",
+                            )
+                        ]
+                    )
+                keyboard.append(
+                    [
+                        InlineKeyboardButton(
+                            "🔙 Back to Dashboard", callback_data="admin_back"
+                        )
+                    ]
+                )
+
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await query.edit_message_text(
+                text, parse_mode="HTML", reply_markup=reply_markup
             )
-
-            status_emoji = {
-                "pending": "⏳",
-                "confirmed": "✅",
-                "preparing": "👨‍🍳",
-                "ready": "🛍️",
-                "completed": "✅",
-                "cancelled": "❌",
-            }.get(new_status, "📋")
-
-            await query.message.reply_text(
-                f"{status_emoji} <b>Status Updated!</b>\n\n"
-                f"Order #{updated_order.order_number} has been updated to: <b>{new_status.title()}</b>\n"
-                f"Customer: {updated_order.customer_name}\n"
-                f"Total: ₪{updated_order.total:.2f}",
-                parse_mode="HTML",
-            )
-
-            # Return to dashboard - create a mock update object from query
-            from types import SimpleNamespace
-            mock_update = SimpleNamespace()
-            mock_update.callback_query = query
-            mock_update.message = None
-            await self._show_admin_dashboard(mock_update, None)
 
         except BusinessLogicError as e:
-            await query.message.reply_text(f"❌ Error: {e.user_message}")
-        except Exception as e:
-            self._logger.error(f"💥 STATUS UPDATE ERROR: {e}", exc_info=True)
-            await query.message.reply_text(
-                "Error updating order status. Please try again."
+            self._logger.error("💥 ALL ORDERS ERROR: %s", e, exc_info=True)
+            await query.message.reply_text("Error loading all orders.")
+
+    async def _show_order_details(self, query: CallbackQuery, order_id: int) -> None:
+        """Show details for a specific order."""
+        try:
+            self._logger.info("📊 SHOWING ORDER DETAILS FOR #%s", order_id)
+            order_details = await self._get_formatted_order_details(order_id)
+
+            if not order_details:
+                await query.edit_message_text("❌ Order not found.")
+                return
+
+            keyboard = self._create_order_details_keyboard(order_id)
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await query.edit_message_text(
+                order_details, parse_mode="HTML", reply_markup=reply_markup
             )
 
-    async def _start_status_update(
-        self, query, context: ContextTypes.DEFAULT_TYPE
-    ) -> int:
-        """Start status update conversation"""
-        await query.edit_message_text(
-            "🔄 <b>UPDATE ORDER STATUS</b>\n\n"
-            "Please enter the Order ID you want to update:",
-            parse_mode="HTML",
+        except BusinessLogicError as e:
+            self._logger.error("💥 ORDER DETAILS ERROR: %s", e, exc_info=True)
+            await query.message.reply_text("Error loading order details.")
+
+    async def _get_formatted_order_details(self, order_id: int) -> str | None:
+        """Helper to get and format order details."""
+        order_use_case = self._container.get_order_status_management_use_case()
+        order_info = await order_use_case.get_order_by_id(CustomerId(order_id))
+
+        if not order_info:
+            return None
+
+        details = [
+            f"📦 <b>Order #{order_info.order_number}</b>",
+            f"👤 <b>Customer:</b> {order_info.customer_name}",
+            f"📞 <b>Phone:</b> {order_info.customer_phone}",
+            f" STATUS: {order_info.status.value}",
+            f"💰 <b>Total:</b> ₪{order_info.total:.2f}",
+            f"📅 <b>Created:</b> {order_info.created_at.strftime('%Y-%m-%d %H:%M')}",
+        ]
+        if order_info.items:
+            details.append("\n🛒 <b>Items:</b>")
+            for item in order_info.items:
+                details.append(
+                    f"- {item.product_name} (x{item.quantity}) - ₪{item.price:.2f}"
+                )
+        return "\n".join(details)
+
+    def _create_order_details_keyboard(
+        self, order_id: int
+    ) -> list[list[InlineKeyboardButton]]:
+        """Creates the keyboard for the order details view."""
+        statuses = ["pending", "confirmed", "preparing", "ready", "delivered"]
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    f"Set to {status.capitalize()}",
+                    callback_data=f"admin_status_{order_id}_{status}",
+                )
+            ]
+            for status in statuses
+        ]
+        keyboard.append(
+            [InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_back")]
         )
+        return keyboard
+
+    async def _update_order_status(
+        self, query: CallbackQuery, order_id: int, new_status: str, admin_telegram_id: int
+    ) -> None:
+        """Update the status of an order."""
+        try:
+            self._logger.info(
+                "🔄 UPDATING STATUS for order #%s to %s by admin %s",
+                order_id,
+                new_status,
+                admin_telegram_id,
+            )
+
+            order_use_case = self._container.get_order_status_management_use_case()
+            await order_use_case.update_order_status(
+                order_id=order_id,
+                new_status=new_status,
+                admin_telegram_id=TelegramId(admin_telegram_id),
+            )
+
+            await query.answer(f"✅ Status updated to {new_status}")
+            await self._show_order_details(query, order_id)
+
+        except (BusinessLogicError, ValueError) as e:
+            self._logger.error("💥 STATUS UPDATE ERROR: %s", e, exc_info=True)
+            await query.message.reply_text(f"❌ Error updating status: {e}")
+
+    async def _start_status_update(self, query: CallbackQuery) -> int:
+        """Start conversation to update an order's status."""
+        await query.message.reply_text("Please enter the Order ID to update:")
         return AWAITING_ORDER_ID
 
-    async def _is_admin_user(self, telegram_id: int) -> bool:
-        """Check if user has admin privileges"""
+    async def show_order_details_for_status_update(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> int:
+        """Show order details and prompt for status update."""
+        order_id_str = update.message.text
         try:
-            self._logger.info(f"🔐 CHECKING ADMIN STATUS: User {telegram_id}")
-            
-            customer_repository = self._container.get_customer_repository()
-            if not customer_repository:
-                self._logger.error("❌ CUSTOMER REPOSITORY NOT FOUND")
-                return False
-                
-            from src.domain.value_objects.telegram_id import TelegramId
+            order_id = int(order_id_str)
+            await self._show_order_details(update.callback_query, order_id)
+            context.user_data["order_id_for_status_update"] = order_id
+            return AWAITING_STATUS_UPDATE
+        except (ValueError, AttributeError):
+            await update.message.reply_text("Invalid Order ID. Please enter a number.")
+            return AWAITING_ORDER_ID
 
-            customer = await customer_repository.find_by_telegram_id(
-                TelegramId(telegram_id)
-            )
-            
-            is_admin = customer and customer.is_admin
-            self._logger.info(f"🔐 ADMIN CHECK RESULT: User {telegram_id} - Admin: {is_admin}")
-            
-            return is_admin
-
-        except Exception as e:
-            self._logger.error(f"💥 ADMIN CHECK ERROR: User {telegram_id}, Error: {e}", exc_info=True)
-            return False
+    async def _is_admin_user(self, telegram_id: int) -> bool:
+        """Check if a user is an admin."""
+        security_manager = self._container.get_security_manager()
+        return security_manager.is_admin(TelegramId(telegram_id))
 
 
-def register_admin_handlers(application):
-    """Register admin handlers with the application"""
+def register_admin_handlers(application: Application):
+    """Register all admin command and callback handlers."""
     admin_handler = AdminHandler()
 
-    # Register command handlers
-    application.add_handler(CommandHandler("admin", admin_handler.handle_admin_command))
+    conversation_handler = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(
+                admin_handler.handle_admin_callback, pattern="^admin_update_status$"
+            )
+        ],
+        states={
+            AWAITING_ORDER_ID: [
+                MessageHandler(
+                    filters.TEXT & ~filters.COMMAND,
+                    admin_handler.show_order_details_for_status_update,
+                )
+            ],
+            AWAITING_STATUS_UPDATE: [
+                CallbackQueryHandler(
+                    admin_handler.handle_admin_callback, pattern="^admin_status_"
+                )
+            ],
+        },
+        fallbacks=[CommandHandler("cancel", admin_handler.handle_admin_command)],
+        map_to_parent={
+            # End of conversation
+            END: END,
+            # Restart admin flow
+            RESTART: "admin_dashboard",
+        },
+    )
 
-    # Register callback query handlers for admin operations
+    application.add_handler(
+        CommandHandler("admin", admin_handler.handle_admin_command)
+    )
     application.add_handler(
         CallbackQueryHandler(admin_handler.handle_admin_callback, pattern="^admin_")
     )
+    application.add_handler(conversation_handler)
+
+RESTART = "admin_dashboard"
+END = ConversationHandler.END

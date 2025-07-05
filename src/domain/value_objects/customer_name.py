@@ -25,11 +25,18 @@ class CustomerName:
         if len(cleaned_name) > 100:
             raise ValueError("Customer name cannot exceed 100 characters")
 
-        # Check that name contains at least some letters
-        if not re.search(
-            r"[a-zA-ZàáâäãåąčćęèéêëėįìíîïłńòóôöõøùúûüųūÿýżźñçčšžæÀÁÂÄÃÅĄĆČĖĘÈÉÊËÌÍÎÏĮŁŃÒÓÔÖÕØÙÚÛÜŲŪŸÝŻŹÑßÇŒÆČŠŽ\u0590-\u05FF\u0600-\u06FF]",
-            cleaned_name,
-        ):
+        # Check that name contains at least some letters (including Hebrew and Arabic)
+        letter_pattern = re.compile(
+            r"""
+            [a-zA-Z] |
+            [àáâäãåąčćęèéêëėįìíîïłńòóôöõøùúûüųūÿýżźñçčšžæ] |
+            [ÀÁÂÄÃÅĄĆČĖĘÈÉÊËÌÍÎÏĮŁŃÒÓÔÖÕØÙÚÛÜŲŪŸÝŻŹÑßÇŒÆČŠŽ] |
+            [\u0590-\u05FF] | # Hebrew
+            [\u0600-\u06FF]   # Arabic
+            """,
+            re.VERBOSE,
+        )
+        if not letter_pattern.search(cleaned_name):
             raise ValueError("Customer name must contain letters")
 
         # Use object.__setattr__ because the class is frozen
