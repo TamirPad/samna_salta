@@ -61,7 +61,7 @@ samna_salta/
 ## Quick Start
 
 ### Prerequisites
-- Python 3.8+ (3.11 recommended for Render free tier)
+- Python 3.8+ (3.13 recommended for optimal performance)
 - Telegram Bot Token (get from @BotFather)
 - Admin Telegram Chat ID
 
