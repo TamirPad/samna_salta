@@ -245,7 +245,7 @@ class AdminHandler:
                 )
 
                 keyboard = []
-                for order in orders[:10]:  # Show max 10 orders
+                for order in orders:  # Show all pending orders
                     order_summary = (
                         f"#{order.order_number} (ID {order.order_id}) - {order.customer_name} - "
                         f"₪{order.total:.2f}"
@@ -483,34 +483,59 @@ class AdminHandler:
 
     async def _start_status_update(self, query: CallbackQuery) -> int:
         """Start conversation to update an order's status."""
-        await query.message.reply_text("Please enter the Order ID to update:")
+        await query.message.reply_text(
+            "Please enter the Order ID to update (the small number inside the \"ID ...\" parentheses).\n"
+            "For example, if the line reads '#ORD-20250705... (ID 20) - John', you should send 20."
+        )
         return AWAITING_ORDER_ID
 
     async def show_order_details_for_status_update(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> int:
         """Show order details and prompt for status update."""
-        order_id_str = update.message.text
-        try:
-            order_id = int(order_id_str)
-            # Fetch formatted details and send as a regular message with inline keyboard
-            order_details = await self._get_formatted_order_details(order_id)
-            if not order_details:
-                await update.message.reply_text("❌ Order not found. Try another ID.")
-                return AWAITING_ORDER_ID
+        order_id_input = update.message.text.strip()
 
-            keyboard = self._create_order_details_keyboard(order_id)
-            reply_markup = InlineKeyboardMarkup(keyboard)
+        # First, try numeric conversion for standard IDs
+        order_id: int | None = None
+        if order_id_input.isdigit():
+            try:
+                order_id = int(order_id_input)
+            except OverflowError:
+                order_id = None
 
-            await update.message.reply_text(
-                order_details, parse_mode="HTML", reply_markup=reply_markup
+        # Fallback: maybe user pasted the long order number like ORD-20250705...
+        if order_id is None:
+            order_status_use_case = self._container.get_order_status_management_use_case()
+            all_orders = await order_status_use_case.get_all_orders()
+            matching = next(
+                (
+                    o for o in all_orders
+                    if o.order_number == order_id_input or o.order_number.lstrip("#") == order_id_input
+                ),
+                None,
             )
+            if matching:
+                order_id = matching.order_id
 
-            context.user_data["order_id_for_status_update"] = order_id
-            return AWAITING_STATUS_UPDATE
-        except (ValueError, AttributeError):
-            await update.message.reply_text("Invalid Order ID. Please enter a number.")
+        if order_id is None:
+            await update.message.reply_text("❌ Order not found. Make sure to send the numeric ID shown in the list.")
             return AWAITING_ORDER_ID
+
+        # Fetch formatted details and send as a regular message with inline keyboard
+        order_details = await self._get_formatted_order_details(order_id)
+        if not order_details:
+            await update.message.reply_text("❌ Order not found. Try another ID.")
+            return AWAITING_ORDER_ID
+
+        keyboard = self._create_order_details_keyboard(order_id)
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await update.message.reply_text(
+            order_details, parse_mode="HTML", reply_markup=reply_markup
+        )
+
+        context.user_data["order_id_for_status_update"] = order_id
+        return AWAITING_STATUS_UPDATE
 
     async def _is_admin_user(self, telegram_id: int) -> bool:
         """Check if a user is an admin."""
