@@ -72,15 +72,13 @@ class OnboardingHandler:
             )
 
             if existing_customer:
-                # Welcome back existing customer
+                # Welcome back existing customer with menu in one message
                 welcome_message = (
-                    f"Hi {existing_customer.full_name.value}, great to see you again! 🎉"
+                    f"Hi {existing_customer.full_name.value}, great to see you again! 🎉\n\n"
+                    "What would you like to order today?"
                 )
-                await update.message.reply_text(welcome_message)
-
-                # Show main menu
                 await update.message.reply_text(
-                    "What would you like to order today?",
+                    welcome_message,
                     reply_markup=get_main_menu_keyboard(),
                 )
                 return END
@@ -167,19 +165,14 @@ class OnboardingHandler:
                 await update.message.reply_text(
                     f"Welcome back, {response.customer.full_name.value}! 🎉\n\n"
                     "Your information has been updated.\n\n"
-                    "What would you like to order today?"
-                )
-                await update.message.reply_text(
-                    "Choose from our menu:", reply_markup=get_main_menu_keyboard()
+                    "What would you like to order today?",
+                    reply_markup=get_main_menu_keyboard()
                 )
                 return END
             else:
                 await update.message.reply_text(
                     f"Thank you, {response.customer.full_name.value}! 📱\n\n"
-                    "How would you like to receive your order?"
-                )
-
-                await update.message.reply_text(
+                    "How would you like to receive your order?\n\n"
                     "Please choose your delivery method:",
                     reply_markup=get_delivery_method_keyboard(),
                 )
@@ -211,9 +204,6 @@ class OnboardingHandler:
                 # For pickup, go directly to menu
                 await query.edit_message_text(
                     "Perfect! You've chosen self-pickup. We'll contact you to coordinate the pickup time.\n\n"
-                    "Now, let's browse our menu:"
-                )
-                await query.message.reply_text(
                     "What would you like to order?",
                     reply_markup=get_main_menu_keyboard(),
                 )
@@ -271,10 +261,8 @@ class OnboardingHandler:
 
             await update.message.reply_text(
                 f"Perfect! Your delivery address is: {address}\n\n"
-                "Now, let's browse our menu:"
-            )
-            await update.message.reply_text(
-                "What would you like to order?", reply_markup=get_main_menu_keyboard()
+                "What would you like to order?",
+                reply_markup=get_main_menu_keyboard()
             )
             return END
 
