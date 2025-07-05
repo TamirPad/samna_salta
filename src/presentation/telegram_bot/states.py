@@ -2,6 +2,7 @@
 Conversation states for the Samna Salta bot
 """
 
+from telegram.ext import ConversationHandler
 
 # Onboarding states (only these are actually used)
 ONBOARDING_NAME = 1
