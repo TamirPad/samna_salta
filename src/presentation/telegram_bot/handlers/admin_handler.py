@@ -99,12 +99,23 @@ class AdminHandler:
     ) -> None:
         """Show main admin dashboard"""
         try:
+            self._logger.info("📊 LOADING ADMIN DASHBOARD")
+            
             # Get order statistics
             order_status_use_case = (
                 self._container.get_order_status_management_use_case()
             )
+            
+            if not order_status_use_case:
+                self._logger.error("❌ ORDER STATUS USE CASE NOT FOUND")
+                raise Exception("Order status management system not available")
+            
+            self._logger.info("✅ ORDER STATUS USE CASE OBTAINED")
+            
             pending_orders = await order_status_use_case.get_pending_orders()
             active_orders = await order_status_use_case.get_active_orders()
+            
+            self._logger.info(f"📊 STATS: {len(pending_orders)} pending, {len(active_orders)} active")
 
             dashboard_text = f"""
 👑 <b>ADMIN DASHBOARD</b>
@@ -150,9 +161,24 @@ class AdminHandler:
 
         except Exception as e:
             self._logger.error(f"💥 DASHBOARD ERROR: {e}", exc_info=True)
-            await update.effective_message.reply_text(
-                "Error loading dashboard. Please try again."
-            )
+            try:
+                if update.callback_query:
+                    await update.callback_query.message.reply_text(
+                        "Error loading dashboard. Please try again."
+                    )
+                elif update.message:
+                    await update.message.reply_text(
+                        "Error loading dashboard. Please try again."
+                    )
+                else:
+                    # Fallback - try to get the message from the update
+                    message = getattr(update, 'message', None) or getattr(update, 'effective_message', None)
+                    if message:
+                        await message.reply_text(
+                            "Error loading dashboard. Please try again."
+                        )
+            except Exception as reply_error:
+                self._logger.error(f"💥 ERROR SENDING ERROR MESSAGE: {reply_error}")
 
     async def _show_analytics(self, query) -> None:
         """Show business analytics report"""
@@ -525,16 +551,26 @@ class AdminHandler:
     async def _is_admin_user(self, telegram_id: int) -> bool:
         """Check if user has admin privileges"""
         try:
+            self._logger.info(f"🔐 CHECKING ADMIN STATUS: User {telegram_id}")
+            
             customer_repository = self._container.get_customer_repository()
+            if not customer_repository:
+                self._logger.error("❌ CUSTOMER REPOSITORY NOT FOUND")
+                return False
+                
             from src.domain.value_objects.telegram_id import TelegramId
 
             customer = await customer_repository.find_by_telegram_id(
                 TelegramId(telegram_id)
             )
-            return customer and customer.is_admin
+            
+            is_admin = customer and customer.is_admin
+            self._logger.info(f"🔐 ADMIN CHECK RESULT: User {telegram_id} - Admin: {is_admin}")
+            
+            return is_admin
 
         except Exception as e:
-            self._logger.error(f"💥 ADMIN CHECK ERROR: {e}")
+            self._logger.error(f"💥 ADMIN CHECK ERROR: User {telegram_id}, Error: {e}", exc_info=True)
             return False
 
 
