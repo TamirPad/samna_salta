@@ -1,185 +1,298 @@
 """
-Caching layer for improved performance
+Cache manager for the Samna Salta bot with performance optimization
+
+Uses constants for TTL values and proper type annotations for better maintainability.
 """
 
 import logging
-import threading
 import time
-from functools import wraps
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional, Union, TypeVar, Generic
+from threading import Lock
 
-from src.infrastructure.database.database_optimizations import (
-    OptimizedQueries,
-    get_database_manager,
-)
+from src.infrastructure.utilities.constants import CacheSettings
 
 logger = logging.getLogger(__name__)
 
+T = TypeVar('T')
 
-class InMemoryCache:
-    """Simple in-memory cache with TTL support"""
 
-    def __init__(self, default_ttl: int = 300):  # 5 minutes default
-        self._cache: Dict[str, Dict[str, Any]] = {}
-        self._default_ttl = default_ttl
-        self._stats = {
+class CacheEntry(Generic[T]):
+    """Cache entry with timestamp and value"""
+    
+    def __init__(self, value: T, ttl: int):
+        self.value = value
+        self.expires_at = time.time() + ttl
+        self.created_at = time.time()
+    
+    def is_expired(self) -> bool:
+        """Check if cache entry is expired"""
+        return time.time() > self.expires_at
+    
+    def get_age(self) -> float:
+        """Get age of cache entry in seconds"""
+        return time.time() - self.created_at
+
+
+class CacheManager:
+    """Simple in-memory cache manager with TTL support"""
+
+    def __init__(self):
+        self.cache: Dict[str, CacheEntry[Any]] = {}
+        self.lock = Lock()
+        self.stats = {
             "hits": 0,
             "misses": 0,
             "sets": 0,
-            "deletes": 0,
+            "evictions": 0
         }
 
     def get(self, key: str) -> Optional[Any]:
         """Get value from cache"""
-        if key in self._cache:
-            entry = self._cache[key]
-
-            # Check if expired
-            if entry["expires_at"] > time.time():
-                self._stats["hits"] += 1
-                return entry["value"]
-            # Remove expired entry
-            del self._cache[key]
-
-        self._stats["misses"] += 1
-        return None
+        with self.lock:
+            if key in self.cache:
+                entry = self.cache[key]
+                if entry.is_expired():
+                    del self.cache[key]
+                    self.stats["evictions"] += 1
+                    self.stats["misses"] += 1
+                    logger.debug(f"Cache miss (expired): {key}")
+                    return None
+                else:
+                    self.stats["hits"] += 1
+                    logger.debug(f"Cache hit: {key}")
+                    return entry.value
+            else:
+                self.stats["misses"] += 1
+                logger.debug(f"Cache miss: {key}")
+                return None
 
     def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
-        """Set value in cache"""
+        """Set value in cache with TTL"""
         if ttl is None:
-            ttl = self._default_ttl
-
-        self._cache[key] = {
-            "value": value,
-            "expires_at": time.time() + ttl,
-            "created_at": time.time(),
-        }
-        self._stats["sets"] += 1
+            ttl = CacheSettings.GENERAL_CACHE_TTL_SECONDS
+            
+        with self.lock:
+            self.cache[key] = CacheEntry(value, ttl)
+            self.stats["sets"] += 1
+            logger.debug(f"Cache set: {key} (TTL: {ttl}s)")
 
     def delete(self, key: str) -> bool:
-        """Delete key from cache"""
-        if key in self._cache:
-            del self._cache[key]
-            self._stats["deletes"] += 1
-            return True
-        return False
+        """Delete value from cache"""
+        with self.lock:
+            if key in self.cache:
+                del self.cache[key]
+                logger.debug(f"Cache delete: {key}")
+                return True
+            return False
 
     def clear(self) -> None:
         """Clear all cache entries"""
-        self._cache.clear()
-        self._stats = {k: 0 for k in self._stats}
+        with self.lock:
+            self.cache.clear()
+            self.stats = {
+                "hits": 0,
+                "misses": 0,
+                "sets": 0,
+                "evictions": 0
+            }
+            logger.info("Cache cleared")
 
     def cleanup_expired(self) -> int:
-        """Remove expired entries and return count removed"""
-        current_time = time.time()
-        expired_keys = [
-            key
-            for key, entry in self._cache.items()
-            if entry["expires_at"] <= current_time
-        ]
+        """Remove expired entries and return count"""
+        with self.lock:
+            expired_keys = [
+                key for key, entry in self.cache.items()
+                if entry.is_expired()
+            ]
+            
+            for key in expired_keys:
+                del self.cache[key]
+                
+            self.stats["evictions"] += len(expired_keys)
+            
+            if expired_keys:
+                logger.debug(f"Cleaned up {len(expired_keys)} expired cache entries")
+                
+            return len(expired_keys)
 
-        for key in expired_keys:
-            del self._cache[key]
-
-        return len(expired_keys)
-
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> Dict[str, Union[int, float]]:
         """Get cache statistics"""
-        total_requests = self._stats["hits"] + self._stats["misses"]
-        hit_rate = (
-            (self._stats["hits"] / total_requests * 100) if total_requests > 0 else 0
-        )
+        with self.lock:
+            total_requests = self.stats["hits"] + self.stats["misses"]
+            hit_rate = (self.stats["hits"] / total_requests) if total_requests > 0 else 0.0
+            
+            return {
+                "hits": self.stats["hits"],
+                "misses": self.stats["misses"],
+                "sets": self.stats["sets"],
+                "evictions": self.stats["evictions"],
+                "hit_rate": hit_rate,
+                "total_entries": len(self.cache),
+                "total_requests": total_requests
+            }
 
-        return {
-            **self._stats,
-            "total_requests": total_requests,
-            "hit_rate": round(hit_rate, 2),
-            "cache_size": len(self._cache),
-        }
+    def get_cache_info(self) -> Dict[str, Any]:
+        """Get detailed cache information"""
+        with self.lock:
+            entries_info = []
+            for key, entry in self.cache.items():
+                entries_info.append({
+                    "key": key,
+                    "age": entry.get_age(),
+                    "expires_in": entry.expires_at - time.time(),
+                    "is_expired": entry.is_expired()
+                })
+            
+            return {
+                "stats": self.get_stats(),
+                "entries": entries_info
+            }
 
 
-class CacheManager:
-    """Central cache manager for the application"""
+class ProductCacheManager(CacheManager):
+    """Specialized cache manager for products"""
 
-    def __init__(self):
-        # Different caches for different data types
-        self.products_cache = InMemoryCache(default_ttl=600)  # 10 minutes
-        self.customers_cache = InMemoryCache(default_ttl=300)  # 5 minutes
-        self.orders_cache = InMemoryCache(default_ttl=180)  # 3 minutes
-        self.general_cache = InMemoryCache(default_ttl=300)  # 5 minutes
+    def get_products(self) -> Optional[Any]:
+        """Get cached products"""
+        return self.get("products")
 
-        self._logger = logging.getLogger(self.__class__.__name__)
+    def set_products(self, products: Any) -> None:
+        """Cache products with specific TTL"""
+        self.set("products", products, CacheSettings.PRODUCTS_CACHE_TTL_SECONDS)
 
-    def get_product(self, product_id: int) -> Optional[Any]:
-        """Get product from cache"""
-        return self.products_cache.get(f"product:{product_id}")
+    def get_product_by_id(self, product_id: int) -> Optional[Any]:
+        """Get cached product by ID"""
+        return self.get(f"product_{product_id}")
 
-    def set_product(self, product_id: int, product_data: Any) -> None:
-        """Set product in cache"""
-        self.products_cache.set(f"product:{product_id}", product_data)
+    def set_product(self, product_id: int, product: Any) -> None:
+        """Cache product with specific TTL"""
+        self.set(f"product_{product_id}", product, CacheSettings.PRODUCTS_CACHE_TTL_SECONDS)
 
-    def get_products_by_category(self, category: str) -> Optional[List[Any]]:
-        """Get products by category from cache"""
-        return self.products_cache.get(f"category:{category}")
 
-    def set_products_by_category(self, category: str, products: List[Any]) -> None:
-        """Set products by category in cache"""
-        self.products_cache.set(f"category:{category}", products)
+class CustomerCacheManager(CacheManager):
+    """Specialized cache manager for customers"""
 
     def get_customer(self, telegram_id: int) -> Optional[Any]:
-        """Get customer from cache"""
-        return self.customers_cache.get(f"customer:{telegram_id}")
+        """Get cached customer"""
+        return self.get(f"customer_{telegram_id}")
 
-    def set_customer(self, telegram_id: int, customer_data: Any) -> None:
-        """Set customer in cache"""
-        self.customers_cache.set(f"customer:{telegram_id}", customer_data)
+    def set_customer(self, telegram_id: int, customer: Any) -> None:
+        """Cache customer with specific TTL"""
+        self.set(f"customer_{telegram_id}", customer, CacheSettings.CUSTOMERS_CACHE_TTL_SECONDS)
+
+    def get_all_customers(self) -> Optional[Any]:
+        """Get cached customer list"""
+        return self.get("all_customers")
+
+    def set_all_customers(self, customers: Any) -> None:
+        """Cache customer list with specific TTL"""
+        self.set("all_customers", customers, CacheSettings.CUSTOMERS_CACHE_TTL_SECONDS)
+
+
+class OrderCacheManager(CacheManager):
+    """Specialized cache manager for orders"""
 
     def get_order(self, order_id: int) -> Optional[Any]:
-        """Get order from cache"""
-        return self.orders_cache.get(f"order:{order_id}")
+        """Get cached order"""
+        return self.get(f"order_{order_id}")
 
-    def set_order(self, order_id: int, order_data: Any) -> None:
-        """Set order in cache"""
-        self.orders_cache.set(f"order:{order_id}", order_data)
+    def set_order(self, order_id: int, order: Any) -> None:
+        """Cache order with specific TTL"""
+        self.set(f"order_{order_id}", order, CacheSettings.ORDERS_CACHE_TTL_SECONDS)
 
-    def invalidate_customer_cache(self, telegram_id: int) -> None:
-        """Invalidate customer cache"""
-        self.customers_cache.delete(f"customer:{telegram_id}")
+    def get_all_orders(self) -> Optional[Any]:
+        """Get cached order list"""
+        return self.get("all_orders")
 
-    def invalidate_product_cache(
-        self, product_id: int = None, category: str = None
-    ) -> None:
-        """Invalidate product cache"""
-        if product_id:
-            self.products_cache.delete(f"product:{product_id}")
-        if category:
-            self.products_cache.delete(f"category:{category}")
+    def set_all_orders(self, orders: Any) -> None:
+        """Cache order list with specific TTL"""
+        self.set("all_orders", orders, CacheSettings.ORDERS_CACHE_TTL_SECONDS)
 
-    def cleanup_all_expired(self) -> Dict[str, int]:
-        """Cleanup expired entries from all caches"""
-        return {
-            "products": self.products_cache.cleanup_expired(),
-            "customers": self.customers_cache.cleanup_expired(),
-            "orders": self.orders_cache.cleanup_expired(),
-            "general": self.general_cache.cleanup_expired(),
-        }
 
-    def get_all_stats(self) -> Dict[str, Dict[str, Any]]:
-        """Get statistics for all caches"""
-        return {
-            "products": self.products_cache.get_stats(),
-            "customers": self.customers_cache.get_stats(),
-            "orders": self.orders_cache.get_stats(),
-            "general": self.general_cache.get_stats(),
-        }
+# Global cache instances
+_product_cache: Optional[ProductCacheManager] = None
+_customer_cache: Optional[CustomerCacheManager] = None
+_order_cache: Optional[OrderCacheManager] = None
+_general_cache: Optional[CacheManager] = None
+_cache_manager_lock = Lock()
+
+
+def get_product_cache() -> ProductCacheManager:
+    """Get product cache instance"""
+    global _product_cache
+    if _product_cache is None:
+        _product_cache = ProductCacheManager()
+    return _product_cache
+
+
+def get_customer_cache() -> CustomerCacheManager:
+    """Get customer cache instance"""
+    global _customer_cache
+    if _customer_cache is None:
+        _customer_cache = CustomerCacheManager()
+    return _customer_cache
+
+
+def get_order_cache() -> OrderCacheManager:
+    """Get order cache instance"""
+    global _order_cache
+    if _order_cache is None:
+        _order_cache = OrderCacheManager()
+    return _order_cache
+
+
+def get_general_cache() -> CacheManager:
+    """Get general cache instance"""
+    global _general_cache
+    if _general_cache is None:
+        _general_cache = CacheManager()
+    return _general_cache
+
+
+def cleanup_all_caches() -> Dict[str, int]:
+    """Clean up expired entries from all caches"""
+    results = {}
+    
+    if _product_cache:
+        results["products"] = _product_cache.cleanup_expired()
+    
+    if _customer_cache:
+        results["customers"] = _customer_cache.cleanup_expired()
+    
+    if _order_cache:
+        results["orders"] = _order_cache.cleanup_expired()
+    
+    if _general_cache:
+        results["general"] = _general_cache.cleanup_expired()
+    
+    return results
+
+
+def get_all_cache_stats() -> Dict[str, Any]:
+    """Get statistics from all caches"""
+    stats = {}
+    
+    if _product_cache:
+        stats["products"] = _product_cache.get_stats()
+    
+    if _customer_cache:
+        stats["customers"] = _customer_cache.get_stats()
+    
+    if _order_cache:
+        stats["orders"] = _order_cache.get_stats()
+    
+    if _general_cache:
+        stats["general"] = _general_cache.get_stats()
+    
+    return stats
 
 
 _cache_manager: Optional[CacheManager] = None
-_cache_manager_lock = threading.Lock()
 
 
 def get_cache_manager() -> "CacheManager":
     """Get the global cache manager instance, ensuring thread safety."""
+    global _cache_manager
     if _cache_manager is None:
         with _cache_manager_lock:
             # Check again inside the lock to ensure thread safety
@@ -274,7 +387,9 @@ class CacheWarmer:
             self.cache_manager.general_cache.set(
                 "popular_products", popular_products, ttl=3600
             )
-            self._logger.info("Warmed up cache with %d popular products", len(popular_products))
+            self._logger.info(
+                "Warmed up cache with %d popular products", len(popular_products)
+            )
         except (IOError, OSError) as e:
             self._logger.error("Error warming popular data cache: %s", e)
 

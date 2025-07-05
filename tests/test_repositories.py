@@ -2,26 +2,36 @@
 Tests for SQLAlchemy Repositories - Customer, Order, Product, Cart
 """
 
+from decimal import Decimal
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
 from sqlalchemy.exc import SQLAlchemyError
 
-from src.infrastructure.repositories.sqlalchemy_customer_repository import SQLAlchemyCustomerRepository
-from src.infrastructure.repositories.sqlalchemy_product_repository import SQLAlchemyProductRepository
-from src.infrastructure.repositories.sqlalchemy_cart_repository import SQLAlchemyCartRepository
-from src.infrastructure.repositories.sqlalchemy_order_repository import SQLAlchemyOrderRepository
-from src.infrastructure.database.models import Customer as SQLCustomer, Product as SQLProduct
 from src.domain.entities.customer_entity import Customer
 from src.domain.value_objects.customer_id import CustomerId
 from src.domain.value_objects.customer_name import CustomerName
-from src.domain.value_objects.phone_number import PhoneNumber
-from src.domain.value_objects.telegram_id import TelegramId
 from src.domain.value_objects.delivery_address import DeliveryAddress
+from src.domain.value_objects.order_id import OrderId
+from src.domain.value_objects.phone_number import PhoneNumber
+from src.domain.value_objects.price import Price
 from src.domain.value_objects.product_id import ProductId
 from src.domain.value_objects.product_name import ProductName
-from src.domain.value_objects.price import Price
-from src.domain.value_objects.order_id import OrderId
-from decimal import Decimal
+from src.domain.value_objects.telegram_id import TelegramId
+from src.infrastructure.database.models import Customer as SQLCustomer
+from src.infrastructure.database.models import Product as SQLProduct
+from src.infrastructure.repositories.sqlalchemy_cart_repository import (
+    SQLAlchemyCartRepository,
+)
+from src.infrastructure.repositories.sqlalchemy_customer_repository import (
+    SQLAlchemyCustomerRepository,
+)
+from src.infrastructure.repositories.sqlalchemy_order_repository import (
+    SQLAlchemyOrderRepository,
+)
+from src.infrastructure.repositories.sqlalchemy_product_repository import (
+    SQLAlchemyProductRepository,
+)
 
 
 class TestSQLAlchemyCustomerRepository:
@@ -41,7 +51,7 @@ class TestSQLAlchemyCustomerRepository:
             full_name=CustomerName("Ahmed Al-Yemeni"),
             phone_number=PhoneNumber("+972501234567"),
             delivery_address=DeliveryAddress("Tel Aviv, Israel"),
-            is_admin=False
+            is_admin=False,
         )
 
     @pytest.fixture
@@ -57,8 +67,10 @@ class TestSQLAlchemyCustomerRepository:
         return sql_customer
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_customer_repository.get_session')
-    async def test_find_by_telegram_id_success(self, mock_get_session, customer_repository, sample_sql_customer):
+    @patch("src.infrastructure.repositories.sqlalchemy_customer_repository.get_session")
+    async def test_find_by_telegram_id_success(
+        self, mock_get_session, customer_repository, sample_sql_customer
+    ):
         """Test successful find by telegram ID"""
         # Setup mocks
         mock_session = MagicMock()
@@ -79,8 +91,10 @@ class TestSQLAlchemyCustomerRepository:
         mock_session.close.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_customer_repository.get_session')
-    async def test_find_by_telegram_id_not_found(self, mock_get_session, customer_repository):
+    @patch("src.infrastructure.repositories.sqlalchemy_customer_repository.get_session")
+    async def test_find_by_telegram_id_not_found(
+        self, mock_get_session, customer_repository
+    ):
         """Test find by telegram ID when customer not found"""
         # Setup mocks
         mock_session = MagicMock()
@@ -98,8 +112,10 @@ class TestSQLAlchemyCustomerRepository:
         mock_session.close.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_customer_repository.get_session')
-    async def test_find_by_telegram_id_database_error(self, mock_get_session, customer_repository):
+    @patch("src.infrastructure.repositories.sqlalchemy_customer_repository.get_session")
+    async def test_find_by_telegram_id_database_error(
+        self, mock_get_session, customer_repository
+    ):
         """Test find by telegram ID with database error"""
         # Setup mocks
         mock_session = MagicMock()
@@ -110,12 +126,14 @@ class TestSQLAlchemyCustomerRepository:
         telegram_id = TelegramId(123456789)
         with pytest.raises(SQLAlchemyError):
             await customer_repository.find_by_telegram_id(telegram_id)
-        
+
         mock_session.close.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_customer_repository.get_session')
-    async def test_find_by_phone_number_success(self, mock_get_session, customer_repository, sample_sql_customer):
+    @patch("src.infrastructure.repositories.sqlalchemy_customer_repository.get_session")
+    async def test_find_by_phone_number_success(
+        self, mock_get_session, customer_repository, sample_sql_customer
+    ):
         """Test successful find by phone number"""
         # Setup mocks
         mock_session = MagicMock()
@@ -134,8 +152,10 @@ class TestSQLAlchemyCustomerRepository:
         mock_session.close.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_customer_repository.get_session')
-    async def test_find_by_phone_number_not_found(self, mock_get_session, customer_repository):
+    @patch("src.infrastructure.repositories.sqlalchemy_customer_repository.get_session")
+    async def test_find_by_phone_number_not_found(
+        self, mock_get_session, customer_repository
+    ):
         """Test find by phone number when customer not found"""
         # Setup mocks
         mock_session = MagicMock()
@@ -152,13 +172,15 @@ class TestSQLAlchemyCustomerRepository:
         assert result is None
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_customer_repository.get_session')
-    async def test_save_new_customer_success(self, mock_get_session, customer_repository, sample_sql_customer):
+    @patch("src.infrastructure.repositories.sqlalchemy_customer_repository.get_session")
+    async def test_save_new_customer_success(
+        self, mock_get_session, customer_repository, sample_sql_customer
+    ):
         """Test saving new customer"""
         # Setup mocks
         mock_session = MagicMock()
         mock_get_session.return_value = mock_session
-        
+
         # Create customer without ID
         customer = Customer(
             id=None,
@@ -166,16 +188,19 @@ class TestSQLAlchemyCustomerRepository:
             full_name=CustomerName("Ahmed Al-Yemeni"),
             phone_number=PhoneNumber("+972501234567"),
             delivery_address=DeliveryAddress("Tel Aviv, Israel"),
-            is_admin=False
+            is_admin=False,
         )
 
         # Mock session refresh to set ID
         def mock_refresh(obj):
             obj.id = 1
+
         mock_session.refresh.side_effect = mock_refresh
 
         # Execute
-        with patch('src.infrastructure.repositories.sqlalchemy_customer_repository.SQLCustomer') as mock_sql_customer_class:
+        with patch(
+            "src.infrastructure.repositories.sqlalchemy_customer_repository.SQLCustomer"
+        ) as mock_sql_customer_class:
             mock_sql_customer_class.return_value = sample_sql_customer
             result = await customer_repository.save(customer)
 
@@ -187,8 +212,14 @@ class TestSQLAlchemyCustomerRepository:
         mock_session.close.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_customer_repository.get_session')
-    async def test_save_existing_customer_success(self, mock_get_session, customer_repository, sample_customer, sample_sql_customer):
+    @patch("src.infrastructure.repositories.sqlalchemy_customer_repository.get_session")
+    async def test_save_existing_customer_success(
+        self,
+        mock_get_session,
+        customer_repository,
+        sample_customer,
+        sample_sql_customer,
+    ):
         """Test saving existing customer"""
         # Setup mocks
         mock_session = MagicMock()
@@ -207,8 +238,10 @@ class TestSQLAlchemyCustomerRepository:
         mock_session.close.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_customer_repository.get_session')
-    async def test_save_existing_customer_not_found(self, mock_get_session, customer_repository, sample_customer):
+    @patch("src.infrastructure.repositories.sqlalchemy_customer_repository.get_session")
+    async def test_save_existing_customer_not_found(
+        self, mock_get_session, customer_repository, sample_customer
+    ):
         """Test saving existing customer when customer not found in database"""
         # Setup mocks
         mock_session = MagicMock()
@@ -222,8 +255,10 @@ class TestSQLAlchemyCustomerRepository:
             await customer_repository.save(sample_customer)
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_customer_repository.get_session')
-    async def test_delete_customer_success(self, mock_get_session, customer_repository, sample_sql_customer):
+    @patch("src.infrastructure.repositories.sqlalchemy_customer_repository.get_session")
+    async def test_delete_customer_success(
+        self, mock_get_session, customer_repository, sample_sql_customer
+    ):
         """Test successful customer deletion"""
         # Setup mocks
         mock_session = MagicMock()
@@ -243,8 +278,10 @@ class TestSQLAlchemyCustomerRepository:
         mock_session.close.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_customer_repository.get_session')
-    async def test_delete_customer_not_found(self, mock_get_session, customer_repository):
+    @patch("src.infrastructure.repositories.sqlalchemy_customer_repository.get_session")
+    async def test_delete_customer_not_found(
+        self, mock_get_session, customer_repository
+    ):
         """Test customer deletion when customer not found"""
         # Setup mocks
         mock_session = MagicMock()
@@ -262,8 +299,10 @@ class TestSQLAlchemyCustomerRepository:
         mock_session.delete.assert_not_called()
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_customer_repository.get_session')
-    async def test_find_by_id_success(self, mock_get_session, customer_repository, sample_sql_customer):
+    @patch("src.infrastructure.repositories.sqlalchemy_customer_repository.get_session")
+    async def test_find_by_id_success(
+        self, mock_get_session, customer_repository, sample_sql_customer
+    ):
         """Test successful find by ID"""
         # Setup mocks
         mock_session = MagicMock()
@@ -281,8 +320,10 @@ class TestSQLAlchemyCustomerRepository:
         assert result.id.value == 1
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_customer_repository.get_session')
-    async def test_find_all_success(self, mock_get_session, customer_repository, sample_sql_customer):
+    @patch("src.infrastructure.repositories.sqlalchemy_customer_repository.get_session")
+    async def test_find_all_success(
+        self, mock_get_session, customer_repository, sample_sql_customer
+    ):
         """Test successful find all customers"""
         # Setup mocks
         mock_session = MagicMock()
@@ -298,8 +339,10 @@ class TestSQLAlchemyCustomerRepository:
         assert len(result) == 2
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_customer_repository.get_session')
-    async def test_exists_by_telegram_id_true(self, mock_get_session, customer_repository, sample_sql_customer):
+    @patch("src.infrastructure.repositories.sqlalchemy_customer_repository.get_session")
+    async def test_exists_by_telegram_id_true(
+        self, mock_get_session, customer_repository, sample_sql_customer
+    ):
         """Test exists by telegram ID returns True"""
         # Setup mocks
         mock_session = MagicMock()
@@ -316,8 +359,10 @@ class TestSQLAlchemyCustomerRepository:
         assert result is True
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_customer_repository.get_session')
-    async def test_exists_by_telegram_id_false(self, mock_get_session, customer_repository):
+    @patch("src.infrastructure.repositories.sqlalchemy_customer_repository.get_session")
+    async def test_exists_by_telegram_id_false(
+        self, mock_get_session, customer_repository
+    ):
         """Test exists by telegram ID returns False"""
         # Setup mocks
         mock_session = MagicMock()
@@ -334,8 +379,10 @@ class TestSQLAlchemyCustomerRepository:
         assert result is False
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_customer_repository.get_session')
-    async def test_exists_by_phone_number_true(self, mock_get_session, customer_repository, sample_sql_customer):
+    @patch("src.infrastructure.repositories.sqlalchemy_customer_repository.get_session")
+    async def test_exists_by_phone_number_true(
+        self, mock_get_session, customer_repository, sample_sql_customer
+    ):
         """Test exists by phone number returns True"""
         # Setup mocks
         mock_session = MagicMock()
@@ -352,8 +399,10 @@ class TestSQLAlchemyCustomerRepository:
         assert result is True
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_customer_repository.get_session')
-    async def test_exists_by_phone_number_false(self, mock_get_session, customer_repository):
+    @patch("src.infrastructure.repositories.sqlalchemy_customer_repository.get_session")
+    async def test_exists_by_phone_number_false(
+        self, mock_get_session, customer_repository
+    ):
         """Test exists by phone number returns False"""
         # Setup mocks
         mock_session = MagicMock()
@@ -417,8 +466,10 @@ class TestSQLAlchemyProductRepository:
         return sql_product
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_product_repository.get_session')
-    async def test_find_by_id_success(self, mock_get_session, product_repository, sample_sql_product):
+    @patch("src.infrastructure.repositories.sqlalchemy_product_repository.get_session")
+    async def test_find_by_id_success(
+        self, mock_get_session, product_repository, sample_sql_product
+    ):
         """Test successful find by ID"""
         # Setup mocks
         mock_session = MagicMock()
@@ -438,7 +489,7 @@ class TestSQLAlchemyProductRepository:
         mock_session.close.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_product_repository.get_session')
+    @patch("src.infrastructure.repositories.sqlalchemy_product_repository.get_session")
     async def test_find_by_id_not_found(self, mock_get_session, product_repository):
         """Test find by ID when product not found"""
         # Setup mocks
@@ -456,8 +507,10 @@ class TestSQLAlchemyProductRepository:
         assert result is None
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_product_repository.get_session')
-    async def test_find_by_category_success(self, mock_get_session, product_repository, sample_sql_product):
+    @patch("src.infrastructure.repositories.sqlalchemy_product_repository.get_session")
+    async def test_find_by_category_success(
+        self, mock_get_session, product_repository, sample_sql_product
+    ):
         """Test successful find by category"""
         # Setup mocks
         mock_session = MagicMock()
@@ -475,8 +528,10 @@ class TestSQLAlchemyProductRepository:
         assert result[0].category == "bread"
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_product_repository.get_session')
-    async def test_find_all_active_success(self, mock_get_session, product_repository, sample_sql_product):
+    @patch("src.infrastructure.repositories.sqlalchemy_product_repository.get_session")
+    async def test_find_all_active_success(
+        self, mock_get_session, product_repository, sample_sql_product
+    ):
         """Test successful find all active products"""
         # Setup mocks
         mock_session = MagicMock()
@@ -494,7 +549,7 @@ class TestSQLAlchemyProductRepository:
         assert result[0].is_active is True
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_product_repository.get_session')
+    @patch("src.infrastructure.repositories.sqlalchemy_product_repository.get_session")
     async def test_database_error_handling(self, mock_get_session, product_repository):
         """Test database error handling"""
         # Setup mocks
@@ -517,7 +572,7 @@ class TestSQLAlchemyCartRepository:
         return SQLAlchemyCartRepository()
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_cart_repository.get_session')
+    @patch("src.infrastructure.repositories.sqlalchemy_cart_repository.get_session")
     async def test_get_or_create_cart_success(self, mock_get_session, cart_repository):
         """Test successful get or create cart"""
         # Setup mocks
@@ -538,7 +593,7 @@ class TestSQLAlchemyCartRepository:
         mock_session.close.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_cart_repository.get_session')
+    @patch("src.infrastructure.repositories.sqlalchemy_cart_repository.get_session")
     async def test_add_item_success(self, mock_get_session, cart_repository):
         """Test successful add item to cart"""
         # Setup mocks
@@ -556,7 +611,7 @@ class TestSQLAlchemyCartRepository:
         mock_session.close.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_cart_repository.get_session')
+    @patch("src.infrastructure.repositories.sqlalchemy_cart_repository.get_session")
     async def test_get_cart_items_success(self, mock_get_session, cart_repository):
         """Test successful get cart items"""
         # Setup mocks
@@ -579,7 +634,7 @@ class TestSQLAlchemyCartRepository:
         mock_session.close.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_cart_repository.get_session')
+    @patch("src.infrastructure.repositories.sqlalchemy_cart_repository.get_session")
     async def test_clear_cart_success(self, mock_get_session, cart_repository):
         """Test successful clear cart"""
         # Setup mocks
@@ -615,18 +670,20 @@ class TestSQLAlchemyOrderRepository:
                     "quantity": 2,
                     "unit_price": 25.0,
                     "total_price": 50.0,
-                    "options": {}
+                    "options": {},
                 }
             ],
             "subtotal": 50.0,
             "total": 50.0,
             "delivery_method": "pickup",
-            "delivery_charge": 0.0
+            "delivery_charge": 0.0,
         }
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_order_repository.get_session')
-    async def test_create_order_success(self, mock_get_session, order_repository, sample_order_data):
+    @patch("src.infrastructure.repositories.sqlalchemy_order_repository.get_session")
+    async def test_create_order_success(
+        self, mock_get_session, order_repository, sample_order_data
+    ):
         """Test successful order creation"""
         # Setup mocks
         mock_session = MagicMock()
@@ -645,7 +702,7 @@ class TestSQLAlchemyOrderRepository:
         mock_session.close.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_order_repository.get_session')
+    @patch("src.infrastructure.repositories.sqlalchemy_order_repository.get_session")
     async def test_get_order_by_id_success(self, mock_get_session, order_repository):
         """Test successful get order by ID"""
         # Setup mocks
@@ -667,8 +724,10 @@ class TestSQLAlchemyOrderRepository:
         mock_session.close.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_order_repository.get_session')
-    async def test_update_order_status_success(self, mock_get_session, order_repository):
+    @patch("src.infrastructure.repositories.sqlalchemy_order_repository.get_session")
+    async def test_update_order_status_success(
+        self, mock_get_session, order_repository
+    ):
         """Test successful order status update"""
         # Setup mocks
         mock_session = MagicMock()
@@ -690,7 +749,7 @@ class TestSQLAlchemyOrderRepository:
         mock_session.close.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_order_repository.get_session')
+    @patch("src.infrastructure.repositories.sqlalchemy_order_repository.get_session")
     async def test_get_all_orders_success(self, mock_get_session, order_repository):
         """Test successful get all orders"""
         # Setup mocks
@@ -706,8 +765,10 @@ class TestSQLAlchemyOrderRepository:
         mock_session.close.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch('src.infrastructure.repositories.sqlalchemy_order_repository.get_session')
-    async def test_order_repository_error_handling(self, mock_get_session, order_repository):
+    @patch("src.infrastructure.repositories.sqlalchemy_order_repository.get_session")
+    async def test_order_repository_error_handling(
+        self, mock_get_session, order_repository
+    ):
         """Test order repository error handling"""
         # Setup mocks
         mock_session = MagicMock()
@@ -717,4 +778,4 @@ class TestSQLAlchemyOrderRepository:
         # Execute and verify
         order_id = OrderId(1)
         with pytest.raises(SQLAlchemyError):
-            await order_repository.get_order_by_id(order_id) 
+            await order_repository.get_order_by_id(order_id)

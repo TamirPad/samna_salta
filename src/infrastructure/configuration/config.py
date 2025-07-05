@@ -5,39 +5,60 @@ Configuration management for the Samna Salta bot
 
 import threading
 from typing import List
+
 from pydantic import Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings"""
 
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore"
+    )
+
     # Bot configuration
-    bot_token: str = Field(..., env="BOT_TOKEN")
-    admin_chat_id: int = Field(..., env="ADMIN_CHAT_ID")
+    bot_token: str = Field(description="Telegram bot token")
+    admin_chat_id: int = Field(description="Admin chat ID for notifications")
 
     # Database configuration
-    database_url: str = Field("sqlite:///data/samna_salta.db", env="DATABASE_URL")
+    database_url: str = Field(
+        default="sqlite:///data/samna_salta.db", 
+        description="Database connection URL"
+    )
 
     # Application settings
-    log_level: str = Field("INFO", env="LOG_LEVEL")
-    environment: str = Field("development", env="ENVIRONMENT")
+    log_level: str = Field(
+        default="INFO", 
+        description="Logging level"
+    )
+    environment: str = Field(
+        default="development", 
+        description="Application environment"
+    )
 
     # Delivery settings
-    delivery_charge: float = Field(5.00, env="DELIVERY_CHARGE")
-    currency: str = Field("ILS", env="CURRENCY")
+    delivery_charge: float = Field(
+        default=5.00, 
+        description="Delivery charge amount"
+    )
+    currency: str = Field(
+        default="ILS", 
+        description="Currency code"
+    )
 
     # Business hours for Hilbeh
     hilbeh_available_days: List[str] = Field(
-        default=["wednesday", "thursday", "friday"],
-        env="HILBEH_AVAILABLE_DAYS"
+        default=["wednesday", "thursday", "friday"], 
+        description="Days when Hilbeh is available"
     )
-    hilbeh_available_hours: str = Field("09:00-18:00", env="HILBEH_AVAILABLE_HOURS")
-
-    class Config:  # pylint: disable=too-few-public-methods
-        """Pydantic model configuration"""
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    hilbeh_available_hours: str = Field(
+        default="09:00-18:00", 
+        description="Hours when Hilbeh is available"
+    )
 
 
 _settings_instance: Settings | None = None

@@ -34,9 +34,7 @@ class SQLAlchemyCartRepository(CartRepository):
             )
 
             if not cart:
-                self._logger.info(
-                    "📭 NO CART: User %s has no cart", telegram_id.value
-                )
+                self._logger.info("📭 NO CART: User %s has no cart", telegram_id.value)
                 return None
 
             self._logger.info(
@@ -276,7 +274,9 @@ class SQLAlchemyCartRepository(CartRepository):
                 session.flush()  # Ensure cart is in the session to be refreshed
                 session.refresh(cart)
             else:
-                self._logger.info("📦 EXISTING cart found for user %s", telegram_id.value)
+                self._logger.info(
+                    "📦 EXISTING cart found for user %s", telegram_id.value
+                )
 
             return {
                 "telegram_id": cart.telegram_id,

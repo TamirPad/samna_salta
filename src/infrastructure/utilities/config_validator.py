@@ -5,6 +5,7 @@ Configuration validation for production deployment
 import logging
 from pathlib import Path
 from typing import Any
+
 import httpx
 from sqlalchemy import exc, text
 
@@ -88,7 +89,9 @@ class ConfigValidator:
 
         # Check if database file exists for SQLite
         if self.config.database_url.startswith("sqlite:"):  # pylint: disable=no-member
-            db_path = self.config.database_url.replace("sqlite:///", "")  # pylint: disable=no-member
+            db_path = self.config.database_url.replace(
+                "sqlite:///", ""
+            )  # pylint: disable=no-member
             if not Path(db_path).parent.exists():
                 self.errors.append(
                     f"Database directory does not exist: {Path(db_path).parent}"
@@ -124,9 +127,11 @@ class ConfigValidator:
                     "DEBUG logging in production may impact performance"
                 )
 
-            if self.config.database_url.startswith("sqlite:"):  # pylint: disable=no-member
+            if self.config.database_url.startswith(
+                "sqlite:"
+            ):  # pylint: disable=no-member
                 self.warnings.append(
-                    "SQLite database in production - consider PostgreSQL for better performance"
+                    "SQLite database in production - consider PostgreSQL for better performance"  # noqa: E501
                 )
 
         # Check required directories
@@ -148,7 +153,11 @@ class ConfigValidator:
 
         if not self.config.currency:
             self.errors.append("Currency is required")
-        elif self.config.currency not in ["ILS", "USD", "EUR"]:  # pylint: disable=no-member
+        elif self.config.currency not in [
+            "ILS",
+            "USD",
+            "EUR",
+        ]:  # pylint: disable=no-member
             self.warnings.append(f"Unusual currency: {self.config.currency}")
 
         # Validate Hilbeh availability days
@@ -167,14 +176,16 @@ class ConfigValidator:
 
         # Validate business hours format
         try:
-            start, end = self.config.hilbeh_available_hours.split("-")  # pylint: disable=no-member
+            start, end = self.config.hilbeh_available_hours.split(
+                "-"
+            )  # pylint: disable=no-member
             for time_str in [start, end]:
                 hours, minutes = time_str.split(":")
                 if not (0 <= int(hours) <= 23 and 0 <= int(minutes) <= 59):
                     raise ValueError("Invalid time")
         except ValueError as e:
             self.errors.append(
-                f"Invalid hilbeh_available_hours format: {self.config.hilbeh_available_hours}: {e}"
+                f"Invalid hilbeh_available_hours format: {self.config.hilbeh_available_hours}: {e}"  # noqa: E501
             )
 
     def _validate_file_permissions(self):
@@ -237,7 +248,8 @@ class ConfigValidator:
             "config_summary": {
                 "environment": self.config.environment if self.config else None,
                 "database_type": "sqlite"
-                if self.config and "sqlite" in self.config.database_url  # pylint: disable=no-member
+                if self.config
+                and "sqlite" in self.config.database_url  # pylint: disable=no-member
                 else "other",
                 "bot_configured": bool(self.config and self.config.bot_token),
                 "admin_configured": bool(self.config and self.config.admin_chat_id),

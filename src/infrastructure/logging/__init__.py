@@ -9,10 +9,10 @@ from .error_handler import (
     BusinessLogicError,
     DatabaseError,
     ErrorCategory,
+    ErrorHandler,
     ErrorSeverity,
     TelegramAPIError,
     ValidationError,
-    ErrorHandler,
     get_error_statistics,
     handle_errors,
 )

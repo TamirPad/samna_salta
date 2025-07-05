@@ -71,8 +71,10 @@ class Customer:
 
     def __str__(self) -> str:
         admin_str = " (Admin)" if self.is_admin else ""
-        return (f"Customer(id={self.id}, name={self.full_name}, "
-                f"phone={self.phone_number}{admin_str})")
+        return (
+            f"Customer(id={self.id}, name={self.full_name}, "
+            f"phone={self.phone_number}{admin_str})"
+        )
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, Customer):

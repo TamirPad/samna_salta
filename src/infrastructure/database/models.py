@@ -1,124 +1,125 @@
 # pylint: disable=too-few-public-methods
 """
-Database models for the Samna Salta bot
+SQLAlchemy database models for the Samna Salta bot
+
+Properly defined models with correct Base class and type annotations.
 """
 
 from datetime import datetime
+from typing import Any, List, Optional, Type
 
-from sqlalchemy import (
-    JSON,
-    Boolean,
-    Column,
-    DateTime,
-    Float,
-    ForeignKey,
-    Integer,
-    String,
-    Text,
-)
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy import Integer, String, Float, Boolean, DateTime, ForeignKey, JSON
+from sqlalchemy.orm import declarative_base, DeclarativeMeta, relationship, Mapped, mapped_column
+from sqlalchemy.sql import func
 
-Base = declarative_base()
+# Create declarative base with proper type annotation
+_Base = declarative_base()
+
+# Type alias for mypy
+Base: Type[DeclarativeMeta] = _Base
 
 
 class Customer(Base):
     """Customer model"""
-
     __tablename__ = "customers"
 
-    id = Column(Integer, primary_key=True)
-    telegram_id = Column(Integer, unique=True, nullable=False)
-    full_name = Column(String(100), nullable=False)
-    phone_number = Column(String(20), unique=True, nullable=False)
-    delivery_address = Column(Text, nullable=True)
-    is_admin = Column(Boolean, default=False, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    telegram_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    phone_number: Mapped[str] = mapped_column(String(20), nullable=False)
+    delivery_address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), 
+        onupdate=func.now(),
+        nullable=True
+    )
 
     # Relationships
-    orders = relationship("Order", back_populates="customer")
+    orders: Mapped[List["Order"]] = relationship("Order", back_populates="customer")
+    carts: Mapped[List["Cart"]] = relationship("Cart", back_populates="customer")
 
 
 class Product(Base):
     """Product model"""
-
     __tablename__ = "products"
 
-    id = Column(Integer, primary_key=True)
-    name = Column(String(100), nullable=False)
-    category = Column(String(50), nullable=False)
-    description = Column(Text, nullable=True)
-    base_price = Column(Float, nullable=False)
-    options = Column(JSON, nullable=True)  # Store available options
-    image_url = Column(String(255), nullable=True)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    price: Mapped[float] = mapped_column(Float, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), 
+        onupdate=func.now(),
+        nullable=True
+    )
+
+    # Relationships  
+    order_items: Mapped[List["OrderItem"]] = relationship("OrderItem", back_populates="product")
 
     @property
-    def price(self) -> float:
-        """Compatibility property for base_price"""
-        return self.base_price
+    def price_display(self) -> str:
+        """Display price with currency"""
+        return f"{self.price:.2f} ILS"
 
-    @price.setter
-    def price(self, value: float) -> None:
-        """Compatibility setter for base_price"""
-        self.base_price = value
+
+class Cart(Base):
+    """Shopping cart model"""
+    __tablename__ = "carts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    telegram_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    items: Mapped[Optional[List[Any]]] = mapped_column(JSON, default=list, nullable=True)
+    delivery_address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), 
+        onupdate=func.now(),
+        nullable=True
+    )
+
+    # Relationships
+    customer: Mapped[Optional["Customer"]] = relationship("Customer", back_populates="carts")
 
 
 class Order(Base):
     """Order model"""
-
     __tablename__ = "orders"
 
-    id = Column(Integer, primary_key=True)
-    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
-    order_number = Column(String(20), unique=True, nullable=False)
-    delivery_method = Column(String(20), nullable=False)  # 'pickup' or 'delivery'
-    delivery_address = Column(Text, nullable=True)
-    delivery_charge = Column(Float, default=0.0)
-    subtotal = Column(Float, nullable=False)
-    total = Column(Float, nullable=False)
-    status = Column(
-        String(20), default="pending"
-    )  # pending, confirmed, completed, cancelled
-    notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_number: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    customer_id: Mapped[int] = mapped_column(Integer, ForeignKey("customers.id"), nullable=False)
+    items: Mapped[List[Any]] = mapped_column(JSON, nullable=False)
+    subtotal: Mapped[float] = mapped_column(Float, nullable=False)
+    delivery_charge: Mapped[float] = mapped_column(Float, nullable=False)
+    total: Mapped[float] = mapped_column(Float, nullable=False)
+    delivery_address: Mapped[str] = mapped_column(String(500), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), 
+        onupdate=func.now(),
+        nullable=True
+    )
 
     # Relationships
-    customer = relationship("Customer", back_populates="orders")
-    items = relationship("OrderItem", back_populates="order")
+    customer: Mapped["Customer"] = relationship("Customer", back_populates="orders")
+    order_items: Mapped[List["OrderItem"]] = relationship("OrderItem", back_populates="order")
 
 
 class OrderItem(Base):
     """Order item model"""
-
     __tablename__ = "order_items"
 
-    id = Column(Integer, primary_key=True)
-    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
-    product_name = Column(String(100), nullable=False)
-    product_options = Column(JSON, nullable=True)  # Store selected options
-    quantity = Column(Integer, nullable=False, default=1)
-    unit_price = Column(Float, nullable=False)
-    total_price = Column(Float, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(Integer, ForeignKey("orders.id"), nullable=False)
+    product_id: Mapped[int] = mapped_column(Integer, ForeignKey("products.id"), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    price: Mapped[float] = mapped_column(Float, nullable=False)  # Price at time of order
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
-    order = relationship("Order", back_populates="items")
-
-
-class Cart(Base):
-    """Shopping cart model (temporary storage)"""
-
-    __tablename__ = "carts"
-
-    id = Column(Integer, primary_key=True)
-    telegram_id = Column(Integer, unique=True, nullable=False)
-    items = Column(JSON, nullable=False, default=list)  # Store cart items as JSON
-    delivery_method = Column(String(20), nullable=True)
-    delivery_address = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    order: Mapped["Order"] = relationship("Order", back_populates="order_items")
+    product: Mapped["Product"] = relationship("Product", back_populates="order_items")

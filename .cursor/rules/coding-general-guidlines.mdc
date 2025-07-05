@@ -1,0 +1,33 @@
+---
+description: Coding best practice rules for clean, maintainable, and scalable code
+globs:
+alwaysApply: true
+---
+
+- Keep it simple (KISS): prefer straightforward, easy-to-understand solutions.
+- Don’t Repeat Yourself (DRY): avoid duplication; abstract common logic.
+- You Aren’t Gonna Need It (YAGNI): only build what's actually needed.
+- Separation of Concerns (SOC): keep different parts of the system independent and modular.
+- Write small, focused functions and classes with a single responsibility.
+- Use meaningful, descriptive names for variables, functions, and classes.
+- Avoid magic numbers and hard-coded strings; use constants or enums.
+- Write self-documenting code; use comments to explain *why*, not *what*.
+- Favor composition over inheritance to increase flexibility.
+- Keep code formatting consistent: indentation, brackets, naming conventions.
+- Delete unused or dead code to keep the codebase clean.
+- Validate inputs and handle edge cases (defensive programming).
+- Keep functions at a single level of abstraction; avoid mixing high-level and low-level logic.
+- Apply SOLID principles:
+  - Single Responsibility Principle – each module/class should have one responsibility.
+  - Open/Closed Principle – open for extension, closed for modification.
+  - Liskov Substitution Principle – derived classes should be substitutable for their base classes.
+  - Interface Segregation Principle – prefer small, specific interfaces over large general ones.
+  - Dependency Inversion Principle – depend on abstractions, not concretions.
+- Use design patterns when appropriate (e.g., Singleton, Factory, Strategy, Observer, Decorator).
+- Avoid over-engineering: don’t add complexity until it’s needed.
+- Write automated tests: unit tests, integration tests, and end-to-end tests.
+- Use version control (Git): small commits with clear messages.
+- Automate linting, formatting, and testing as part of the CI/CD process.
+- Do regular code reviews to catch issues early and share knowledge.
+- Consider performance, scalability, and security in design and implementation.
+- Refactor code regularly to improve structure without changing behavior.

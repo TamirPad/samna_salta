@@ -19,6 +19,7 @@ from telegram.ext import ContextTypes
 
 class ErrorSeverity(Enum):
     """Error severity levels"""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -27,6 +28,7 @@ class ErrorSeverity(Enum):
 
 class ErrorCategory(Enum):
     """Error categories for classification"""
+
     BUSINESS_LOGIC = "business_logic"
     DATABASE = "database"
     TELEGRAM_API = "telegram_api"
@@ -39,6 +41,7 @@ class ErrorCategory(Enum):
 @dataclass
 class ApplicationError(Exception):
     """Base application error with enhanced context"""
+
     message: str
     error_code: str = "UNKNOWN"
     severity: ErrorSeverity = ErrorSeverity.MEDIUM
@@ -51,6 +54,7 @@ class ApplicationError(Exception):
 @dataclass
 class BusinessLogicError(ApplicationError):
     """Business logic specific errors"""
+
     error_code: str = "BUSINESS_ERROR"
     severity: ErrorSeverity = ErrorSeverity.MEDIUM
     category: ErrorCategory = ErrorCategory.BUSINESS_LOGIC
@@ -59,6 +63,7 @@ class BusinessLogicError(ApplicationError):
 @dataclass
 class DatabaseError(ApplicationError):
     """Database operation errors"""
+
     error_code: str = "DB_ERROR"
     severity: ErrorSeverity = ErrorSeverity.HIGH
     category: ErrorCategory = ErrorCategory.DATABASE
@@ -67,6 +72,7 @@ class DatabaseError(ApplicationError):
 @dataclass
 class TelegramAPIError(ApplicationError):
     """Telegram API related errors"""
+
     error_code: str = "TELEGRAM_ERROR"
     severity: ErrorSeverity = ErrorSeverity.HIGH
     category: ErrorCategory = ErrorCategory.TELEGRAM_API
@@ -75,6 +81,7 @@ class TelegramAPIError(ApplicationError):
 @dataclass
 class ValidationError(ApplicationError):
     """Input validation errors"""
+
     error_code: str = "VALIDATION_ERROR"
     severity: ErrorSeverity = ErrorSeverity.LOW
     category: ErrorCategory = ErrorCategory.VALIDATION
@@ -83,6 +90,7 @@ class ValidationError(ApplicationError):
 @dataclass
 class ErrorReport:
     """Dataclass for error reports"""
+
     error: Exception
     context: Optional[Dict[str, Any]] = None
     user_id: Optional[str] = None
@@ -99,7 +107,7 @@ class ErrorReporter:
             "total_errors": 0,
             "errors_by_category": {},
             "errors_by_severity": {},
-            "recent_errors": []
+            "recent_errors": [],
         }
 
     def report_error(self, report: ErrorReport) -> str:
@@ -119,7 +127,7 @@ class ErrorReporter:
                 "context": report.error.context,
                 "timestamp": report.error.timestamp.isoformat(),
                 "user_id": report.user_id,
-                "additional_context": report.context
+                "additional_context": report.context,
             }
         else:
             error_details = {
@@ -131,7 +139,7 @@ class ErrorReporter:
                 "context": report.context or {},
                 "timestamp": datetime.now().isoformat(),
                 "user_id": report.user_id,
-                "traceback": traceback.format_exc()
+                "traceback": traceback.format_exc(),
             }
 
         # Update metrics
@@ -188,10 +196,7 @@ class ErrorReporter:
 
     def _handle_critical_error(self, error_details: Dict[str, Any]):
         """Handle critical errors that need immediate attention"""
-        self.logger.critical(
-            "🚨 CRITICAL ERROR DETECTED: %(error_id)s 🚨",
-            error_details
-        )
+        self.logger.critical("🚨 CRITICAL ERROR DETECTED: %(error_id)s 🚨", error_details)
 
         # Here you could add integrations with:
         # - Slack/Discord notifications
@@ -207,10 +212,13 @@ class ErrorReporter:
             "errors_by_category": self.error_metrics["errors_by_category"],
             "errors_by_severity": self.error_metrics["errors_by_severity"],
             "recent_error_count": len(self.error_metrics["recent_errors"]),
-            "critical_errors_last_24h": len([
-                e for e in self.error_metrics["recent_errors"]
-                if e.get("severity") == ErrorSeverity.CRITICAL.value
-            ])
+            "critical_errors_last_24h": len(
+                [
+                    e
+                    for e in self.error_metrics["recent_errors"]
+                    if e.get("severity") == ErrorSeverity.CRITICAL.value
+                ]
+            ),
         }
 
 
@@ -253,7 +261,7 @@ class ErrorHandler:
         self,
         _error: ApplicationError,
         _update: Optional[Update],
-        _context: Optional[ContextTypes.DEFAULT_TYPE]
+        _context: Optional[ContextTypes.DEFAULT_TYPE],
     ):
         """Recovery strategy for database errors"""
         # Placeholder for recovery logic, e.g., retry mechanism
@@ -263,7 +271,7 @@ class ErrorHandler:
         self,
         _error: ApplicationError,
         _update: Optional[Update],
-        _context: Optional[ContextTypes.DEFAULT_TYPE]
+        _context: Optional[ContextTypes.DEFAULT_TYPE],
     ):
         """Recovery strategy for Telegram API errors"""
         # Placeholder for recovery logic, e.g., exponential backoff
@@ -273,7 +281,7 @@ class ErrorHandler:
         self,
         _error: ApplicationError,
         _update: Optional[Update],
-        _context: Optional[ContextTypes.DEFAULT_TYPE]
+        _context: Optional[ContextTypes.DEFAULT_TYPE],
     ):
         """Recovery strategy for business logic errors"""
         # Placeholder for recovery logic, e.g., alternative data source
@@ -300,7 +308,7 @@ class ErrorHandler:
 
 def handle_errors(
     error_category: ErrorCategory = ErrorCategory.SYSTEM,
-    severity: ErrorSeverity = ErrorSeverity.MEDIUM
+    severity: ErrorSeverity = ErrorSeverity.MEDIUM,
 ):
     """Decorator to handle errors in functions"""
 
@@ -310,15 +318,23 @@ def handle_errors(
             try:
                 return await func(*args, **kwargs)
             except (
-                ApplicationError, BusinessLogicError, DatabaseError,
-                TelegramAPIError, ValidationError
+                ApplicationError,
+                BusinessLogicError,
+                DatabaseError,
+                TelegramAPIError,
+                ValidationError,
             ) as e:
                 # Find update and context from args
                 update = next((arg for arg in args if isinstance(arg, Update)), None)
                 context_types = next(
-                    (arg for arg in args if isinstance(arg, ContextTypes.DEFAULT_TYPE)), None)
-                user_id = str(
-                    update.effective_user.id) if update and update.effective_user else "unknown"
+                    (arg for arg in args if isinstance(arg, ContextTypes.DEFAULT_TYPE)),
+                    None,
+                )
+                user_id = (
+                    str(update.effective_user.id)
+                    if update and update.effective_user
+                    else "unknown"
+                )
 
                 # Create an ApplicationError
                 app_error = ApplicationError(
@@ -326,7 +342,7 @@ def handle_errors(
                     severity=severity,
                     category=error_category,
                     original_error=e,
-                    context={"function": func.__name__}
+                    context={"function": func.__name__},
                 )
 
                 # Handle the error
@@ -336,11 +352,13 @@ def handle_errors(
                     context={"function": func.__name__},
                     user_id=user_id,
                     update=update,
-                    context_types=context_types
+                    context_types=context_types,
                 )
                 await error_handler_instance.handle_error(report)
                 return None
+
         return wrapper
+
     return decorator
 
 
@@ -349,5 +367,6 @@ def get_error_statistics() -> Dict[str, Any]:
     # This is a placeholder. In a real app, you would have a central
     # error handler instance to get stats from.
     return {}
+
 
 # Final newline

@@ -49,7 +49,8 @@ class Money:
         """Add two money amounts"""
         if self.currency != other.currency:
             raise ValueError(
-                f"Cannot add different currencies: {self.currency} and {other.currency}"
+                f"Cannot add different currencies: "
+                f"{self.currency} and {other.currency}"
             )
         return Money(self.amount + other.amount, self.currency)
 
@@ -57,7 +58,8 @@ class Money:
         """Subtract two money amounts"""
         if self.currency != other.currency:
             raise ValueError(
-                f"Cannot subtract different currencies: {self.currency} and {other.currency}"
+                f"Cannot subtract different currencies: "
+                f"{self.currency} and {other.currency}"
             )
         result_amount = self.amount - other.amount
         if result_amount < 0:
@@ -102,28 +104,32 @@ class Money:
     def __lt__(self, other: "Money") -> bool:
         if self.currency != other.currency:
             raise ValueError(
-                f"Cannot compare different currencies: {self.currency} and {other.currency}"
+                f"Cannot compare different currencies: "
+                f"{self.currency} and {other.currency}"
             )
         return self.amount < other.amount
 
     def __le__(self, other: "Money") -> bool:
         if self.currency != other.currency:
             raise ValueError(
-                f"Cannot compare different currencies: {self.currency} and {other.currency}"
+                f"Cannot compare different currencies: "
+                f"{self.currency} and {other.currency}"
             )
         return self.amount <= other.amount
 
     def __gt__(self, other: "Money") -> bool:
         if self.currency != other.currency:
             raise ValueError(
-                f"Cannot compare different currencies: {self.currency} and {other.currency}"
+                f"Cannot compare different currencies: "
+                f"{self.currency} and {other.currency}"
             )
         return self.amount > other.amount
 
     def __ge__(self, other: "Money") -> bool:
         if self.currency != other.currency:
             raise ValueError(
-                f"Cannot compare different currencies: {self.currency} and {other.currency}"
+                f"Cannot compare different currencies: "
+                f"{self.currency} and {other.currency}"
             )
         return self.amount >= other.amount
 

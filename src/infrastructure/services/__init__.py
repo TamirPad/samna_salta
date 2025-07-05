@@ -1,1 +1,1 @@
-"""Module for infrastructure services.""" 
+"""Module for infrastructure services."""

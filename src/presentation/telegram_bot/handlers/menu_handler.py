@@ -33,9 +33,7 @@ class MenuHandler:
         self._product_catalog_use_case = self._container.get_product_catalog_use_case()
         self._logger = logging.getLogger(self.__class__.__name__)
 
-    async def handle_menu_callback(
-        self, update: Update, _: ContextTypes.DEFAULT_TYPE
-    ):
+    async def handle_menu_callback(self, update: Update, _: ContextTypes.DEFAULT_TYPE):
         """Handle menu-related callbacks"""
         query = update.callback_query
         await query.answer()

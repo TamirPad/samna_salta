@@ -39,9 +39,7 @@ class SQLAlchemyProductRepository(ProductRepository):
         """Find products by category"""
         with managed_session() as session:
             return (
-                session.query(SQLProduct)
-                .filter(SQLProduct.category == category)
-                .all()
+                session.query(SQLProduct).filter(SQLProduct.category == category).all()
             )
 
     async def find_all_active(self) -> list[SQLProduct]:

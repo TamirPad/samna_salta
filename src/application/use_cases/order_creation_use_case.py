@@ -5,10 +5,16 @@ Handles the business logic for creating orders from cart items.
 """
 
 import logging
-from datetime import datetime
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
+from src.application.dtos.order_dtos import (
+    CreateOrderRequest,
+    OrderCreationResponse,
+    OrderInfo,
+    OrderItemInfo,
+)
 from src.domain.repositories.cart_repository import CartRepository
 from src.domain.repositories.customer_repository import CustomerRepository
 from src.domain.repositories.order_repository import OrderRepository
@@ -16,15 +22,7 @@ from src.domain.value_objects.telegram_id import TelegramId
 from src.infrastructure.services.admin_notification_service import (
     AdminNotificationService,
 )
-from src.infrastructure.utilities.exceptions import (
-    BusinessLogicError,
-)
-from src.application.dtos.order_dtos import (
-    CreateOrderRequest,
-    OrderCreationResponse,
-    OrderInfo,
-    OrderItemInfo,
-)
+from src.infrastructure.utilities.exceptions import BusinessLogicError
 
 
 @dataclass
@@ -122,7 +120,9 @@ class OrderCreationUseCase:
             self._logger.error("💥 ORDER CREATION ERROR: %s", e, exc_info=True)
             return OrderCreationResponse(
                 success=False,
-                error_message="An error occurred while creating your order. Please try again.",
+                error_message=(
+                    "An error occurred while creating your order. " "Please try again."
+                ),
             )
 
     async def get_order_preview(
@@ -191,9 +191,7 @@ class OrderCreationUseCase:
             request.delivery_method or cart_data.get("delivery_method") or "pickup"
         )
         delivery_charge = 5.0 if delivery_method == "delivery" else 0.0
-        delivery_address = request.delivery_address or cart_data.get(
-            "delivery_address"
-        )
+        delivery_address = request.delivery_address or cart_data.get("delivery_address")
         if delivery_method == "delivery" and not delivery_address:
             raise BusinessLogicError(
                 "Delivery address is required for delivery orders."

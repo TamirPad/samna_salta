@@ -1,440 +1,328 @@
 """
-Rate limiting and security enhancements
+Rate limiting functionality for the Samna Salta bot with circuit breaker pattern
+
+Uses constants for thresholds and proper type annotations for better maintainability.
 """
 
 import logging
-import re
-import threading
 import time
 from collections import defaultdict, deque
-from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, DefaultDict, Deque
+from dataclasses import dataclass, field
+from enum import Enum
+
+from src.infrastructure.utilities.constants import SecuritySettings
+from src.infrastructure.utilities.exceptions import RateLimitExceededError
+from src.infrastructure.logging.logging_config import SecurityLogger
 
 logger = logging.getLogger(__name__)
+security_logger = SecurityLogger()
+
+
+class CircuitBreakerState(Enum):
+    """Circuit breaker states"""
+    CLOSED = "closed"
+    OPEN = "open"
+    HALF_OPEN = "half_open"
 
 
 @dataclass
-class RateLimit:
-    """Rate limit configuration"""
-
-    max_requests: int
-    time_window: int  # seconds
-    description: str
-
-
-class TokenBucket:
-    """Token bucket algorithm for rate limiting"""
-
-    def __init__(self, capacity: int, refill_rate: float):
-        self.capacity = capacity
-        self.tokens = capacity
-        self.refill_rate = refill_rate
-        self.last_refill = time.time()
-
-    def consume(self, tokens: int = 1) -> bool:
-        """Try to consume tokens from bucket"""
-        now = time.time()
-
-        # Refill tokens based on time elapsed
-        time_passed = now - self.last_refill
-        self.tokens = min(self.capacity, self.tokens + time_passed * self.refill_rate)
-        self.last_refill = now
-
-        # Check if enough tokens available
-        if self.tokens >= tokens:
-            self.tokens -= tokens
-            return True
-        return False
-
-    def __repr__(self) -> str:
-        return f"TokenBucket(capacity={self.capacity}, tokens={self.tokens:.2f})"
+class RateLimitConfig:
+    """Configuration for rate limiting"""
+    max_requests: int = SecuritySettings.DEFAULT_RATE_LIMIT_REQUESTS
+    window_seconds: int = SecuritySettings.DEFAULT_RATE_LIMIT_WINDOW_SECONDS
+    block_duration_seconds: int = SecuritySettings.DEFAULT_RATE_LIMIT_WINDOW_SECONDS
 
 
-class SlidingWindowRateLimiter:
-    """Sliding window rate limiter with per-user tracking"""
-
-    def __init__(self, rate_limits: Dict[str, RateLimit]):
-        self.rate_limits = rate_limits
-        self.user_requests: Dict[str, Dict[str, deque]] = defaultdict(
-            lambda: defaultdict(deque)
-        )
-        self._logger = logging.getLogger(self.__class__.__name__)
-
-    def is_allowed(self, user_id: str, endpoint: str) -> Tuple[bool, Optional[int]]:
-        """
-        Check if request is allowed
-
-        Returns:
-            (is_allowed, retry_after_seconds)
-        """
-        if endpoint not in self.rate_limits:
-            return True, None
-
-        rate_limit = self.rate_limits[endpoint]
-        now = time.time()
-
-        # Get user's request history for this endpoint
-        user_requests = self.user_requests[user_id][endpoint]
-
-        # Remove old requests outside the time window
-        cutoff_time = now - rate_limit.time_window
-        while user_requests and user_requests[0] < cutoff_time:
-            user_requests.popleft()
-
-        # Check if under limit
-        if len(user_requests) < rate_limit.max_requests:
-            user_requests.append(now)
-            return True, None
-
-        # Calculate retry after time
-        oldest_request = user_requests[0]
-        retry_after = int(oldest_request + rate_limit.time_window - now) + 1
-
-        self._logger.warning(
-            "Rate limit exceeded for user %s on endpoint %s. "
-            "Requests: %d/%d in %ds window",
-            user_id,
-            endpoint,
-            len(user_requests),
-            rate_limit.max_requests,
-            rate_limit.time_window,
-        )
-
-        return False, retry_after
-
-    def get_user_stats(self, user_id: str) -> Dict[str, Dict[str, Any]]:
-        """Get rate limiting stats for a user"""
-        stats = {}
-        for endpoint, requests in self.user_requests[user_id].items():
-            if endpoint in self.rate_limits:
-                rate_limit = self.rate_limits[endpoint]
-                now = time.time()
-
-                # Count requests in current window
-                cutoff_time = now - rate_limit.time_window
-                current_requests = sum(
-                    1 for req_time in requests if req_time > cutoff_time
-                )
-
-                stats[endpoint] = {
-                    "current_requests": current_requests,
-                    "max_requests": rate_limit.max_requests,
-                    "time_window": rate_limit.time_window,
-                    "remaining": max(0, rate_limit.max_requests - current_requests),
-                }
-
-        return stats
+@dataclass
+class CircuitBreakerConfig:
+    """Configuration for circuit breaker"""
+    failure_threshold: int = SecuritySettings.CIRCUIT_BREAKER_FAILURE_THRESHOLD
+    timeout_seconds: int = SecuritySettings.CIRCUIT_BREAKER_TIMEOUT_SECONDS
+    half_open_max_calls: int = 5
 
 
-class SecurityValidator:
-    """Input validation and security checks"""
-
-    # Malicious patterns to detect
-    MALICIOUS_PATTERNS = [
-        r"<script[^>]*>.*?</script>",  # XSS
-        r"javascript:",  # JavaScript URLs
-        r"on\w+\s*=",  # Event handlers
-        r"SELECT.*FROM",  # SQL injection
-        r"UNION.*SELECT",  # SQL injection
-        r"DROP.*TABLE",  # SQL injection
-        r"INSERT.*INTO",  # SQL injection
-        r"UPDATE.*SET",  # SQL injection
-        r"DELETE.*FROM",  # SQL injection
-        r"exec\s*\(",  # Code execution
-        r"eval\s*\(",  # Code execution
-        r"\.\./.*\.\.",  # Path traversal
-        r"file://",  # File access
-        r"http://.*\.onion",  # Tor links
-    ]
-
-    def __init__(self):
-        self.compiled_patterns = [
-            re.compile(pattern, re.IGNORECASE) for pattern in self.MALICIOUS_PATTERNS
-        ]
-        self._logger = logging.getLogger(self.__class__.__name__)
-
-    def validate_user_input(
-        self, text: str, max_length: int = 1000
-    ) -> Tuple[bool, Optional[str]]:
-        """
-        Validate user input for security threats
-
-        Returns:
-            (is_valid, error_message)
-        """
-        if not text:
-            return True, None
-
-        # Check length
-        if len(text) > max_length:
-            return False, f"Input too long (max {max_length} characters)"
-
-        # Check for malicious patterns
-        for pattern in self.compiled_patterns:
-            if pattern.search(text):
-                self._logger.warning(
-                    "Malicious pattern detected in input: %s...", text[:100]
-                )
-                return False, "Invalid input detected"
-
-        # Check for excessive special characters (potential obfuscation)
-        special_char_ratio = (
-            sum(1 for c in text if not c.isalnum() and not c.isspace()) / len(text)
-        )
-        if special_char_ratio > 0.5:
-            return False, "Input contains too many special characters"
-
-        return True, None
-
-    def sanitize_input(self, text: str) -> str:
-        """Sanitize user input"""
-        if not text:
-            return ""
-
-        # Remove null bytes
-        text = text.replace("\x00", "")
-
-        # Remove control characters except common whitespace
-        text = "".join(char for char in text if ord(char) >= 32 or char in "\t\n\r")
-
-        # Normalize whitespace
-        text = " ".join(text.split())
-
-        return text.strip()
-
-    def is_suspicious_telegram_id(self, telegram_id: int) -> bool:
-        """Check if Telegram ID looks suspicious"""
-        # Check for obviously fake IDs
-        if telegram_id <= 0 or telegram_id > 10**10:
-            return True
-
-        # Check for test bot IDs
-        test_bot_patterns = [12345, 123456789, 987654321]
-        if telegram_id in test_bot_patterns:
-            return True
-
-        return False
-
-    def validate_phone_number(self, phone: str) -> Tuple[bool, Optional[str]]:
-        """Validate phone number format"""
-        if not phone:
-            return False, "Phone number is required"
-
-        # Remove all non-digit characters except +
-        cleaned = re.sub(r"[^\d+]", "", phone)
-
-        # Israeli phone number patterns
-        israeli_patterns = [
-            r"^\+972[2-9]\d{7,8}$",  # Landline
-            r"^\+9725[0-9]\d{7}$",  # Mobile
-            r"^0[2-9]\d{7,8}$",  # Local landline
-            r"^05[0-9]\d{7}$",  # Local mobile
-        ]
-
-        for pattern in israeli_patterns:
-            if re.match(pattern, cleaned):
-                return True, None
-
-        return False, "Invalid Israeli phone number format"
+@dataclass
+class UserRateLimit:
+    """Rate limit data for a user"""
+    requests: Deque[float] = field(default_factory=deque)
+    blocked_until: Optional[float] = None
+    violation_count: int = 0
 
 
-class SecurityMonitor:
-    """Security event monitoring and alerting"""
+@dataclass
+class CircuitBreakerData:
+    """Circuit breaker data for a user"""
+    state: CircuitBreakerState = CircuitBreakerState.CLOSED
+    failure_count: int = 0
+    last_failure_time: Optional[float] = None
+    half_open_calls: int = 0
 
-    def __init__(self):
-        self.security_events = deque(maxlen=1000)  # Keep last 1000 events
-        self.blocked_users = {}  # user_id -> block_until_timestamp
-        self._logger = logging.getLogger(self.__class__.__name__)
 
-    def log_security_event(
-        self, event_type: str, user_id: str, details: Dict[str, Any]
+class RateLimiter:
+    """Rate limiter with circuit breaker functionality"""
+
+    def __init__(
+        self,
+        default_config: Optional[RateLimitConfig] = None,
+        circuit_breaker_config: Optional[CircuitBreakerConfig] = None
     ):
-        """Log a security event and check for suspicious patterns"""
-        event = {
-            "timestamp": time.time(),
-            "type": event_type,
-            "user_id": user_id,
-            "details": details,
-        }
-        self.security_events.append(event)
-        self._logger.warning(
-            "SECURITY EVENT: [%s] User %s - Details: %s",
-            event_type,
-            user_id,
-            details,
-        )
-        self._check_user_blocking(user_id)
+        self.default_config = default_config or RateLimitConfig()
+        self.circuit_breaker_config = circuit_breaker_config or CircuitBreakerConfig()
+        self.user_limits: DefaultDict[int, UserRateLimit] = defaultdict(UserRateLimit)
+        self.circuit_breakers: DefaultDict[int, CircuitBreakerData] = defaultdict(CircuitBreakerData)
+        self.endpoint_configs: Dict[str, RateLimitConfig] = {}
 
-    def _check_user_blocking(self, user_id: str):
-        """Check if a user should be temporarily blocked"""
-        now = time.time()
-        user_events = [
-            e
-            for e in self.security_events
-            if e["user_id"] == user_id and now - e["timestamp"] < 3600
-        ]
+    def configure_endpoint(self, endpoint: str, config: RateLimitConfig) -> None:
+        """Configure rate limiting for specific endpoint"""
+        self.endpoint_configs[endpoint] = config
+        logger.info(f"Rate limit configured for endpoint {endpoint}: {config}")
 
-        # Example blocking logic: block for 5 mins if > 5 invalid inputs in an hour
-        if len(user_events) > 5:
-            block_until = now + 300  # Block for 5 minutes
-            self.blocked_users[user_id] = block_until
-            self._logger.critical(
-                "User %s temporarily blocked until %s due to suspicious activity",
-                user_id,
-                time.ctime(block_until),
-            )
-
-    def is_user_blocked(self, user_id: str) -> Tuple[bool, Optional[int]]:
-        """Check if a user is currently blocked"""
-        block_until = self.blocked_users.get(user_id)
-        if block_until and time.time() < block_until:
-            retry_after = int(block_until - time.time())
-            return True, retry_after
-        return False, None
-
-    def get_security_stats(self) -> Dict[str, Any]:
-        """Get security monitoring statistics"""
-        now = time.time()
-        recent_events = [e for e in self.security_events if now - e["timestamp"] < 3600]
-        event_types = defaultdict(int)
-        for event in recent_events:
-            event_types[event["type"]] += 1
-
-        return {
-            "total_events_logged": len(self.security_events),
-            "events_last_hour": event_types,
-            "currently_blocked_users": len(
-                [
-                    u
-                    for u, t in self.blocked_users.items()
-                    if t > now
-                ]
+    def configure_endpoints_from_constants(self) -> None:
+        """Configure endpoints using predefined constants"""
+        self.endpoint_configs.update({
+            "menu": RateLimitConfig(
+                max_requests=SecuritySettings.MENU_RATE_LIMIT,
+                window_seconds=SecuritySettings.DEFAULT_RATE_LIMIT_WINDOW_SECONDS
             ),
-        }
+            "cart": RateLimitConfig(
+                max_requests=SecuritySettings.CART_RATE_LIMIT,
+                window_seconds=SecuritySettings.DEFAULT_RATE_LIMIT_WINDOW_SECONDS
+            ),
+            "order": RateLimitConfig(
+                max_requests=SecuritySettings.ORDER_RATE_LIMIT,
+                window_seconds=SecuritySettings.DEFAULT_RATE_LIMIT_WINDOW_SECONDS
+            ),
+            "admin": RateLimitConfig(
+                max_requests=SecuritySettings.ADMIN_RATE_LIMIT,
+                window_seconds=SecuritySettings.DEFAULT_RATE_LIMIT_WINDOW_SECONDS
+            ),
+        })
 
+    def is_allowed(self, user_id: int, endpoint: Optional[str] = None) -> Tuple[bool, Optional[str]]:
+        """Check if user is allowed to make request"""
+        current_time = time.time()
 
-class BotSecurityManager:
-    """Comprehensive security manager for the bot"""
+        # Check circuit breaker
+        if not self._is_circuit_breaker_allowed(user_id, current_time):
+            security_logger.log_suspicious_activity(
+                user_id, 
+                "circuit_breaker_blocked",
+                {"endpoint": endpoint, "timestamp": current_time}
+            )
+            return False, "Service temporarily unavailable. Please try again later."
 
-    _instance: Optional["BotSecurityManager"] = None
-    _lock = threading.Lock()
+        # Get appropriate config
+        config = self.endpoint_configs.get(endpoint, self.default_config)
+        user_limit = self.user_limits[user_id]
 
-    def __init__(self):
-        # Rate limits configuration
-        rate_limits = {
-            "start": RateLimit(5, 60, "Start command"),
-            "menu": RateLimit(10, 60, "Menu interaction"),
-            "cart": RateLimit(20, 60, "Cart operations"),
-            "order": RateLimit(5, 300, "Order creation"),
-            "general": RateLimit(30, 60, "General messages"),
-        }
-        self.rate_limiter = SlidingWindowRateLimiter(rate_limits)
-        self.validator = SecurityValidator()
-        self.monitor = SecurityMonitor()
+        # Check if user is currently blocked
+        if user_limit.blocked_until and current_time < user_limit.blocked_until:
+            remaining_time = int(user_limit.blocked_until - current_time)
+            return False, f"Rate limit exceeded. Try again in {remaining_time} seconds."
 
-    @classmethod
-    def get_instance(cls) -> "BotSecurityManager":
-        """Get the singleton instance of the security manager"""
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    logger.info("Initializing BotSecurityManager singleton...")
-                    cls._instance = BotSecurityManager()
-        return cls._instance
+        # Clean up old requests
+        cutoff_time = current_time - config.window_seconds
+        while user_limit.requests and user_limit.requests[0] <= cutoff_time:
+            user_limit.requests.popleft()
 
-    def check_request_allowed(
-        self, user_id: int, endpoint: str
-    ) -> Tuple[bool, Optional[str]]:
-        """Check rate limits and if user is blocked"""
-        # Check blocking first
-        is_blocked, retry_after_block = self.monitor.is_user_blocked(str(user_id))
-        if is_blocked:
-            return False, f"You are temporarily blocked. Please try again in {retry_after_block}s."
+        # Check rate limit
+        if len(user_limit.requests) >= config.max_requests:
+            # Block user
+            user_limit.blocked_until = current_time + config.block_duration_seconds
+            user_limit.violation_count += 1
+            
+            # Log security event
+            security_logger.log_rate_limit_exceeded(
+                user_id,
+                endpoint or "unknown",
+                {
+                    "violation_count": user_limit.violation_count,
+                    "blocked_until": user_limit.blocked_until,
+                    "requests_in_window": len(user_limit.requests)
+                }
+            )
+            
+            logger.warning(
+                f"Rate limit exceeded for user {user_id} on endpoint {endpoint}",
+                extra={
+                    "user_id": user_id,
+                    "endpoint": endpoint,
+                    "violation_count": user_limit.violation_count,
+                    "requests_in_window": len(user_limit.requests)
+                }
+            )
+            
+            return False, "Rate limit exceeded. Please slow down."
 
-        # Check rate limiting
-        is_allowed, retry_after_limit = self.rate_limiter.is_allowed(
-            str(user_id), endpoint
-        )
-        if not is_allowed:
-            return False, f"Rate limit exceeded. Please try again in {retry_after_limit}s."
-
+        # Add current request
+        user_limit.requests.append(current_time)
         return True, None
 
-    def validate_message(
-        self, user_id: int, message: str
-    ) -> Tuple[bool, Optional[str]]:
-        """Validate incoming user message"""
-        # Suspicious ID check
-        if self.validator.is_suspicious_telegram_id(user_id):
-            self.monitor.log_security_event(
-                "suspicious_telegram_id", str(user_id), {"id": user_id}
+    def record_success(self, user_id: int) -> None:
+        """Record successful request for circuit breaker"""
+        circuit_breaker = self.circuit_breakers[user_id]
+        
+        if circuit_breaker.state == CircuitBreakerState.HALF_OPEN:
+            circuit_breaker.half_open_calls += 1
+            if circuit_breaker.half_open_calls >= self.circuit_breaker_config.half_open_max_calls:
+                circuit_breaker.state = CircuitBreakerState.CLOSED
+                circuit_breaker.failure_count = 0
+                circuit_breaker.half_open_calls = 0
+                logger.info(f"Circuit breaker closed for user {user_id}")
+        elif circuit_breaker.state == CircuitBreakerState.CLOSED:
+            circuit_breaker.failure_count = 0
+
+    def record_failure(self, user_id: int) -> None:
+        """Record failed request for circuit breaker"""
+        circuit_breaker = self.circuit_breakers[user_id]
+        current_time = time.time()
+        
+        circuit_breaker.failure_count += 1
+        circuit_breaker.last_failure_time = current_time
+        
+        if circuit_breaker.failure_count >= self.circuit_breaker_config.failure_threshold:
+            circuit_breaker.state = CircuitBreakerState.OPEN
+            logger.warning(f"Circuit breaker opened for user {user_id}")
+            
+            security_logger.log_suspicious_activity(
+                user_id,
+                "circuit_breaker_opened",
+                {
+                    "failure_count": circuit_breaker.failure_count,
+                    "threshold": self.circuit_breaker_config.failure_threshold
+                }
             )
-            return False, "Invalid user ID."
 
-        # Input validation
-        is_valid, error = self.validator.validate_user_input(message)
-        if not is_valid:
-            self.monitor.log_security_event(
-                "invalid_input", str(user_id), {"message": message[:100]}
-            )
-            return False, error
+    def _is_circuit_breaker_allowed(self, user_id: int, current_time: float) -> bool:
+        """Check if circuit breaker allows request"""
+        circuit_breaker = self.circuit_breakers[user_id]
+        
+        if circuit_breaker.state == CircuitBreakerState.CLOSED:
+            return True
+        elif circuit_breaker.state == CircuitBreakerState.OPEN:
+            if (circuit_breaker.last_failure_time and 
+                current_time - circuit_breaker.last_failure_time > self.circuit_breaker_config.timeout_seconds):
+                circuit_breaker.state = CircuitBreakerState.HALF_OPEN
+                circuit_breaker.half_open_calls = 0
+                logger.info(f"Circuit breaker half-open for user {user_id}")
+                return True
+            return False
+        elif circuit_breaker.state == CircuitBreakerState.HALF_OPEN:
+            return circuit_breaker.half_open_calls < self.circuit_breaker_config.half_open_max_calls
+        
+        return False
 
-        return True, None
-
-    def sanitize_message(self, message: str) -> str:
-        """Sanitize a user message"""
-        return self.validator.sanitize_input(message)
-
-    def get_security_report(self) -> Dict[str, Any]:
-        """Get combined security report"""
-        rate_limit_stats = {}
-        for user_id in self.rate_limiter.user_requests:
-            rate_limit_stats[user_id] = self.rate_limiter.get_user_stats(user_id)
-
+    def get_user_status(self, user_id: int) -> Dict[str, any]:
+        """Get rate limit status for user"""
+        current_time = time.time()
+        user_limit = self.user_limits[user_id]
+        circuit_breaker = self.circuit_breakers[user_id]
+        
+        # Clean up old requests
+        cutoff_time = current_time - self.default_config.window_seconds
+        while user_limit.requests and user_limit.requests[0] <= cutoff_time:
+            user_limit.requests.popleft()
+        
         return {
-            "security_monitor_stats": self.monitor.get_security_stats(),
-            "rate_limit_stats": rate_limit_stats,
+            "user_id": user_id,
+            "requests_in_window": len(user_limit.requests),
+            "max_requests": self.default_config.max_requests,
+            "window_seconds": self.default_config.window_seconds,
+            "is_blocked": user_limit.blocked_until is not None and current_time < user_limit.blocked_until,
+            "blocked_until": user_limit.blocked_until,
+            "violation_count": user_limit.violation_count,
+            "circuit_breaker_state": circuit_breaker.state.value,
+            "circuit_breaker_failures": circuit_breaker.failure_count,
         }
 
+    def get_stats(self) -> Dict[str, any]:
+        """Get rate limiter statistics"""
+        current_time = time.time()
+        
+        total_users = len(self.user_limits)
+        blocked_users = sum(
+            1 for user_limit in self.user_limits.values()
+            if user_limit.blocked_until and current_time < user_limit.blocked_until
+        )
+        
+        circuit_breaker_stats = {
+            "open": 0,
+            "half_open": 0,
+            "closed": 0
+        }
+        
+        for cb in self.circuit_breakers.values():
+            circuit_breaker_stats[cb.state.value] += 1
+        
+        return {
+            "total_users": total_users,
+            "blocked_users": blocked_users,
+            "circuit_breakers": circuit_breaker_stats,
+            "endpoint_configs": {
+                endpoint: {
+                    "max_requests": config.max_requests,
+                    "window_seconds": config.window_seconds
+                }
+                for endpoint, config in self.endpoint_configs.items()
+            }
+        }
 
-def get_security_manager() -> "BotSecurityManager":
-    """Get the singleton instance of the security manager"""
-    return BotSecurityManager.get_instance()
+    def cleanup_expired(self) -> int:
+        """Clean up expired rate limit data"""
+        current_time = time.time()
+        cleaned_count = 0
+        
+        # Clean up expired blocks
+        for user_limit in self.user_limits.values():
+            if user_limit.blocked_until and current_time >= user_limit.blocked_until:
+                user_limit.blocked_until = None
+                cleaned_count += 1
+        
+        # Clean up old requests
+        cutoff_time = current_time - self.default_config.window_seconds
+        for user_limit in self.user_limits.values():
+            old_count = len(user_limit.requests)
+            while user_limit.requests and user_limit.requests[0] <= cutoff_time:
+                user_limit.requests.popleft()
+            cleaned_count += old_count - len(user_limit.requests)
+        
+        return cleaned_count
+
+    def reset_user(self, user_id: int) -> None:
+        """Reset rate limit data for a user"""
+        if user_id in self.user_limits:
+            del self.user_limits[user_id]
+        if user_id in self.circuit_breakers:
+            del self.circuit_breakers[user_id]
+        logger.info(f"Reset rate limit data for user {user_id}")
 
 
-def security_check(endpoint: str = "general"):
-    """
-    Decorator for rate limiting and security checks on Telegram handlers.
-    """
+# Global rate limiter instance
+_rate_limiter: Optional[RateLimiter] = None
 
-    def decorator(func):
-        """Decorator function"""
 
-        async def wrapper(update, context, *args, **kwargs):
-            """Wrapper that performs security checks"""
-            if not update or not update.effective_user:
-                return await func(update, context, *args, **kwargs)
+def get_rate_limiter() -> RateLimiter:
+    """Get global rate limiter instance"""
+    global _rate_limiter
+    if _rate_limiter is None:
+        _rate_limiter = RateLimiter()
+        _rate_limiter.configure_endpoints_from_constants()
+    return _rate_limiter
 
-            user_id = update.effective_user.id
-            manager = get_security_manager()
 
-            # Check rate limiting and blocking
-            is_allowed, error_msg = manager.check_request_allowed(user_id, endpoint)
-            if not is_allowed and error_msg:
-                await update.message.reply_text(error_msg)
-                return
+def rate_limit_check(user_id: int, endpoint: Optional[str] = None) -> None:
+    """Check rate limit and raise exception if exceeded"""
+    allowed, message = get_rate_limiter().is_allowed(user_id, endpoint)
+    if not allowed:
+        raise RateLimitExceededError(message or "Rate limit exceeded")
 
-            # Validate message content if available
-            if update.message and update.message.text:
-                is_valid, error_msg = manager.validate_message(
-                    user_id, update.message.text
-                )
-                if not is_valid and error_msg:
-                    await update.message.reply_text(error_msg)
-                    return
 
-            return await func(update, context, *args, **kwargs)
+def record_request_success(user_id: int) -> None:
+    """Record successful request"""
+    get_rate_limiter().record_success(user_id)
 
-        return wrapper
 
-    return decorator
+def record_request_failure(user_id: int) -> None:
+    """Record failed request"""
+    get_rate_limiter().record_failure(user_id)

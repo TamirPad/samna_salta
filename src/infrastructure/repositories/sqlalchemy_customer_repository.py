@@ -88,9 +88,7 @@ class SQLAlchemyCustomerRepository(CustomerRepository):
             sql_customer.full_name = customer.full_name.value
             sql_customer.phone_number = customer.phone_number.value
             sql_customer.delivery_address = (
-                customer.delivery_address.value
-                if customer.delivery_address
-                else None
+                customer.delivery_address.value if customer.delivery_address else None
             )
             session.flush()
             session.refresh(sql_customer)

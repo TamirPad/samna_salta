@@ -51,7 +51,9 @@ class AdminNotificationService:
                 )
                 return
 
-            self._logger.info("✅ FOUND %d ADMIN USERS: %s", len(admin_users), admin_users)
+            self._logger.info(
+                "✅ FOUND %d ADMIN USERS: %s", len(admin_users), admin_users
+            )
 
             # Create notification message
             self._logger.info("📝 STEP 2: Creating notification message...")
@@ -102,9 +104,7 @@ class AdminNotificationService:
         self, order_info: OrderInfo, old_status: str
     ) -> None:
         """Send order status update notification to admin users"""
-        self._logger.info(
-            "📨 SENDING STATUS UPDATE: Order #%s", order_info.order_number
-        )
+        self._logger.info("📨 SENDING STATUS UPDATE: Order #%s", order_info.order_number)
 
         try:
             admin_users = await self._get_admin_users()

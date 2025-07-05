@@ -23,14 +23,12 @@ class OrderAnalyticsUseCase:
         self._customer_repository = customer_repository
         self._logger = logging.getLogger(self.__class__.__name__)
 
-    async def get_daily_summary(
-        self, date: datetime | None = None
-    ) -> dict[str, Any]:
+    async def get_daily_summary(self, date: datetime | None = None) -> dict[str, Any]:
         """Get daily order summary"""
         if not date:
             date = datetime.now()
 
-        self._logger.info("📊 GENERATING DAILY SUMMARY: %s", date.strftime('%Y-%m-%d'))
+        self._logger.info("📊 GENERATING DAILY SUMMARY: %s", date.strftime("%Y-%m-%d"))
 
         try:
             # Get all orders (in a real system, you'd filter by date)
@@ -40,8 +38,11 @@ class OrderAnalyticsUseCase:
             today_orders = [
                 order
                 for order in all_orders
-                if order.get("created_at") and order["created_at"].date() == date.date()
-            ]
+                if (
+                    order.get("created_at")
+                    and order["created_at"].date() == date.date()
+                )
+            ]  # noqa: E501
 
             # Calculate metrics
             total_orders = len(today_orders)
@@ -160,8 +161,9 @@ class OrderAnalyticsUseCase:
                         "order_count": stats["count"],
                         "total_quantity": stats["total_quantity"],
                         "total_revenue": stats["revenue"],
-                        "avg_quantity_per_order": stats["total_quantity"]
-                        / stats["count"],
+                        "avg_quantity_per_order": (
+                            stats["total_quantity"] / stats["count"]
+                        ),  # noqa: E501
                     }
                     for name, stats in product_stats.items()
                 ],
@@ -338,15 +340,19 @@ class OrderAnalyticsUseCase:
             customers = overview["customer_insights"]
             report_lines.append("\n👥 <b>CUSTOMER INSIGHTS:</b>")
             report_lines.append(f"👨‍💼 Total Customers: {customers['total_customers']}")
-            report_lines.append(f"🔄 Repeat Rate: {customers['repeat_customer_rate']:.1f}%")
             report_lines.append(
-                f"💰 Avg Customer Value: ₪{customers['avg_customer_lifetime_value']:.2f}"
+                f"🔄 Repeat Rate: {customers['repeat_customer_rate']:.1f}%"
+            )
+            report_lines.append(
+                f"💰 Avg Customer Value: ₪{customers['avg_customer_lifetime_value']:.2f}"  # noqa: E501
             )
 
             # Lifetime Totals
             report_lines.append("\n📋 <b>LIFETIME TOTALS:</b>")
             report_lines.append(f"📊 Total Orders: {overview['total_lifetime_orders']}")
-            report_lines.append(f"💰 Total Revenue: ₪{overview['total_lifetime_revenue']:.2f}")
+            report_lines.append(
+                f"💰 Total Revenue: ₪{overview['total_lifetime_revenue']:.2f}"
+            )
 
             report_lines.append(
                 f"📊 Avg LTV: ₪{overview['customer_insights']['avg_customer_lifetime_value']:.2f}"

@@ -1,18 +1,19 @@
 """
 Database Query Optimizer
 
-Advanced database query optimization with intelligent analysis and performance improvements.
+Advanced database query optimization with intelligent analysis
+and performance improvements.
 """
 
-import logging
-import time
 import hashlib
+import logging
 import re
+import threading
+import time
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any
 from datetime import datetime, timedelta
-import threading
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class QueryMetrics:
     """Query performance metrics"""
+
     query_hash: str
     execution_time: float
     rows_examined: int
@@ -31,6 +33,7 @@ class QueryMetrics:
 @dataclass
 class QueryOptimization:
     """Query optimization suggestion"""
+
     query_hash: str
     optimization_type: str
     description: str
@@ -74,7 +77,7 @@ class QueryOptimizer:
             rows_examined=rows_examined,
             rows_returned=rows_returned,
             timestamp=datetime.now(),
-            query_text=query
+            query_text=query,
         )
 
         self.query_metrics[query_hash].append(metrics)
@@ -102,13 +105,13 @@ class QueryOptimizer:
         normalized = query.lower().strip()
 
         # Replace parameter placeholders
-        normalized = re.sub(r'\$\d+', '?', normalized)  # PostgreSQL parameters
-        normalized = re.sub(r'%\([^)]+\)s', '?', normalized)  # Python string formatting
+        normalized = re.sub(r"\$\d+", "?", normalized)  # PostgreSQL parameters
+        normalized = re.sub(r"%\([^)]+\)s", "?", normalized)  # Python string formatting
         normalized = re.sub(r"'[^']*'", "'?'", normalized)  # String literals
-        normalized = re.sub(r'\b\d+\b', '?', normalized)  # Numeric literals
+        normalized = re.sub(r"\b\d+\b", "?", normalized)  # Numeric literals
 
         # Remove extra whitespace
-        normalized = re.sub(r'\s+', ' ', normalized)
+        normalized = re.sub(r"\s+", " ", normalized)
 
         return normalized
 
@@ -128,20 +131,20 @@ class QueryOptimizer:
         query_lower = query.lower().strip()
         query_type = "OTHER"
 
-        if query_lower.startswith('select'):
-            query_type = 'SELECT'
-        elif query_lower.startswith('insert'):
-            query_type = 'INSERT'
-        elif query_lower.startswith('update'):
-            query_type = 'UPDATE'
-        elif query_lower.startswith('delete'):
-            query_type = 'DELETE'
-        elif query_lower.startswith('create'):
-            query_type = 'CREATE'
-        elif query_lower.startswith('alter'):
-            query_type = 'ALTER'
-        elif query_lower.startswith('drop'):
-            query_type = 'DROP'
+        if query_lower.startswith("select"):
+            query_type = "SELECT"
+        elif query_lower.startswith("insert"):
+            query_type = "INSERT"
+        elif query_lower.startswith("update"):
+            query_type = "UPDATE"
+        elif query_lower.startswith("delete"):
+            query_type = "DELETE"
+        elif query_lower.startswith("create"):
+            query_type = "CREATE"
+        elif query_lower.startswith("alter"):
+            query_type = "ALTER"
+        elif query_lower.startswith("drop"):
+            query_type = "DROP"
 
         return query_type
 
@@ -152,96 +155,110 @@ class QueryOptimizer:
         query_lower = query.lower()
 
         # Find tables after FROM
-        from_matches = re.findall(r'from\s+(\w+)', query_lower)
+        from_matches = re.findall(r"from\s+(\w+)", query_lower)
         tables.extend(from_matches)
 
         # Find tables after JOIN
-        join_matches = re.findall(r'join\s+(\w+)', query_lower)
+        join_matches = re.findall(r"join\s+(\w+)", query_lower)
         tables.extend(join_matches)
 
         # Find tables after INSERT INTO
-        insert_matches = re.findall(r'insert\s+into\s+(\w+)', query_lower)
+        insert_matches = re.findall(r"insert\s+into\s+(\w+)", query_lower)
         tables.extend(insert_matches)
 
         # Find tables after UPDATE
-        update_matches = re.findall(r'update\s+(\w+)', query_lower)
+        update_matches = re.findall(r"update\s+(\w+)", query_lower)
         tables.extend(update_matches)
 
         return list(set(tables))  # Remove duplicates
 
-    def _generate_optimizations(self, query: str, metrics: QueryMetrics) -> list[QueryOptimization]:
+    def _generate_optimizations(
+        self, query: str, metrics: QueryMetrics
+    ) -> list[QueryOptimization]:
         """Generate optimization suggestions for slow query"""
         optimizations = []
         query_lower = query.lower()
 
         # Check for missing WHERE clause
-        if 'select' in query_lower and 'where' not in query_lower:
-            optimizations.append(QueryOptimization(
-                query_hash=metrics.query_hash,
-                optimization_type='missing_where',
-                description='Query lacks WHERE clause, potentially scanning entire table',
-                estimated_improvement='50-90% performance improvement',
-                priority='high',
-                sql_suggestion='Add WHERE clause to filter results'
-            ))
+        if "select" in query_lower and "where" not in query_lower:
+            optimizations.append(
+                QueryOptimization(
+                    query_hash=metrics.query_hash,
+                    optimization_type="missing_where",
+                    description="Query lacks WHERE clause, potentially scanning entire table",  # noqa: E501
+                    estimated_improvement="50-90% performance improvement",
+                    priority="high",
+                    sql_suggestion="Add WHERE clause to filter results",
+                )
+            )
 
         # Check for SELECT *
-        if 'select *' in query_lower:
-            optimizations.append(QueryOptimization(
-                query_hash=metrics.query_hash,
-                optimization_type='select_star',
-                description='Using SELECT * retrieves unnecessary columns',
-                estimated_improvement='10-30% performance improvement',
-                priority='medium',
-                sql_suggestion='Select only required columns: SELECT col1, col2 FROM table'
-            ))
+        if "select *" in query_lower:
+            optimizations.append(
+                QueryOptimization(
+                    query_hash=metrics.query_hash,
+                    optimization_type="select_star",
+                    description="Using SELECT * retrieves unnecessary columns",
+                    estimated_improvement="10-30% performance improvement",
+                    priority="medium",
+                    sql_suggestion="Select only required columns: SELECT col1, col2 FROM table",  # noqa: E501
+                )
+            )
 
         # Check for high row examination ratio
         if metrics.rows_examined > 0 and metrics.rows_returned > 0:
             examination_ratio = metrics.rows_examined / metrics.rows_returned
             if examination_ratio > 10:
-                optimizations.append(QueryOptimization(
-                    query_hash=metrics.query_hash,
-                    optimization_type='high_examination_ratio',
-                    description=f'Query examines {examination_ratio:.1f}x more rows than returned',
-                    estimated_improvement='30-70% performance improvement',
-                    priority='high',
-                    sql_suggestion='Add indexes on WHERE clause columns'
-                ))
+                optimizations.append(
+                    QueryOptimization(
+                        query_hash=metrics.query_hash,
+                        optimization_type="high_examination_ratio",
+                        description=f"Query examines {examination_ratio:.1f}x more rows than returned",  # noqa: E501
+                        estimated_improvement="30-70% performance improvement",
+                        priority="high",
+                        sql_suggestion="Add indexes on WHERE clause columns",
+                    )
+                )
 
         # Check for ORDER BY without LIMIT
-        if 'order by' in query_lower and 'limit' not in query_lower:
-            optimizations.append(QueryOptimization(
-                query_hash=metrics.query_hash,
-                optimization_type='order_without_limit',
-                description='ORDER BY without LIMIT sorts entire result set',
-                estimated_improvement='20-50% performance improvement',
-                priority='medium',
-                sql_suggestion='Add LIMIT clause if not all results are needed'
-            ))
+        if "order by" in query_lower and "limit" not in query_lower:
+            optimizations.append(
+                QueryOptimization(
+                    query_hash=metrics.query_hash,
+                    optimization_type="order_without_limit",
+                    description="ORDER BY without LIMIT sorts entire result set",
+                    estimated_improvement="20-50% performance improvement",
+                    priority="medium",
+                    sql_suggestion="Add LIMIT clause if not all results are needed",
+                )
+            )
 
         # Check for LIKE with leading wildcard
         if re.search(r"like\s+['\"]%", query_lower):
-            optimizations.append(QueryOptimization(
-                query_hash=metrics.query_hash,
-                optimization_type='leading_wildcard',
-                description='LIKE with leading wildcard prevents index usage',
-                estimated_improvement='40-80% performance improvement',
-                priority='high',
-                sql_suggestion='Use full-text search or reorganize LIKE pattern'
-            ))
+            optimizations.append(
+                QueryOptimization(
+                    query_hash=metrics.query_hash,
+                    optimization_type="leading_wildcard",
+                    description="LIKE with leading wildcard prevents index usage",
+                    estimated_improvement="40-80% performance improvement",
+                    priority="high",
+                    sql_suggestion="Use full-text search or reorganize LIKE pattern",
+                )
+            )
 
         # Check for N+1 query pattern
         if self._detect_n_plus_one_pattern(metrics.query_hash):
-            optimizations.append(QueryOptimization(
-                query_hash=metrics.query_hash,
-                optimization_type='n_plus_one',
-                description='Possible N+1 query pattern detected',
-                estimated_improvement='60-90% performance improvement',
-                priority='high',
-                sql_suggestion='Use JOIN or batch queries instead '
-                               'of multiple single queries'
-            ))
+            optimizations.append(
+                QueryOptimization(
+                    query_hash=metrics.query_hash,
+                    optimization_type="n_plus_one",
+                    description="Possible N+1 query pattern detected",
+                    estimated_improvement="60-90% performance improvement",
+                    priority="high",
+                    sql_suggestion="Use JOIN or batch queries instead "
+                    "of multiple single queries",
+                )
+            )
 
         return optimizations
 
@@ -253,8 +270,9 @@ class QueryOptimizer:
             # Check if query is executed frequently in short time spans
             time_spans = []
             for i in range(1, len(recent_metrics)):
-                time_diff = (recent_metrics[i].timestamp -
-                             recent_metrics[i-1].timestamp).total_seconds()
+                time_diff = (
+                    recent_metrics[i].timestamp - recent_metrics[i - 1].timestamp
+                ).total_seconds()
                 time_spans.append(time_diff)
 
             # If average time between executions is very short
@@ -264,10 +282,7 @@ class QueryOptimizer:
         return False
 
     def _format_optimization_report(
-        self,
-        query: str,
-        metrics: QueryMetrics,
-        optimizations: list[QueryOptimization]
+        self, query: str, metrics: QueryMetrics, optimizations: list[QueryOptimization]
     ) -> str:
         """Format optimization report"""
         report = (
@@ -289,12 +304,12 @@ class QueryOptimizer:
     def get_query_statistics(self, hours: int = 24) -> dict[str, Any]:
         """Get query performance statistics"""
         stats: dict[str, Any] = {
-            'total_queries': 0,
-            'slow_queries': 0,
-            'average_execution_time': 0,
-            'total_execution_time': 0,
-            'top_slow_queries': [],
-            'top_frequent_queries': []
+            "total_queries": 0,
+            "slow_queries": 0,
+            "average_execution_time": 0,
+            "total_execution_time": 0,
+            "top_slow_queries": [],
+            "top_frequent_queries": [],
         }
         all_metrics = []
         cutoff = datetime.now() - timedelta(hours=hours)
@@ -303,32 +318,39 @@ class QueryOptimizer:
             for metrics in metrics_list:
                 if metrics.timestamp >= cutoff:
                     all_metrics.append(metrics)
-                    stats['total_queries'] += 1
-                    stats['total_execution_time'] += metrics.execution_time
+                    stats["total_queries"] += 1
+                    stats["total_execution_time"] += metrics.execution_time
                     if metrics.execution_time > self.slow_query_threshold:
-                        stats['slow_queries'] += 1
+                        stats["slow_queries"] += 1
 
-        if stats['total_queries'] > 0:
-            stats['average_execution_time'] = stats['total_execution_time'] / \
-                stats['total_queries']
+        if stats["total_queries"] > 0:
+            stats["average_execution_time"] = (
+                stats["total_execution_time"] / stats["total_queries"]
+            )
 
         # Sort queries by execution time
         sorted_by_time = sorted(
-            all_metrics, key=lambda m: m.execution_time, reverse=True)
-        stats['top_slow_queries'] = [
-            (m.query_text, m.execution_time) for m in sorted_by_time[:5]]
+            all_metrics, key=lambda m: m.execution_time, reverse=True
+        )
+        stats["top_slow_queries"] = [
+            (m.query_text, m.execution_time) for m in sorted_by_time[:5]
+        ]
 
         # Get most frequent queries
         frequent_queries = sorted(
-            self.query_metrics.items(), key=lambda item: len(item[1]), reverse=True)
-        stats['top_frequent_queries'] = [
-            (item[1][0].query_text, len(item[1])) for item in frequent_queries[:5]]
+            self.query_metrics.items(), key=lambda item: len(item[1]), reverse=True
+        )
+        stats["top_frequent_queries"] = [
+            (item[1][0].query_text, len(item[1])) for item in frequent_queries[:5]
+        ]
 
         return stats
 
     def _get_top_patterns(self, limit: int = 10) -> list[tuple[str, int]]:
         """Get top query patterns"""
-        return sorted(self.query_patterns.items(), key=lambda item: item[1], reverse=True)[:limit]
+        return sorted(
+            self.query_patterns.items(), key=lambda item: item[1], reverse=True
+        )[:limit]
 
     def get_optimization_recommendations(self) -> list[QueryOptimization]:
         """Get all generated optimization recommendations"""
@@ -353,7 +375,9 @@ class QueryOptimizer:
         # Suggest indexes for frequently filtered columns
         for col, count in where_columns.items():
             if count > 10:  # Arbitrary threshold
-                suggestions.append(f"Consider index on {col} (used in WHERE {count} times)")
+                suggestions.append(
+                    f"Consider index on {col} (used in WHERE {count} times)"
+                )
 
         return suggestions
 
@@ -364,14 +388,14 @@ class QueryOptimizer:
         columns = defaultdict(list)
 
         # Find table name
-        table_match = re.search(r'from\s+(\w+)', query, re.IGNORECASE)
+        table_match = re.search(r"from\s+(\w+)", query, re.IGNORECASE)
         if not table_match:
             return columns
 
         table = table_match.group(1)
 
         # Find WHERE clause
-        where_match = re.search(r'where\s+(.*)', query, re.IGNORECASE)
+        where_match = re.search(r"where\s+(.*)", query, re.IGNORECASE)
         if not where_match:
             return columns
 
@@ -379,7 +403,7 @@ class QueryOptimizer:
 
         # Find column names in WHERE clause
         # This regex looks for patterns like `column = value` or `column > value`
-        col_matches = re.findall(r'(\w+)\s*[=<>!]', where_clause)
+        col_matches = re.findall(r"(\w+)\s*[=<>!]", where_clause)
 
         for col in col_matches:
             columns[table].append(col)
@@ -391,8 +415,7 @@ class QueryOptimizer:
         cutoff_date = datetime.now() - timedelta(days=days)
         for query_hash in list(self.query_metrics.keys()):
             self.query_metrics[query_hash] = [
-                m for m in self.query_metrics[query_hash]
-                if m.timestamp >= cutoff_date
+                m for m in self.query_metrics[query_hash] if m.timestamp >= cutoff_date
             ]
             if not self.query_metrics[query_hash]:
                 del self.query_metrics[query_hash]
@@ -423,6 +446,7 @@ _optimizer_lock = threading.Lock()
 
 def get_query_optimizer() -> QueryOptimizer:
     """Get the global QueryOptimizer instance."""
+    global _optimizer_instance
     if _optimizer_instance is None:
         with _optimizer_lock:
             # Check again inside the lock to ensure thread safety

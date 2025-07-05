@@ -123,7 +123,9 @@ class CartManagementUseCase:
                 success=False, error_message="Invalid request data"
             )
         except (TypeError, AttributeError) as e:
-            self._logger.error("💥 UNEXPECTED ERROR adding to cart: %s", e, exc_info=True)
+            self._logger.error(
+                "💥 UNEXPECTED ERROR adding to cart: %s", e, exc_info=True
+            )
             return CartOperationResponse(
                 success=False, error_message="Failed to add item to cart"
             )

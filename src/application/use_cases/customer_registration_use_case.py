@@ -92,9 +92,7 @@ class CustomerRegistrationUseCase:
                 else:
                     # Check if someone else is using this Telegram ID
                     existing_telegram_user = (
-                        await self._customer_repository.find_by_telegram_id(
-                            telegram_id
-                        )
+                        await self._customer_repository.find_by_telegram_id(telegram_id)
                     )
                     if existing_telegram_user:
                         error_msg = (
@@ -210,9 +208,7 @@ class CustomerRegistrationUseCase:
 
         return CustomerRegistrationResponse(success=True)
 
-    async def find_customer_by_telegram_id(
-        self, telegram_id: int
-    ) -> Customer | None:
+    async def find_customer_by_telegram_id(self, telegram_id: int) -> Customer | None:
         """
         Find existing customer by Telegram ID
 

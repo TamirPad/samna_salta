@@ -3,11 +3,12 @@ Domain Layer Tests - Value Objects and Entities
 """
 
 import pytest
+
 from src.domain.entities.customer_entity import Customer
-from src.domain.value_objects.telegram_id import TelegramId
 from src.domain.value_objects.customer_name import CustomerName
-from src.domain.value_objects.phone_number import PhoneNumber
 from src.domain.value_objects.delivery_address import DeliveryAddress
+from src.domain.value_objects.phone_number import PhoneNumber
+from src.domain.value_objects.telegram_id import TelegramId
 
 
 class TestValueObjects:
@@ -64,7 +65,7 @@ class TestValueObjects:
         addresses = [
             "123 Main St, Tel Aviv, Israel",
             "רחוב הרצל 45, תל אביב",
-            "Apartment 5B, Building 12, Ramat Gan"
+            "Apartment 5B, Building 12, Ramat Gan",
         ]
         for address in addresses:
             da = DeliveryAddress(address)
@@ -87,15 +88,15 @@ class TestCustomerEntity:
         name = CustomerName("John Doe")
         phone = PhoneNumber("+972501234567")
         address = DeliveryAddress("123 Main St, Tel Aviv")
-        
+
         customer = Customer(
             id=None,
             telegram_id=telegram_id,
             full_name=name,
             phone_number=phone,
-            delivery_address=address
+            delivery_address=address,
         )
-        
+
         assert customer.telegram_id == telegram_id
         assert customer.full_name == name
         assert customer.phone_number == phone
@@ -109,14 +110,11 @@ class TestCustomerEntity:
         telegram_id = TelegramId(123456789)
         name = CustomerName("John Doe")
         phone = PhoneNumber("+972501234567")
-        
+
         customer = Customer(
-            id=None,
-            telegram_id=telegram_id,
-            full_name=name,
-            phone_number=phone
+            id=None, telegram_id=telegram_id, full_name=name, phone_number=phone
         )
-        
+
         assert customer.delivery_address is None
 
     def test_customer_methods(self):
@@ -124,30 +122,27 @@ class TestCustomerEntity:
         telegram_id = TelegramId(123456789)
         name = CustomerName("John Doe")
         phone = PhoneNumber("+972501234567")
-        
+
         customer = Customer(
-            id=None,
-            telegram_id=telegram_id,
-            full_name=name,
-            phone_number=phone
+            id=None, telegram_id=telegram_id, full_name=name, phone_number=phone
         )
-        
+
         # Test can_place_order
         assert customer.can_place_order() is True
-        
+
         # Test requires_delivery_address
         assert customer.requires_delivery_address() is True
-        
+
         # Test update methods
         new_name = CustomerName("Jane Doe")
         new_phone = PhoneNumber("+972521234567")
         original_updated_at = customer.updated_at
-        
+
         customer.update_contact_info(new_name, new_phone)
         assert customer.full_name == new_name
         assert customer.phone_number == new_phone
         assert customer.updated_at > original_updated_at
-        
+
         # Test admin status
         customer.set_admin_status(True)
-        assert customer.is_admin is True 
+        assert customer.is_admin is True

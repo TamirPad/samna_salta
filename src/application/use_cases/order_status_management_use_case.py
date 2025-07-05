@@ -6,6 +6,7 @@ Handles the business logic for updating order statuses and notifications.
 
 import logging
 
+from src.application.dtos.order_dtos import OrderInfo, OrderItemInfo
 from src.domain.repositories.customer_repository import CustomerRepository
 from src.domain.repositories.order_repository import OrderRepository
 from src.domain.value_objects.customer_id import CustomerId
@@ -19,7 +20,6 @@ from src.infrastructure.utilities.exceptions import (
     BusinessLogicError,
     OrderNotFoundError,
 )
-from src.application.dtos.order_dtos import OrderInfo, OrderItemInfo
 
 
 class OrderStatusManagementUseCase:

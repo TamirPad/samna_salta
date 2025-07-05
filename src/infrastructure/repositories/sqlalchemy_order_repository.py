@@ -24,11 +24,9 @@ class SQLAlchemyOrderRepository(OrderRepository):
     def __init__(self):
         self._logger = logging.getLogger(self.__class__.__name__)
 
-    async def create_order(
-        self, order_data: dict[str, Any]
-    ) -> dict[str, Any] | None:
+    async def create_order(self, order_data: dict[str, Any]) -> dict[str, Any] | None:
         """Create a new order"""
-        self._logger.info("📝 CREATE ORDER: Customer %s", order_data.get('customer_id'))
+        self._logger.info("📝 CREATE ORDER: Customer %s", order_data.get("customer_id"))
 
         try:
             session = get_session()
@@ -249,7 +247,9 @@ class SQLAlchemyOrderRepository(OrderRepository):
             self._logger.error("💥 DATABASE ERROR getting orders by telegram ID: %s", e)
             raise
         except Exception as e:
-            self._logger.error("💥 UNEXPECTED ERROR getting orders by telegram ID: %s", e)
+            self._logger.error(
+                "💥 UNEXPECTED ERROR getting orders by telegram ID: %s", e
+            )
             raise
 
     async def update_order_status(self, order_id: OrderId, status: str) -> bool:
@@ -377,7 +377,9 @@ class SQLAlchemyOrderRepository(OrderRepository):
                     session.commit()
                     self._logger.info("✅ ORDER DELETED: ID %s", order_id.value)
                     return True
-                self._logger.warning("📭 ORDER NOT FOUND for deletion: %s", order_id.value)
+                self._logger.warning(
+                    "📭 ORDER NOT FOUND for deletion: %s", order_id.value
+                )
                 return False
             finally:
                 session.close()

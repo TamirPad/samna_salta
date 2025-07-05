@@ -3,11 +3,11 @@ Database optimizations for improved performance and scalability
 """
 
 import logging
+import shutil
+import threading
 import time
 from contextlib import contextmanager
 from typing import Any, Dict, Optional
-import shutil
-import threading
 
 from sqlalchemy import Index, create_engine, event
 from sqlalchemy.engine import Engine
@@ -16,7 +16,14 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 
 from src.infrastructure.configuration.config import get_config
-from src.infrastructure.database.models import Base, Cart, Customer, Order, OrderItem, Product
+from src.infrastructure.database.models import (
+    Base,
+    Cart,
+    Customer,
+    Order,
+    OrderItem,
+    Product,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +71,9 @@ class DatabaseConnectionManager:
         # Production vs Development settings
         if config.environment == "production":
             # PostgreSQL settings for production
-            if config.database_url.startswith("postgresql"):  # pylint: disable=no-member
+            if config.database_url.startswith(
+                "postgresql"
+            ):  # pylint: disable=no-member
                 pool_settings.update(
                     {
                         "pool_size": 20,

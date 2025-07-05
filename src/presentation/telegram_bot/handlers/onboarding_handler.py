@@ -60,7 +60,9 @@ class OnboardingHandler:
         """Handle /start command - begin onboarding process"""
         user = update.effective_user
 
-        self._logger.info("Start command received from user %s (%s)", user.id, user.username)
+        self._logger.info(
+            "Start command received from user %s (%s)", user.id, user.username
+        )
 
         try:
             # Check if user is already registered using use case
@@ -101,7 +103,9 @@ class OnboardingHandler:
             )
             return END
 
-    async def handle_name(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    async def handle_name(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> int:
         """Handle customer name input with validation"""
         try:
             name = update.message.text.strip()
@@ -216,7 +220,7 @@ class OnboardingHandler:
                     reply_markup=get_main_menu_keyboard(),
                 )
                 return END
-            
+
             # For delivery, ask for address
             await query.edit_message_text(
                 "Great! You've chosen delivery. There's a 5 ILS delivery charge.\n\n"
@@ -284,7 +288,9 @@ class OnboardingHandler:
             await self._send_error_message(update, "Please try again with /start")
             return END
 
-    async def cancel_onboarding(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> int:
+    async def cancel_onboarding(
+        self, update: Update, _: ContextTypes.DEFAULT_TYPE
+    ) -> int:
         """Cancel the onboarding process"""
         user = update.effective_user
         self._logger.info("User %s canceled the onboarding process.", user.id)
@@ -294,7 +300,9 @@ class OnboardingHandler:
         return END
 
     @error_handler("unknown_command")
-    async def handle_unknown_command(self, update: Update, _: ContextTypes.DEFAULT_TYPE):
+    async def handle_unknown_command(
+        self, update: Update, _: ContextTypes.DEFAULT_TYPE
+    ):
         """Handle unknown commands during onboarding."""
         self._logger.warning("Unknown command received: %s", update.message.text)
         await update.message.reply_text(
@@ -302,7 +310,9 @@ class OnboardingHandler:
         )
 
     @error_handler("unknown_message")
-    async def handle_unknown_message(self, update: Update, _: ContextTypes.DEFAULT_TYPE):
+    async def handle_unknown_message(
+        self, update: Update, _: ContextTypes.DEFAULT_TYPE
+    ):
         """Handle unknown messages during onboarding."""
         self._logger.warning("Unknown message received: %s", update.message.text)
         await update.message.reply_text(

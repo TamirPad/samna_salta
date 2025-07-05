@@ -6,7 +6,6 @@ from typing import cast
 
 from src.infrastructure.performance.performance_monitor import PerformanceMonitor
 
-
 _instance: PerformanceMonitor | None = None
 _lock = threading.Lock()
 

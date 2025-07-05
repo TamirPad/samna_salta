@@ -84,7 +84,7 @@ class CartHandler:
 
                 self._logger.info(
                     "✅ ADD SUCCESS: %s added. Cart: %d items, ₪%.2f",
-                    product_info['display_name'],
+                    product_info["display_name"],
                     item_count,
                     cart_total,
                 )
@@ -303,7 +303,9 @@ class CartHandler:
             cart_response = await cart_use_case.get_cart(user_id)
 
             if not cart_response.success or not cart_response.cart_summary.items:
-                self._logger.warning("⚠️ SEND ORDER: Cart empty or invalid for User %s", user_id)
+                self._logger.warning(
+                    "⚠️ SEND ORDER: Cart empty or invalid for User %s", user_id
+                )
                 await query.edit_message_text(
                     "🛒 Your cart is empty. Add items before sending an order.",
                     reply_markup=self._get_back_to_menu_keyboard(),
@@ -317,7 +319,11 @@ class CartHandler:
             order_request = CreateOrderRequest(
                 telegram_id=user_id,
                 items=[
-                    {"product_id": item.product_id, "quantity": item.quantity, "options": item.options}
+                    {
+                        "product_id": item.product_id,
+                        "quantity": item.quantity,
+                        "options": item.options,
+                    }
                     for item in cart_summary.items
                 ],
                 subtotal=cart_summary.total,
@@ -331,7 +337,9 @@ class CartHandler:
                 order_info = order_response.order_summary
                 order_confirmation_text = self._format_order_confirmation(order_info)
 
-                self._logger.info("✅ ORDER SENT: User %s, Order #%s", user_id, order_info.order_number)
+                self._logger.info(
+                    "✅ ORDER SENT: User %s, Order #%s", user_id, order_info.order_number
+                )
 
                 await query.edit_message_text(
                     order_confirmation_text,
@@ -343,7 +351,11 @@ class CartHandler:
                 await cart_use_case.clear_cart(user_id)
                 self._logger.info("🛒 CART CLEARED for User %s", user_id)
             else:
-                self._logger.error("❌ SEND ORDER FAILED for User %s: %s", user_id, order_response.error_message)
+                self._logger.error(
+                    "❌ SEND ORDER FAILED for User %s: %s",
+                    user_id,
+                    order_response.error_message,
+                )
                 await query.edit_message_text(
                     "❌ There was a problem sending your order. Please try again.",
                     reply_markup=get_cart_keyboard(),
@@ -359,7 +371,10 @@ class CartHandler:
             )
         except Exception as e:
             self._logger.critical(
-                "💥 UNEXPECTED SEND ORDER ERROR: User %s, Error: %s", user_id, e, exc_info=True
+                "💥 UNEXPECTED SEND ORDER ERROR: User %s, Error: %s",
+                user_id,
+                e,
+                exc_info=True,
             )
             await query.edit_message_text(
                 "❌ An unexpected error occurred. Please try again.",
@@ -462,7 +477,11 @@ class CartHandler:
                     reply_markup=self._get_back_to_menu_keyboard(),
                 )
             else:
-                self._logger.error("❌ CLEAR CART FAILED for User %s: %s", user_id, clear_response.error_message)
+                self._logger.error(
+                    "❌ CLEAR CART FAILED for User %s: %s",
+                    user_id,
+                    clear_response.error_message,
+                )
                 await query.edit_message_text(
                     f"❌ Could not clear cart: {clear_response.error_message}",
                     reply_markup=get_cart_keyboard(),

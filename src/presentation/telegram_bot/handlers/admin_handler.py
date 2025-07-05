@@ -20,10 +20,7 @@ from telegram.ext import (
 from src.domain.value_objects.customer_id import CustomerId
 from src.domain.value_objects.telegram_id import TelegramId
 from src.infrastructure.container.dependency_injection import get_container
-from src.infrastructure.utilities.exceptions import (
-    BusinessLogicError,
-    error_handler,
-)
+from src.infrastructure.utilities.exceptions import BusinessLogicError, error_handler
 
 # Conversation states
 AWAITING_ORDER_ID, AWAITING_STATUS_UPDATE = range(2)
@@ -147,11 +144,7 @@ class AdminHandler:
                         "🔄 Update Status", callback_data="admin_update_status"
                     ),
                 ],
-                [
-                    InlineKeyboardButton(
-                        "📊 Analytics", callback_data="admin_analytics"
-                    )
-                ],
+                [InlineKeyboardButton("📊 Analytics", callback_data="admin_analytics")],
             ]
 
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -235,8 +228,7 @@ class AdminHandler:
 
             if not orders:
                 text = (
-                    "⏳ <b>PENDING ORDERS</b>\n\n"
-                    "✅ No pending orders! All caught up."
+                    "⏳ <b>PENDING ORDERS</b>\n\n" "✅ No pending orders! All caught up."
                 )
                 keyboard = [
                     [
@@ -293,10 +285,7 @@ class AdminHandler:
             orders = await order_status_use_case.get_active_orders()
 
             if not orders:
-                text = (
-                    "🔄 <b>ACTIVE ORDERS</b>\n\n"
-                    "✅ No active orders at the moment."
-                )
+                text = "🔄 <b>ACTIVE ORDERS</b>\n\n" "✅ No active orders at the moment."
                 keyboard = [
                     [
                         InlineKeyboardButton(
@@ -457,7 +446,11 @@ class AdminHandler:
         return keyboard
 
     async def _update_order_status(
-        self, query: CallbackQuery, order_id: int, new_status: str, admin_telegram_id: int
+        self,
+        query: CallbackQuery,
+        order_id: int,
+        new_status: str,
+        admin_telegram_id: int,
     ) -> None:
         """Update the status of an order."""
         try:
@@ -539,13 +532,12 @@ def register_admin_handlers(application: Application):
         },
     )
 
-    application.add_handler(
-        CommandHandler("admin", admin_handler.handle_admin_command)
-    )
+    application.add_handler(CommandHandler("admin", admin_handler.handle_admin_command))
     application.add_handler(
         CallbackQueryHandler(admin_handler.handle_admin_callback, pattern="^admin_")
     )
     application.add_handler(conversation_handler)
+
 
 RESTART = "admin_dashboard"
 END = ConversationHandler.END

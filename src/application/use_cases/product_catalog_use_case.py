@@ -165,7 +165,6 @@ class ProductCatalogUseCase:
 
             # Special handling for time-sensitive products like Hilbeh
             if product.name.lower() == "hilbeh":
-
                 if not is_hilbeh_available():
                     return ProductCatalogResponse(
                         success=False,
