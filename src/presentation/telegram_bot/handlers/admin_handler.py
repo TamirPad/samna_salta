@@ -5,6 +5,7 @@ Handles admin-specific operations including order management, status updates, an
 """
 
 import logging
+from datetime import datetime
 
 from telegram import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
@@ -302,7 +303,7 @@ class AdminHandler:
                 for order in orders[:10]:  # Show max 10 orders
                     order_summary = (
                         f"#{order.order_number} - {order.customer_name} - "
-                        f"{order.status.value}"
+                        f"{getattr(order.status, 'value', str(order.status)).capitalize()}"
                     )
                     keyboard.append(
                         [
@@ -353,7 +354,7 @@ class AdminHandler:
                 for order in orders[:15]:  # Show max 15
                     order_summary = (
                         f"#{order.order_number} - {order.customer_name} - "
-                        f"{order.status.value}"
+                        f"{getattr(order.status, 'value', str(order.status)).capitalize()}"
                     )
                     keyboard.append(
                         [
@@ -414,15 +415,20 @@ class AdminHandler:
             f"📦 <b>Order #{order_info.order_number}</b>",
             f"👤 <b>Customer:</b> {order_info.customer_name}",
             f"📞 <b>Phone:</b> {order_info.customer_phone}",
-            f" STATUS: {order_info.status.value}",
+            f" STATUS: {getattr(order_info.status, 'value', str(order_info.status)).capitalize()}",
             f"💰 <b>Total:</b> ₪{order_info.total:.2f}",
-            f"📅 <b>Created:</b> {order_info.created_at.strftime('%Y-%m-%d %H:%M')}",
+            f"📅 <b>Created:</b> "
+            f"{(order_info.created_at or datetime.utcnow()).strftime('%Y-%m-%d %H:%M')}",
         ]
         if order_info.items:
             details.append("\n🛒 <b>Items:</b>")
             for item in order_info.items:
+                price = getattr(item, 'total_price', getattr(item, 'price', None))
+                if price is None:
+                    # Fallback to unit_price * quantity if total not provided
+                    price = getattr(item, 'unit_price', 0.0) * getattr(item, 'quantity', 1)
                 details.append(
-                    f"- {item.product_name} (x{item.quantity}) - ₪{item.price:.2f}"
+                    f"- {item.product_name} (x{item.quantity}) - ₪{price:.2f}"
                 )
         return "\n".join(details)
 

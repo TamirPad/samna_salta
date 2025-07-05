@@ -408,10 +408,20 @@ class BotSecurityManager:
         # Get the numeric value if it's a TelegramId object
         user_id = telegram_id.value if hasattr(telegram_id, 'value') else telegram_id
         
-        # For now, hardcode the admin IDs for simplicity
-        # In a production environment, this should come from a database or config
-        admin_ids = [598829473]  # Add your admin Telegram IDs here
-        
+        # Admin IDs may come from configuration (.env / config.yaml)
+        try:
+            from src.infrastructure.configuration.config import get_config  # local import to avoid heavy import chains
+
+            cfg = get_config()
+            admin_ids_cfg = [cfg.admin_chat_id] if getattr(cfg, "admin_chat_id", None) else []
+        except Exception:  # pragma: no cover – config not yet initialised in some tests
+            admin_ids_cfg = []
+
+        # Fallback hard-coded ID(s) to keep backward compatibility
+        legacy_ids = [598829473]
+
+        admin_ids = set(admin_ids_cfg + legacy_ids)
+
         return user_id in admin_ids
 
 

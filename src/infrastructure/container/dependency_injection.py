@@ -30,6 +30,7 @@ from ..repositories.sqlalchemy_product_repository import SQLAlchemyProductReposi
 from ..security.rate_limiter import BotSecurityManager
 from ..services.admin_notification_service import AdminNotificationService
 from ..services.customer_notification_service import CustomerNotificationService
+from ..configuration.config import get_config  # local import
 
 logger = logging.getLogger(__name__)
 
@@ -77,8 +78,15 @@ class DependencyContainer:
     def _register_services(self):
         """Register service implementations"""
         if self._bot:
+            # Provide admin IDs from configuration so owners who are not
+            # customers can still receive notifications.
+            cfg = get_config()
+            admin_ids_cfg = [cfg.admin_chat_id] if cfg.admin_chat_id else []
+
             self._instances["admin_notification_service"] = AdminNotificationService(
-                bot=self._bot, customer_repository=self.get_customer_repository()
+                bot=self._bot,
+                customer_repository=self.get_customer_repository(),
+                config_admin_ids=admin_ids_cfg,
             )
 
             self._instances[

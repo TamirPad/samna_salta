@@ -15,11 +15,25 @@ from src.infrastructure.services.notification_utils import format_order_details
 
 
 class AdminNotificationService:
-    """Service for sending notifications to admin users"""
+    """Service for sending notifications to admin users.
 
-    def __init__(self, bot: Bot, customer_repository: CustomerRepository):
+    The list of admin Telegram-IDs can come from two sources:
+    1. `config_admin_ids` – passed in via the DI container (owner IDs that are
+       **not** customers).
+    2. Customers stored in the DB with `is_admin = True`.
+    Both sources are merged so either mechanism continues to work.
+    """
+
+    def __init__(
+        self,
+        bot: Bot,
+        customer_repository: CustomerRepository,
+        *,
+        config_admin_ids: list[int] | None = None,
+    ):
         self._bot = bot
         self._customer_repository = customer_repository
+        self._config_admin_ids: list[int] = config_admin_ids or []
         self._logger = logging.getLogger(self.__class__.__name__)
 
         # Log initialization
@@ -28,6 +42,8 @@ class AdminNotificationService:
         self._logger.info(
             "  👤 Customer Repository: %s", type(self._customer_repository).__name__
         )
+        if self._config_admin_ids:
+            self._logger.info("  👑 Config admin IDs: %s", self._config_admin_ids)
 
     async def notify_new_order(self, order_info: OrderInfo) -> None:
         """Send new order notification to all admin users"""
@@ -43,7 +59,7 @@ class AdminNotificationService:
 
         try:
             # Get admin users
-            self._logger.info("👑 STEP 1: Finding admin users...")
+            self._logger.info("👑 SEARCHING FOR ADMIN USERS...")
             admin_users = await self._get_admin_users()
             if not admin_users:
                 self._logger.warning(
@@ -132,10 +148,17 @@ class AdminNotificationService:
         """Get list of admin user telegram IDs"""
         self._logger.info("👑 SEARCHING FOR ADMIN USERS...")
         try:
+            # 1. Admin IDs provided via configuration --------------------------------
+            admin_ids: set[int] = set(self._config_admin_ids)
+
+            if self._config_admin_ids:
+                self._logger.info(
+                    "👑 %d admin IDs supplied from config", len(self._config_admin_ids)
+                )
+
+            # 2. Admin customers stored in DB ----------------------------------------
             customers = await self._customer_repository.get_all_customers()
             self._logger.info("👥 FOUND %d TOTAL CUSTOMERS", len(customers))
-
-            admin_users = []
 
             for i, customer in enumerate(customers):
                 self._logger.info(
@@ -148,15 +171,12 @@ class AdminNotificationService:
                 )
 
                 if customer.is_admin:
-                    admin_users.append(customer.telegram_id.value)
-                    self._logger.info(
-                        "  👑 ADMIN FOUND: %s (TelegramID: %s)",
-                        customer.full_name.value,
-                        customer.telegram_id.value,
-                    )
+                    admin_ids.add(customer.telegram_id.value)
+
+            admin_users = sorted(list(admin_ids))
 
             self._logger.info(
-                "👑 ADMIN SEARCH COMPLETE: Found %d admin users", len(admin_users)
+                "👑 ADMIN SEARCH COMPLETE: Found %d unique admin users", len(admin_users)
             )
             if admin_users:
                 self._logger.info("👑 ADMIN TELEGRAM IDS: %s", admin_users)

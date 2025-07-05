@@ -43,7 +43,7 @@ def format_order_details(order_info: OrderInfo, header: str) -> str:
 📋 <b>Order Details:</b>
 🔢 Order #: <code>{order_info.order_number}</code>
 {status_emoji} Status: <b>{order_info.status.title()}</b>
-📅 Date: {order_info.created_at.strftime('%d/%m/%Y %H:%M')}
+📅 Date: {(order_info.created_at or __import__('datetime').datetime.utcnow()).strftime('%d/%m/%Y %H:%M')}
 
 👤 <b>Customer Info:</b>
 👨‍💼 Name: <b>{order_info.customer_name}</b>
