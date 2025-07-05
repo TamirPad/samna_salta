@@ -296,7 +296,7 @@ class OrderAnalyticsUseCase:
             products = overview["popular_products"]
             customers = overview["customer_insights"]
 
-            report = """
+            report = f"""
 📊 <b>BUSINESS ANALYTICS REPORT</b>
 📅 Generated: {datetime.now().strftime('%d/%m/%Y %H:%M')}
 
@@ -317,7 +317,7 @@ class OrderAnalyticsUseCase:
                     f"\n{i}. {product['product_name']}: {product['order_count']} orders"
                 )
 
-            report += """
+            report += f"""
 
 👥 <b>CUSTOMER INSIGHTS:</b>
 👨‍💼 Total Customers: {customers['total_customers']}

@@ -527,8 +527,12 @@ class AdminHandler:
                 parse_mode="HTML",
             )
 
-            # Return to dashboard
-            await self._show_admin_dashboard(query, None)
+            # Return to dashboard - create a mock update object from query
+            from types import SimpleNamespace
+            mock_update = SimpleNamespace()
+            mock_update.callback_query = query
+            mock_update.message = None
+            await self._show_admin_dashboard(mock_update, None)
 
         except BusinessLogicError as e:
             await query.message.reply_text(f"❌ Error: {e.user_message}")
