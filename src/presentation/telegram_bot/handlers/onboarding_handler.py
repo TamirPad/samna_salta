@@ -342,7 +342,6 @@ def register_onboarding_handlers(application):
         },
         fallbacks=[
             CommandHandler("cancel", handler.cancel_onboarding),
-            CommandHandler("start", handler.start_command),
             MessageHandler(filters.COMMAND, handler.handle_unknown_command),
             MessageHandler(filters.ALL, handler.handle_unknown_message),
         ],
