@@ -77,7 +77,7 @@ class AdminHandler:
         elif data == "admin_all_orders":
             await self._show_all_orders(query)
         elif data == "admin_update_status":
-            await self._start_status_update(query)
+            return await self._start_status_update(query)
         elif data == "admin_analytics":
             await self._show_analytics(query)
         elif data.startswith("admin_order_"):
@@ -247,7 +247,7 @@ class AdminHandler:
                 keyboard = []
                 for order in orders[:10]:  # Show max 10 orders
                     order_summary = (
-                        f"#{order.order_number} - {order.customer_name} - "
+                        f"#{order.order_number} (ID {order.order_id}) - {order.customer_name} - "
                         f"₪{order.total:.2f}"
                     )
                     keyboard.append(
@@ -302,7 +302,7 @@ class AdminHandler:
                 keyboard = []
                 for order in orders[:10]:  # Show max 10 orders
                     order_summary = (
-                        f"#{order.order_number} - {order.customer_name} - "
+                        f"#{order.order_number} (ID {order.order_id}) - {order.customer_name} - "
                         f"{getattr(order.status, 'value', str(order.status)).capitalize()}"
                     )
                     keyboard.append(
@@ -353,7 +353,7 @@ class AdminHandler:
                 keyboard = []
                 for order in orders[:15]:  # Show max 15
                     order_summary = (
-                        f"#{order.order_number} - {order.customer_name} - "
+                        f"#{order.order_number} (ID {order.order_id}) - {order.customer_name} - "
                         f"{getattr(order.status, 'value', str(order.status)).capitalize()}"
                     )
                     keyboard.append(
@@ -412,7 +412,7 @@ class AdminHandler:
             return None
 
         details = [
-            f"📦 <b>Order #{order_info.order_number}</b>",
+            f"📦 <b>Order #{order_info.order_number}</b> (ID {order_info.order_id})",
             f"👤 <b>Customer:</b> {order_info.customer_name}",
             f"📞 <b>Phone:</b> {order_info.customer_phone}",
             f" STATUS: {getattr(order_info.status, 'value', str(order_info.status)).capitalize()}",
@@ -493,7 +493,19 @@ class AdminHandler:
         order_id_str = update.message.text
         try:
             order_id = int(order_id_str)
-            await self._show_order_details(update.callback_query, order_id)
+            # Fetch formatted details and send as a regular message with inline keyboard
+            order_details = await self._get_formatted_order_details(order_id)
+            if not order_details:
+                await update.message.reply_text("❌ Order not found. Try another ID.")
+                return AWAITING_ORDER_ID
+
+            keyboard = self._create_order_details_keyboard(order_id)
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await update.message.reply_text(
+                order_details, parse_mode="HTML", reply_markup=reply_markup
+            )
+
             context.user_data["order_id_for_status_update"] = order_id
             return AWAITING_STATUS_UPDATE
         except (ValueError, AttributeError):
@@ -538,11 +550,13 @@ def register_admin_handlers(application: Application):
         },
     )
 
+    # The conversation handler must be registered BEFORE the generic admin callback handler
+    # so that its entry point (admin_update_status) is not intercepted by the broader pattern.
     application.add_handler(CommandHandler("admin", admin_handler.handle_admin_command))
+    application.add_handler(conversation_handler)
     application.add_handler(
         CallbackQueryHandler(admin_handler.handle_admin_callback, pattern="^admin_")
     )
-    application.add_handler(conversation_handler)
 
 
 RESTART = "admin_dashboard"
