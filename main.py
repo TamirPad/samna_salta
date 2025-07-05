@@ -52,19 +52,24 @@ def main():
         async def error_handler(
             update: object, context: ContextTypes.DEFAULT_TYPE
         ) -> None:
-            """Log the error and send a telegram message to notify the developer."""
-            logger.error(f"Exception while handling an update: {context.error}")
+            """Central error handler – logs and tries to notify the user."""
+            logger.error("Exception while handling an update: %s", context.error, exc_info=True)
 
-            # Handle specific Telegram errors
+            # Ignore polling conflicts gracefully
             if "Conflict: terminated by other getUpdates request" in str(context.error):
-                logger.warning(
-                    "Bot conflict detected - another instance may be running"
-                )
-                # Don't crash, just log and continue
+                logger.warning("Bot conflict detected – another instance may be running")
                 return
 
-            # For other errors, try to notify the user if possible
-            if update and hasattr(update, "effective_user") and update.effective_user:
+            # Determine the Telegram user (Update or CallbackQuery)
+            tg_user = None
+            if update is not None:
+                if hasattr(update, "effective_user") and update.effective_user:
+                    tg_user = update.effective_user
+                elif hasattr(update, "from_user") and update.from_user:  # CallbackQuery
+                    tg_user = update.from_user
+
+            # Attempt to notify the user
+            if tg_user is not None:
                 try:
                     if hasattr(update, "message") and update.message:
                         await update.message.reply_text(
@@ -74,8 +79,11 @@ def main():
                         await update.callback_query.message.reply_text(
                             "Sorry, something went wrong. Please try again."
                         )
-                except Exception as e:
-                    logger.error(f"Failed to send error message to user: {e}")
+                    elif hasattr(update, "answer"):
+                        # Fallback for bare CallbackQuery objects passed erroneously
+                        await update.answer(text="An error occurred. Please try again.")
+                except Exception as send_err:  # pragma: no cover
+                    logger.error("Failed to send error message to user: %s", send_err)
 
         # Register the error handler
         application.add_error_handler(error_handler)

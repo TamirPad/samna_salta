@@ -55,6 +55,15 @@ class SQLAlchemyCustomerRepository(CustomerRepository):
             if not sql_customer:
                 return None
 
+            # Guard against invalid or empty full_name that would violate domain validation.
+            if not sql_customer.full_name or not str(sql_customer.full_name).strip():
+                # Treat as not found / incomplete record.
+                self._logger.warning(
+                    "Customer record with telegram_id %s has empty full_name; ignoring.",
+                    telegram_id.value,
+                )
+                return None
+
             return self._map_to_domain(sql_customer)
 
     async def find_by_phone_number(
@@ -71,22 +80,46 @@ class SQLAlchemyCustomerRepository(CustomerRepository):
             if not sql_customer:
                 return None
 
+            if not sql_customer.full_name or not str(sql_customer.full_name).strip():
+                self._logger.warning(
+                    "Customer record with phone_number %s has empty full_name; ignoring.",
+                    phone_number.value,
+                )
+                return None
+
             return self._map_to_domain(sql_customer)
 
     async def save(self, customer: DomainCustomer) -> DomainCustomer:
         """Save customer to database"""
         with managed_session() as session:
             if customer.id is None:
-                # Create new customer
-                sql_customer = SQLCustomer(
-                    telegram_id=customer.telegram_id.value,
-                    full_name=customer.full_name.value,
-                    phone_number=customer.phone_number.value,
-                    delivery_address=customer.delivery_address.value
-                    if customer.delivery_address
-                    else None,
+                # If a record with the same telegram_id already exists (likely created with empty full_name),
+                # update it instead of inserting a new one to avoid UNIQUE constraint errors.
+                sql_customer = (
+                    session.query(SQLCustomer)
+                    .filter(SQLCustomer.telegram_id == customer.telegram_id.value)
+                    .first()
                 )
-                session.add(sql_customer)
+
+                if sql_customer is None:
+                    # Create new customer
+                    sql_customer = SQLCustomer(
+                        telegram_id=customer.telegram_id.value,
+                        full_name=customer.full_name.value,
+                        phone_number=customer.phone_number.value,
+                        delivery_address=customer.delivery_address.value
+                        if customer.delivery_address
+                        else None,
+                    )
+                    session.add(sql_customer)
+                else:
+                    # Update existing placeholder row
+                    sql_customer.full_name = customer.full_name.value
+                    sql_customer.phone_number = customer.phone_number.value
+                    sql_customer.delivery_address = (
+                        customer.delivery_address.value if customer.delivery_address else None
+                    )
+
                 session.commit()
                 session.refresh(sql_customer)
 

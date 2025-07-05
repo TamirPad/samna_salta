@@ -32,7 +32,7 @@ class Customer(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     telegram_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    full_name: Mapped[str] = mapped_column(String(100), nullable=False)
     phone_number: Mapped[str] = mapped_column(String(20), nullable=False)
     delivery_address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -41,6 +41,16 @@ class Customer(Base):
     updated_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), onupdate=func.now(), nullable=True
     )
+
+    # Temporary alias so legacy code/tests that might still access `sql_customer.name` don't break.
+    @property  # pragma: no cover
+    def name(self) -> str:  # type: ignore
+        """Alias for backward-compatibility. Prefer `full_name`."""
+        return self.full_name
+
+    @name.setter  # pragma: no cover
+    def name(self, value: str) -> None:  # type: ignore
+        self.full_name = value
 
     # Relationships
     orders: Mapped[List["Order"]] = relationship("Order", back_populates="customer")

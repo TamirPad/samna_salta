@@ -48,6 +48,7 @@ class GetCartResponse:
     cart_items: List[CartItemInfo] = None
     delivery_method: Optional[str] = None
     delivery_address: Optional[str] = None
+    cart_total: float = 0.0
     error_message: Optional[str] = None
 
 

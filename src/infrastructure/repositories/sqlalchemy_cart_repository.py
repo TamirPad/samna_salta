@@ -112,7 +112,7 @@ class SQLAlchemyCartRepository(CartRepository):
         self._logger.info(
             "➕ ADD ITEM: User %s, Product %s, Qty %d, Options %s",
             telegram_id.value,
-            product_id.value,
+            product_id.value if hasattr(product_id, 'value') else int(product_id),
             quantity,
             options,
         )
@@ -144,7 +144,7 @@ class SQLAlchemyCartRepository(CartRepository):
             existing_item = None
             for i, item in enumerate(items):
                 if (
-                    item.get("product_id") == product_id.value
+                    item.get("product_id") == (product_id.value if hasattr(product_id, 'value') else int(product_id))
                     and item.get("options", {}) == options
                 ):
                     existing_item = i
@@ -166,7 +166,7 @@ class SQLAlchemyCartRepository(CartRepository):
             else:
                 # Add new item
                 new_item = {
-                    "product_id": product_id.value,
+                    "product_id": (product_id.value if hasattr(product_id, 'value') else int(product_id)),
                     "quantity": quantity,
                     "options": options,
                 }

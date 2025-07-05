@@ -183,7 +183,7 @@ class MenuHandler:
         )
         await query.edit_message_text(
             text,
-            reply_markup=get_direct_add_keyboard("Hawaij coffee spice"),
+            reply_markup=get_direct_add_keyboard("Hawaij coffee spice", include_info=False),
             parse_mode="Markdown",
         )
 
@@ -198,7 +198,7 @@ class MenuHandler:
         )
         await query.edit_message_text(
             text,
-            reply_markup=get_direct_add_keyboard("White coffee"),
+            reply_markup=get_direct_add_keyboard("White coffee", include_info=False),
             parse_mode="Markdown",
         )
 

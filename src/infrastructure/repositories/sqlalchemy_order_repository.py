@@ -57,6 +57,14 @@ class SQLAlchemyOrderRepository(OrderRepository):
                         total=order_data["total"],
                         status="pending",
                     )
+                    
+                    # Set items field if it exists in the model but might be missing in database
+                    if "items" in order_data and hasattr(order, "items"):
+                        try:
+                            order.items = order_data.get("items", [])
+                        except Exception as e:
+                            self._logger.warning("Could not set items field: %s", e)
+                    
                     session.add(order)
                     session.flush()  # Get order ID
 
@@ -74,10 +82,19 @@ class SQLAlchemyOrderRepository(OrderRepository):
                             unit_price=item_data["unit_price"],
                             total_price=item_data["total_price"],
                         )
+                        # Add product_id if available in the item data
+                        if "product_id" in item_data and item_data["product_id"] is not None:
+                            order_item.product_id = item_data["product_id"]
+                        
                         session.add(order_item)
 
                     session.commit()
-                    session.refresh(order)
+                    # Try to refresh but don't fail if columns are missing
+                    try:
+                        session.refresh(order)
+                    except Exception as e:
+                        self._logger.warning("Could not refresh order: %s", e)
+                        # Continue without refresh
 
                     # Return order data
                     result = {

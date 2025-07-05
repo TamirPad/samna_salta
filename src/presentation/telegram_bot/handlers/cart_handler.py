@@ -231,7 +231,11 @@ class CartHandler:
         query = update.callback_query
         await query.answer()
 
-        user_id = update.effective_user.id
+        # CallbackQuery objects don't expose `effective_user`; use `from_user`.
+        try:
+            user_id = query.effective_user.id  # type: ignore[attr-defined]
+        except AttributeError:
+            user_id = query.from_user.id  # type: ignore[attr-defined]
         self._logger.info("🛒 VIEW CART: User %s", user_id)
 
         try:
@@ -266,9 +270,8 @@ class CartHandler:
                 if cart_summary
                 else [],
                 delivery_method=cart_summary.delivery_method if cart_summary else None,
-                delivery_address=cart_summary.delivery_address
-                if cart_summary
-                else None,
+                delivery_address=cart_summary.delivery_address if cart_summary else None,
+                cart_total=cart_summary.total if cart_summary else 0.0,
             )
 
             # Display cart contents
@@ -289,7 +292,11 @@ class CartHandler:
         query = update.callback_query
         await query.answer()
 
-        user_id = update.effective_user.id
+        # CallbackQuery objects don't expose `effective_user`; use `from_user`.
+        try:
+            user_id = query.effective_user.id  # type: ignore[attr-defined]
+        except AttributeError:
+            user_id = query.from_user.id  # type: ignore[attr-defined]
         self._logger.info("📤 SEND ORDER: User %s", user_id)
 
         try:
@@ -316,25 +323,19 @@ class CartHandler:
 
             # Create order request from cart summary
             cart_summary = cart_response.cart_summary
+            # CreateOrderRequest only accepts telegram_id, delivery_method, delivery_address, and notes
             order_request = CreateOrderRequest(
                 telegram_id=user_id,
-                items=[
-                    {
-                        "product_id": item.product_id,
-                        "quantity": item.quantity,
-                        "options": item.options,
-                    }
-                    for item in cart_summary.items
-                ],
-                subtotal=cart_summary.total,
-                total=cart_summary.total,  # Assume total is same as subtotal for now
+                # Use default delivery method and address from cart if available
+                delivery_method=cart_summary.delivery_method,
+                delivery_address=cart_summary.delivery_address,
             )
 
             # Create order
             order_response = await order_use_case.create_order(order_request)
 
             if order_response.success:
-                order_info = order_response.order_summary
+                order_info = order_response.order_info
                 order_confirmation_text = self._format_order_confirmation(order_info)
 
                 self._logger.info(
@@ -344,7 +345,7 @@ class CartHandler:
                 await query.edit_message_text(
                     order_confirmation_text,
                     parse_mode="HTML",
-                    reply_markup=get_main_menu_keyboard(),
+                    reply_markup=self._get_back_to_menu_keyboard(),
                 )
 
                 # Clear the cart after sending the order
@@ -367,7 +368,7 @@ class CartHandler:
             )
             await query.edit_message_text(
                 f"❌ Error creating order: {e}",
-                reply_markup=get_cart_keyboard(cart_response.cart_summary),
+                reply_markup=get_cart_keyboard(),
             )
         except Exception as e:
             self._logger.critical(
@@ -403,7 +404,11 @@ class CartHandler:
         self, query: CallbackQuery, cart_response: GetCartResponse
     ) -> None:
         """Display cart contents and action buttons"""
-        user_id = query.effective_user.id
+        # CallbackQuery objects don't expose `effective_user`; use `from_user`.
+        try:
+            user_id = query.effective_user.id  # type: ignore[attr-defined]
+        except AttributeError:
+            user_id = query.from_user.id  # type: ignore[attr-defined]
 
         if not cart_response.success or not cart_response.cart_items:
             self._logger.info("🛒 CART is empty for User %s", user_id)
@@ -417,32 +422,20 @@ class CartHandler:
 
         self._logger.info("🛒 DISPLAYING cart for User %s", user_id)
 
-        if not cart_response.cart_summary or not cart_response.cart_summary.items:
-            await query.edit_message_text(
-                text="🛒 Your cart is empty!",
-                reply_markup=self._get_back_to_menu_keyboard(),
-            )
-            return
-
         items_text = [
-            (
-                f"• {item.quantity}x {item.product_name} "
-                f"({format_price(item.unit_price)}) - {format_price(item.total_price)}"
-            )
+            f"<b>{item.product_name}</b> x{item.quantity} @ {format_price(item.unit_price)} = {format_price(item.total_price)}"
             for item in cart_response.cart_items
         ]
-        cart_items_text = "\n".join(items_text)
 
-        text = (
-            "🛒 <b>Your Cart</b>\n\n"
-            f"{cart_items_text}\n\n"
+        cart_text = (
+            "🛒 <b>Your Cart</b> 🛒\n\n" + "\n".join(items_text) + "\n\n" +
             f"<b>Total: {format_price(cart_response.cart_total)}</b>"
         )
 
         await query.edit_message_text(
-            text=text,
+            text=cart_text,
             parse_mode="HTML",
-            reply_markup=get_cart_keyboard(cart_response.cart_summary),
+            reply_markup=get_cart_keyboard(),
         )
 
     def _get_back_to_menu_keyboard(self) -> InlineKeyboardMarkup:
@@ -460,7 +453,11 @@ class CartHandler:
         query = update.callback_query
         await query.answer()
 
-        user_id = update.effective_user.id
+        # CallbackQuery objects don't expose `effective_user`; use `from_user`.
+        try:
+            user_id = query.effective_user.id  # type: ignore[attr-defined]
+        except AttributeError:
+            user_id = query.from_user.id  # type: ignore[attr-defined]
         self._logger.info("🗑️ CLEAR CART: User %s", user_id)
 
         try:

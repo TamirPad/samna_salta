@@ -194,9 +194,24 @@ class DatabaseManager:
                             "ALTER TABLE carts ADD COLUMN delivery_method VARCHAR(20) DEFAULT 'pickup'",
                         ),
                         (
+                            "carts",
+                            "customer_id",
+                            "ALTER TABLE carts ADD COLUMN customer_id INTEGER",
+                        ),
+                        (
                             "orders",
                             "delivery_method",
                             "ALTER TABLE orders ADD COLUMN delivery_method VARCHAR(20) DEFAULT 'pickup'",
+                        ),
+                        (
+                            "order_items",
+                            "product_id",
+                            "ALTER TABLE order_items ADD COLUMN product_id INTEGER REFERENCES products(id)",
+                        ),
+                        (
+                            "orders",
+                            "items",
+                            "ALTER TABLE orders ADD COLUMN items JSON",
                         ),
                     ]
 

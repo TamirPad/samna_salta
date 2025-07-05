@@ -106,25 +106,30 @@ def get_red_bisbas_menu_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_direct_add_keyboard(product_name: str):
-    """Get direct add to cart keyboard for simple products"""
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                "➕ Add to cart",
-                callback_data=f"add_{product_name.lower().replace(' ', '_')}",
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "ℹ️ Info",
-                callback_data=f"info_{product_name.lower().replace(' ', '_')}",
-            )
-        ],
-        [InlineKeyboardButton("⬅️ Back to main menu", callback_data="menu_main")],
-    ]
+def get_direct_add_keyboard(product_name: str, include_info: bool = True):
+    """Get direct add-to-cart keyboard.
 
-    return InlineKeyboardMarkup(keyboard)
+    If *include_info* is False, the ℹ️ Info button is omitted. This is currently
+    used for coffee products where an info popup is unnecessary.
+    """
+
+    add_button = InlineKeyboardButton(
+        "➕ Add to cart",
+        callback_data=f"add_{product_name.lower().replace(' ', '_')}",
+    )
+
+    rows = [[add_button]]
+
+    if include_info:
+        info_button = InlineKeyboardButton(
+            "ℹ️ Info",
+            callback_data=f"info_{product_name.lower().replace(' ', '_')}",
+        )
+        rows.append([info_button])
+
+    rows.append([InlineKeyboardButton("⬅️ Back to main menu", callback_data="menu_main")])
+
+    return InlineKeyboardMarkup(rows)
 
 
 def get_hilbeh_menu_keyboard():
