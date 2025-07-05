@@ -392,7 +392,8 @@ class AdminHandler:
                 await query.message.reply_text("Order not found.")
                 return
 
-            customer = await customer_repository.find_by_id(order_data["customer_id"])
+            from src.domain.value_objects.customer_id import CustomerId
+            customer = await customer_repository.find_by_id(CustomerId(order_data["customer_id"]))
             if not customer:
                 await query.message.reply_text("Customer not found for this order.")
                 return

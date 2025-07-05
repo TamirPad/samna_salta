@@ -10,6 +10,7 @@ from typing import List, Optional
 
 from ...domain.repositories.customer_repository import CustomerRepository
 from ...domain.repositories.order_repository import OrderRepository
+from ...domain.value_objects.customer_id import CustomerId
 from ...infrastructure.services.admin_notification_service import (
     AdminNotificationService,
 )
@@ -95,7 +96,7 @@ class OrderStatusManagementUseCase:
 
             # Get customer info
             customer = await self._customer_repository.find_by_id(
-                updated_order["customer_id"]
+                CustomerId(updated_order["customer_id"])
             )
             if not customer:
                 raise BusinessLogicError("Customer not found for order")
@@ -133,7 +134,7 @@ class OrderStatusManagementUseCase:
             order_infos = []
             for order_data in filtered_orders:
                 customer = await self._customer_repository.find_by_id(
-                    order_data["customer_id"]
+                    CustomerId(order_data["customer_id"])
                 )
                 if customer:
                     order_info = self._create_order_info(order_data, customer)
@@ -159,7 +160,7 @@ class OrderStatusManagementUseCase:
         for order_data in all_orders:
             if order_data.get("status") in active_statuses:
                 customer = await self._customer_repository.find_by_id(
-                    order_data["customer_id"]
+                    CustomerId(order_data["customer_id"])
                 )
                 if customer:
                     order_info = self._create_order_info(order_data, customer)
