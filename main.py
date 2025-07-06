@@ -6,6 +6,9 @@ Main entry point for the Samna Salta Telegram Bot
 import logging
 import sys
 from pathlib import Path
+import threading
+import os
+from flask import Flask
 
 # Add current directory to Python path for deployment
 sys.path.insert(0, str(Path(__file__).parent))
@@ -22,9 +25,8 @@ from src.presentation.telegram_bot.handlers import register_handlers
 # Load environment variables
 load_dotenv()
 
-
-def main():
-    """Main function to run the bot"""
+def run_bot():
+    """Function to run the bot (to be started in a background thread)"""
     # Setup production logging
     ProductionLogger.setup_logging()
     logger = logging.getLogger(__name__)
@@ -140,15 +142,21 @@ def main():
         logger.error(f"Error starting bot: {e}")
         raise
 
+# Minimal Flask app for Render health check
+app = Flask(__name__)
+
+@app.route("/")
+def health_check():
+    return "OK", 200
 
 if __name__ == "__main__":
     # Ensure data directory exists
     Path("data").mkdir(exist_ok=True)
 
-    # Run the bot
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("Bot stopped by user")
-    except Exception as e:
-        print(f"Error: {e}")
+    # Start the bot in a background thread
+    bot_thread = threading.Thread(target=run_bot, daemon=True)
+    bot_thread.start()
+
+    # Start the Flask web server for health checks
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
