@@ -71,4 +71,8 @@ i18n = I18nManager()
 
 def _(key: str, language: Optional[str] = None) -> str:
     """Shorthand function to get translated text"""
+    return i18n.get_text(key, language)
+
+def tr(key: str, language: Optional[str] = None) -> str:
+    """Translation function alias for backward compatibility"""
     return i18n.get_text(key, language) 

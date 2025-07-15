@@ -930,9 +930,15 @@ def get_all_customers() -> list[Customer]:
 
 
 def get_all_orders() -> list[Order]:
-    """Get all orders with customer information"""
+    """Get all orders with customer and order_items information"""
     session = get_db_session()
     try:
-        return session.query(Order).options(joinedload(Order.customer)).order_by(Order.created_at.desc()).all()
+        from sqlalchemy.orm import joinedload
+        return (
+            session.query(Order)
+            .options(joinedload(Order.customer), joinedload(Order.order_items))
+            .order_by(Order.created_at.desc())
+            .all()
+        )
     finally:
         session.close()
