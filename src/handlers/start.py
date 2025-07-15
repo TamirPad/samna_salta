@@ -4,7 +4,7 @@ Onboarding Handler for the Telegram bot.
 
 import logging
 
-from telegram import Update
+from telegram import Update, CallbackQuery
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -59,14 +59,16 @@ class OnboardingHandler:
             existing_customer = self.cart_service.get_customer(user.id)
 
             if existing_customer:
-                # Welcome back existing customer with menu
+                # Welcome back existing customer with main page
                 welcome_message = (
-                    i18n.get_text("WELCOME_BACK").format(name=existing_customer.full_name) + "\n\n" +
-                    i18n.get_text("WHAT_TO_ORDER_TODAY")
+                    f"🇾🇪 **Welcome to Samna Salta!** 🇾🇪\n\n"
+                    f"👋 **Hello {existing_customer.full_name}!**\n\n"
+                    f"Welcome back to the best traditional Yemenite food experience!\n\n"
+                    f"What would you like to do today?"
                 )
                 await update.message.reply_text(
                     welcome_message,
-                    reply_markup=get_main_menu_keyboard(),
+                    reply_markup=self._get_main_page_keyboard(),
                     parse_mode="HTML"
                 )
                 return END
@@ -161,8 +163,9 @@ class OnboardingHandler:
                 await update.message.reply_text(
                     i18n.get_text("WELCOME_BACK_UPDATED").format(name=result["customer"].full_name) + "\n\n" +
                     i18n.get_text("INFO_UPDATED") + "\n\n" +
-                    i18n.get_text("WHAT_TO_ORDER_TODAY"),
-                    reply_markup=get_main_menu_keyboard(),
+                    f"🇾🇪 **Welcome to Samna Salta!** 🇾🇪\n\n"
+                    f"What would you like to do today?",
+                    reply_markup=self._get_main_page_keyboard(),
                     parse_mode="HTML"
                 )
                 next_state = END
@@ -215,8 +218,10 @@ class OnboardingHandler:
                     )
 
                 await query.edit_message_text(
-                    i18n.get_text("REGISTRATION_COMPLETE") + "\n\n" + i18n.get_text("WHAT_TO_ORDER_TODAY"),
-                    reply_markup=get_main_menu_keyboard(),
+                    i18n.get_text("REGISTRATION_COMPLETE") + "\n\n" +
+                    f"🇾🇪 **Welcome to Samna Salta!** 🇾🇪\n\n"
+                    f"What would you like to do today?",
+                    reply_markup=self._get_main_page_keyboard(),
                     parse_mode="HTML"
                 )
                 return END
@@ -300,6 +305,130 @@ class OnboardingHandler:
                 await update.message.reply_text(message, parse_mode="HTML")
         except Exception as e:
             self.logger.error("Failed to send error message: %s", e)
+
+    def _get_main_page_keyboard(self):
+        """Get main page keyboard with My Info and Menu buttons"""
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
+        keyboard = [
+            [InlineKeyboardButton("👤 My Info", callback_data="main_my_info")],
+            [InlineKeyboardButton("🍽️ Menu", callback_data="main_menu")],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
+    async def handle_main_page_callback(self, update: Update, _: ContextTypes.DEFAULT_TYPE):
+        """Handle main page callbacks (My Info, Menu)"""
+        query = update.callback_query
+        await query.answer()
+
+        data = query.data
+        user_id = update.effective_user.id
+
+        self.logger.info("🏠 MAIN PAGE CALLBACK: User %s clicked: %s", user_id, data)
+
+        try:
+            if data == "main_my_info":
+                await self._show_my_info(query)
+            elif data == "main_menu":
+                await self._show_menu(query)
+            elif data == "main_page":
+                await self._show_main_page(query)
+            else:
+                self.logger.warning("⚠️ UNKNOWN MAIN PAGE CALLBACK: %s", data)
+
+        except Exception as e:
+            self.logger.error("Error in handle_main_page_callback: %s", e)
+            await query.edit_message_text("❌ An error occurred. Please try again.")
+
+    async def _show_my_info(self, query: CallbackQuery):
+        """Show user information"""
+        try:
+            user_id = query.from_user.id
+            customer = self.cart_service.get_customer(user_id)
+            
+            if customer:
+                info_text = (
+                    f"👤 **My Information**\n\n"
+                    f"**Name:** {customer.full_name}\n"
+                    f"**Phone:** {customer.phone_number}\n"
+                    f"**Delivery Address:** {customer.delivery_address or 'Not set'}\n\n"
+                    f"To update your information, please contact support."
+                )
+            else:
+                info_text = "❌ User information not found. Please restart the bot with /start"
+
+            await query.edit_message_text(
+                info_text,
+                reply_markup=self._get_back_to_main_keyboard(),
+                parse_mode="HTML"
+            )
+
+        except Exception as e:
+            self.logger.error("Error showing my info: %s", e)
+            await query.edit_message_text(
+                "❌ Error loading your information. Please try again.",
+                reply_markup=self._get_back_to_main_keyboard()
+            )
+
+    async def _show_menu(self, query: CallbackQuery):
+        """Show the food menu"""
+        try:
+            from src.keyboards.menu_keyboards import get_main_menu_keyboard
+            
+            await query.edit_message_text(
+                i18n.get_text("MENU_PROMPT"),
+                reply_markup=get_main_menu_keyboard(),
+                parse_mode="HTML"
+            )
+
+        except Exception as e:
+            self.logger.error("Error showing menu: %s", e)
+            await query.edit_message_text(
+                "❌ Error loading menu. Please try again.",
+                reply_markup=self._get_back_to_main_keyboard()
+            )
+
+    async def _show_main_page(self, query: CallbackQuery):
+        """Show the main page with welcome message"""
+        try:
+            user_id = query.from_user.id
+            customer = self.cart_service.get_customer(user_id)
+            
+            if customer:
+                welcome_message = (
+                    f"🇾🇪 **Welcome to Samna Salta!** 🇾🇪\n\n"
+                    f"👋 **Hello {customer.full_name}!**\n\n"
+                    f"Welcome back to the best traditional Yemenite food experience!\n\n"
+                    f"What would you like to do today?"
+                )
+            else:
+                welcome_message = (
+                    f"🇾🇪 **Welcome to Samna Salta!** 🇾🇪\n\n"
+                    f"Welcome to the best traditional Yemenite food experience!\n\n"
+                    f"What would you like to do today?"
+                )
+
+            await query.edit_message_text(
+                welcome_message,
+                reply_markup=self._get_main_page_keyboard(),
+                parse_mode="HTML"
+            )
+
+        except Exception as e:
+            self.logger.error("Error showing main page: %s", e)
+            await query.edit_message_text(
+                "❌ Error loading main page. Please try again.",
+                reply_markup=self._get_main_page_keyboard()
+            )
+
+    def _get_back_to_main_keyboard(self):
+        """Get keyboard to go back to main page"""
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
+        keyboard = [
+            [InlineKeyboardButton("🏠 Back to Main", callback_data="main_page")],
+        ]
+        return InlineKeyboardMarkup(keyboard)
 
 
 def register_start_handlers(application: Application):

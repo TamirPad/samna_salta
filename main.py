@@ -76,6 +76,11 @@ def main():
         application.add_handler(CommandHandler("start", start_handler))
         application.add_handler(CommandHandler("ping", ping_handler))
         
+        # Main page handlers (My Info, Menu navigation)
+        from src.handlers.start import OnboardingHandler
+        onboarding_handler = OnboardingHandler()
+        application.add_handler(CallbackQueryHandler(onboarding_handler.handle_main_page_callback, pattern="^main_"))
+        
         # Menu handlers
         application.add_handler(CallbackQueryHandler(menu_handler, pattern="^menu_"))
         
@@ -86,8 +91,13 @@ def main():
         application.add_handler(CallbackQueryHandler(cart_handler.handle_view_cart, pattern="^cart_view"))
         application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart, pattern="^cart_clear"))
         application.add_handler(CallbackQueryHandler(cart_handler.handle_checkout, pattern="^cart_checkout"))
+        application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_address_choice, pattern="^delivery_address_"))
         application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_method, pattern="^delivery_"))
         application.add_handler(CallbackQueryHandler(cart_handler.handle_confirm_order, pattern="^confirm_order"))
+        
+        # Text message handler for delivery address input
+        from telegram.ext import MessageHandler, filters
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, cart_handler.handle_delivery_address_input))
         
         # Register admin handlers
         register_admin_handlers(application)

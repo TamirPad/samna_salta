@@ -89,13 +89,21 @@ class NotificationService:
             item_total = item.get("price", 0) * item.get("quantity", 1)
             items_text += f"{i}. {item.get('product_name', 'Unknown')} x{item.get('quantity', 1)} - ₪{item_total:.2f}\n"
         
+        # Format delivery info
+        delivery_method = order_data.get('delivery_method', 'Unknown').title()
+        delivery_info = f"🚚 <b>Delivery:</b> {delivery_method}"
+        
+        # Add delivery address if it's delivery
+        if order_data.get('delivery_method') == 'delivery' and order_data.get('delivery_address'):
+            delivery_info += f"\n📍 <b>Address:</b> {order_data.get('delivery_address')}"
+        
         return f"""
 🆕 <b>NEW ORDER RECEIVED!</b>
 
 📋 <b>Order #{order_data.get('order_number', 'Unknown')}</b>
 👤 <b>Customer:</b> {order_data.get('customer_name', 'Unknown')}
 📞 <b>Phone:</b> {order_data.get('customer_phone', 'Unknown')}
-🚚 <b>Delivery:</b> {order_data.get('delivery_method', 'Unknown').title()}
+{delivery_info}
 
 📦 <b>Items:</b>
 {items_text}

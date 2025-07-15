@@ -246,14 +246,14 @@ class AdminHandler:
                 keyboard = []
                 for order in orders:  # Show all pending orders
                     order_summary = (
-                        f"#{order.order_number} (ID {order.order_id}) - {order.customer_name} - "
-                        f"₪{order.total:.2f}"
+                        f"#{order['order_number']} (ID {order['order_id']}) - {order['customer_name']} - "
+                        f"₪{order['total']:.2f}"
                     )
                     keyboard.append(
                         [
                             InlineKeyboardButton(
                                 order_summary,
-                                callback_data=f"admin_order_{order.order_id}",
+                                callback_data=f"admin_order_{order['order_id']}",
                             )
                         ]
                     )
@@ -298,14 +298,14 @@ class AdminHandler:
                 keyboard = []
                 for order in orders[:10]:  # Show max 10 orders
                     order_summary = (
-                        f"#{order.order_number} (ID {order.order_id}) - {order.customer_name} - "
-                        f"{getattr(order.status, 'value', str(order.status)).capitalize()}"
+                        f"#{order['order_number']} (ID {order['order_id']}) - {order['customer_name']} - "
+                        f"{order['status'].capitalize()}"
                     )
                     keyboard.append(
                         [
                             InlineKeyboardButton(
                                 order_summary,
-                                callback_data=f"admin_order_{order.order_id}",
+                                callback_data=f"admin_order_{order['order_id']}",
                             )
                         ]
                     )
@@ -346,14 +346,14 @@ class AdminHandler:
                 keyboard = []
                 for order in orders[:15]:  # Show max 15
                     order_summary = (
-                        f"#{order.order_number} (ID {order.order_id}) - {order.customer_name} - "
-                        f"{getattr(order.status, 'value', str(order.status)).capitalize()}"
+                        f"#{order['order_number']} (ID {order['order_id']}) - {order['customer_name']} - "
+                        f"{order['status'].capitalize()}"
                     )
                     keyboard.append(
                         [
                             InlineKeyboardButton(
                                 order_summary,
-                                callback_data=f"admin_order_{order.order_id}",
+                                callback_data=f"admin_order_{order['order_id']}",
                             )
                         ]
                     )

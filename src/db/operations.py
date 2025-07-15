@@ -17,6 +17,7 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.pool import StaticPool, QueuePool
+from sqlalchemy.orm import joinedload
 
 from src.config import get_config
 from src.db.models import (
@@ -696,7 +697,12 @@ def update_cart(
     """Update cart with new items and delivery info"""
     session = get_db_session()
     try:
-        cart = get_or_create_cart(telegram_id)
+        # Get or create cart within this session
+        cart = session.query(Cart).filter(Cart.telegram_id == telegram_id).first()
+        if not cart:
+            cart = Cart(telegram_id=telegram_id, items=[])
+            session.add(cart)
+            session.flush()
 
         # Update cart items
         cart.items = items
@@ -763,6 +769,39 @@ def remove_from_cart(telegram_id: int, product_id: int) -> bool:
         session.rollback()
         logger.error("Failed to remove from cart: %s", e)
         raise
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def get_cart_by_telegram_id(telegram_id: int) -> Cart | None:
+    """Get cart by telegram ID"""
+    session = get_db_session()
+    try:
+        return session.query(Cart).filter(Cart.telegram_id == telegram_id).first()
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def update_customer_delivery_address(telegram_id: int, delivery_address: str) -> bool:
+    """Update customer's delivery address"""
+    session = get_db_session()
+    try:
+        customer = session.query(Customer).filter(Customer.telegram_id == telegram_id).first()
+        if customer:
+            customer.delivery_address = delivery_address
+            customer.updated_at = datetime.now()
+            session.commit()
+            logger.info("Updated delivery address for customer %s", telegram_id)
+            return True
+        else:
+            logger.error("Customer %s not found for address update", telegram_id)
+            return False
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error("Failed to update customer delivery address: %s", e)
+        return False
     finally:
         session.close()
 
@@ -891,9 +930,9 @@ def get_all_customers() -> list[Customer]:
 
 
 def get_all_orders() -> list[Order]:
-    """Get all orders"""
+    """Get all orders with customer information"""
     session = get_db_session()
     try:
-        return session.query(Order).order_by(Order.created_at.desc()).all()
+        return session.query(Order).options(joinedload(Order.customer)).order_by(Order.created_at.desc()).all()
     finally:
         session.close()

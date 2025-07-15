@@ -13,6 +13,8 @@ from src.db.operations import (
     remove_from_cart,
     get_customer_by_telegram_id,
     get_or_create_customer,
+    get_cart_by_telegram_id,
+    update_customer_delivery_address,
 )
 from src.db.models import Customer
 
@@ -185,4 +187,64 @@ class CartService:
             return success
         except Exception as e:
             logger.error("Exception setting delivery method: %s", e)
+            return False
+
+    def set_delivery_address(self, telegram_id: int, delivery_address: str) -> bool:
+        """Set delivery address for cart"""
+        try:
+            # Get current cart items
+            current_items = self.get_items(telegram_id)
+            if not current_items:
+                logger.error("No items in cart for user %s", telegram_id)
+                return False
+            
+            # Update cart with delivery address
+            success = self.update_cart(telegram_id, current_items, delivery_address=delivery_address)
+            if success:
+                logger.info("Successfully set delivery address for user %s", telegram_id)
+            else:
+                logger.error("Failed to set delivery address for user %s", telegram_id)
+            return success
+        except Exception as e:
+            logger.error("Exception setting delivery address: %s", e)
+            return False
+
+    def get_cart_info(self, telegram_id: int) -> Dict:
+        """Get cart information including delivery method and address"""
+        try:
+            cart = get_cart_by_telegram_id(telegram_id)
+            if cart:
+                logger.info("DEBUG: Cart found for user %s - delivery_method: %s, delivery_address: %s", 
+                           telegram_id, cart.delivery_method, cart.delivery_address)
+                return {
+                    "delivery_method": cart.delivery_method,
+                    "delivery_address": cart.delivery_address,
+                    "items_count": len(cart.items) if cart.items else 0
+                }
+            else:
+                logger.info("DEBUG: No cart found for user %s, returning default pickup", telegram_id)
+                return {
+                    "delivery_method": "pickup",
+                    "delivery_address": None,
+                    "items_count": 0
+                }
+        except Exception as e:
+            logger.error("Exception getting cart info: %s", e)
+            return {
+                "delivery_method": "pickup",
+                "delivery_address": None,
+                "items_count": 0
+            }
+
+    def update_customer_delivery_address(self, telegram_id: int, delivery_address: str) -> bool:
+        """Update customer's delivery address in database"""
+        try:
+            success = update_customer_delivery_address(telegram_id, delivery_address)
+            if success:
+                logger.info("Successfully updated customer delivery address for user %s", telegram_id)
+            else:
+                logger.error("Failed to update customer delivery address for user %s", telegram_id)
+            return success
+        except Exception as e:
+            logger.error("Exception updating customer delivery address: %s", e)
             return False 

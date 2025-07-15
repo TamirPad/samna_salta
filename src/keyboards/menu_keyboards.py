@@ -26,9 +26,8 @@ def get_main_menu_keyboard(lang: str | None = None):
         ],
         [InlineKeyboardButton(i18n.get_text("BUTTON_HILBEH", lang), callback_data="menu_hilbeh")],
         [InlineKeyboardButton(i18n.get_text("BUTTON_VIEW_CART", lang), callback_data="cart_view")],
+        [InlineKeyboardButton("🏠 Back to Main", callback_data="main_page")],
     ]
-
-    keyboard.append([InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU"), callback_data="menu_main")])
 
     return InlineKeyboardMarkup(keyboard)
 

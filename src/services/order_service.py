@@ -14,6 +14,7 @@ from src.db.operations import (
     get_all_products,
     get_product_by_name,
     get_product_by_id,
+    get_cart_by_telegram_id,
 )
 from src.utils.helpers import is_hilbeh_available
 
@@ -33,18 +34,30 @@ class OrderService:
                     "error": "Customer not found. Please register first."
                 }
             
+            # Get cart info including delivery method and address
+            cart = get_cart_by_telegram_id(telegram_id)
+            delivery_method = "pickup"  # default
+            delivery_address = ""
+            
+            if cart:
+                delivery_method = cart.delivery_method or "pickup"
+                delivery_address = cart.delivery_address or ""
+                logger.info("DEBUG: Order creation - delivery_method: %s, delivery_address: %s", delivery_method, delivery_address)
+            
             # Calculate total
             total = sum(item.get("price", 0) * item.get("quantity", 1) for item in cart_items)
             
             # Generate order number
             order_number = generate_order_number()
             
-            # Create order with items
+            # Create order with items and delivery info
             order = create_order_with_items(
                 customer_id=customer.id,
                 order_number=order_number,
                 total_amount=total,
-                items=cart_items
+                items=cart_items,
+                delivery_method=delivery_method,
+                delivery_address=delivery_address
             )
             
             if order:
@@ -66,7 +79,8 @@ class OrderService:
                         "total": total,
                         "delivery_method": order.delivery_method,
                         "delivery_address": order.delivery_address,
-                        "customer_telegram_id": telegram_id
+                        "customer_telegram_id": telegram_id,
+                        "created_at": order.created_at.strftime("%Y-%m-%d %H:%M:%S") if order.created_at else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     }
                     
                     # Send admin notification
