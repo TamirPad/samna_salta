@@ -6,6 +6,7 @@ import logging
 from typing import Dict, List, Optional
 
 from src.config import get_config
+from src.utils.i18n import i18n
 
 logger = logging.getLogger(__name__)
 
@@ -77,10 +78,31 @@ class NotificationService:
         message = self._format_order_notification(order_data)
         return await self.send_admin_notification(message, order_data.get("id"))
 
-    async def notify_order_status_update(self, order_id: int, new_status: str, customer_chat_id: int) -> bool:
+    async def notify_order_status_update(self, order_id: str, new_status: str, customer_chat_id: int, delivery_method: str = "pickup") -> bool:
         """Notify customer about order status update"""
-        message = f"Your order #{order_id} status has been updated to: {new_status}"
-        return await self.send_customer_notification(customer_chat_id, message)
+        # Create user-friendly status messages using i18n
+        status_messages = {
+            "confirmed": i18n.get_text("ORDER_STATUS_CONFIRMED"),
+            "preparing": i18n.get_text("ORDER_STATUS_PREPARING"),
+            "ready": i18n.get_text("ORDER_STATUS_READY"),
+            "delivered": i18n.get_text("ORDER_STATUS_DELIVERED"),
+            "cancelled": i18n.get_text("ORDER_STATUS_CANCELLED")
+        }
+        
+        # Get the appropriate message for the status
+        message = status_messages.get(new_status.lower(), i18n.get_text("ORDER_STATUS_UNKNOWN").format(status=new_status))
+        
+        # Add delivery-specific information for ready orders
+        if new_status.lower() == "ready":
+            if delivery_method.lower() == "delivery":
+                message += "\n\n" + i18n.get_text("DELIVERY_READY_INFO")
+            else:
+                message += "\n\n" + i18n.get_text("PICKUP_READY_INFO")
+        
+        # Add order number to the message
+        full_message = f"{i18n.get_text('CUSTOMER_ORDER_UPDATE_HEADER')}\n\n📋 **{i18n.get_text('ORDER_NUMBER_LABEL')} #{order_id}**\n\n{message}"
+        
+        return await self.send_customer_notification(customer_chat_id, full_message)
 
     def _format_order_notification(self, order_data: Dict) -> str:
         """Format order data for notification"""

@@ -139,13 +139,28 @@ class AdminService:
                     container = get_container()
                     notification_service = container.get_notification_service()
                     
-                    # Get order to find customer
-                    order_details = await self.get_order_by_id(order_id)
-                    if order_details:
-                        # In a real implementation, you'd get the customer's telegram_id
-                        # For now, we'll just log the notification
-                        logger.info("Customer notification: Order #%s status updated to %s", 
-                                  order_details.get("order_number"), new_status)
+                    # Get order with customer information to find customer's telegram_id
+                    from src.db.operations import get_all_orders
+                    orders = get_all_orders()
+                    order = next((o for o in orders if o.id == order_id), None)
+                    
+                    if order and order.customer:
+                        customer_telegram_id = order.customer.telegram_id
+                        order_number = order.order_number
+                        delivery_method = order.delivery_method
+                        
+                        # Send actual notification to customer
+                        await notification_service.notify_order_status_update(
+                            order_id=order_number,
+                            new_status=new_status,
+                            customer_chat_id=customer_telegram_id,
+                            delivery_method=delivery_method
+                        )
+                        
+                        logger.info("Customer notification sent: Order #%s status updated to %s for customer %d", 
+                                  order_number, new_status, customer_telegram_id)
+                    else:
+                        logger.warning("Could not find order or customer for notification: order_id=%d", order_id)
                         
                 except Exception as e:
                     logger.error("Failed to send customer notification: %s", e)
