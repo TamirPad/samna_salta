@@ -114,6 +114,7 @@
   "ADMIN_ORDER_STATS": "📊 <b>סטטיסטיקות הזמנות:</b>",
   "ADMIN_PENDING_COUNT": "⏳ הזמנות ממתינות: {count}",
   "ADMIN_ACTIVE_COUNT": "🔄 הזמנות פעילות: {count}",
+  "ADMIN_COMPLETED_COUNT": "✅ הזמנות שהושלמו: {count}",
   "ADMIN_TOTAL_TODAY": "📋 סה\"כ היום: {count}",
   "ADMIN_QUICK_ACTIONS": "🛠️ <b>פעולות מהירות:</b>",
   "ADMIN_PENDING_ORDERS": "⏳ הזמנות ממתינות",

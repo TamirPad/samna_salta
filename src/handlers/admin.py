@@ -103,11 +103,15 @@ class AdminHandler:
             # Get order statistics
             pending_orders = await self.admin_service.get_pending_orders()
             active_orders = await self.admin_service.get_active_orders()
+            completed_orders = await self.admin_service.get_completed_orders()
+            today_orders = await self.admin_service.get_today_orders()
 
             self.logger.info(
-                "📊 STATS: %s pending, %s active",
+                "📊 STATS: %s pending, %s active, %s completed, %s today",
                 len(pending_orders),
                 len(active_orders),
+                len(completed_orders),
+                len(today_orders),
             )
 
             dashboard_text = (
@@ -115,7 +119,8 @@ class AdminHandler:
                 i18n.get_text("ADMIN_ORDER_STATS") + "\n" +
                 i18n.get_text("ADMIN_PENDING_COUNT").format(count=len(pending_orders)) + "\n" +
                 i18n.get_text("ADMIN_ACTIVE_COUNT").format(count=len(active_orders)) + "\n" +
-                i18n.get_text("ADMIN_TOTAL_TODAY").format(count=len(pending_orders) + len(active_orders)) + "\n\n" +
+                i18n.get_text("ADMIN_COMPLETED_COUNT").format(count=len(completed_orders)) + "\n" +
+                i18n.get_text("ADMIN_TOTAL_TODAY").format(count=len(today_orders)) + "\n\n" +
                 i18n.get_text("ADMIN_QUICK_ACTIONS")
             )
 
@@ -198,7 +203,8 @@ class AdminHandler:
 📋 <b>Current Status:</b>
 • Pending Orders: {analytics_data.get('pending_orders', 0)}
 • Active Orders: {analytics_data.get('active_orders', 0)}
-• Completed Orders: {analytics_data.get('total_orders', 0) - analytics_data.get('pending_orders', 0) - analytics_data.get('active_orders', 0)}
+• Completed Orders: {analytics_data.get('completed_orders', 0)}
+• Orders Today: {analytics_data.get('today_orders', 0)}
 
 <i>Report generated at {analytics_data.get('generated_at', datetime.now()).strftime('%Y-%m-%d %H:%M')}</i>
             """.strip()

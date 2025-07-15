@@ -81,6 +81,7 @@
   "ADMIN_ORDER_STATS": "📊 <b>Order Statistics:</b>",
   "ADMIN_PENDING_COUNT": "⏳ Pending orders: {count}",
   "ADMIN_ACTIVE_COUNT": "🔄 Active orders: {count}",
+  "ADMIN_COMPLETED_COUNT": "✅ Completed orders: {count}",
   "ADMIN_TOTAL_TODAY": "📋 Total today: {count}",
   "ADMIN_QUICK_ACTIONS": "🛠️ <b>Quick Actions:</b>",
   "ADMIN_PENDING_ORDERS": "⏳ Pending Orders",

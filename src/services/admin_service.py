@@ -188,9 +188,13 @@ class AdminService:
             for order in orders:
                 status_counts[order.status] = status_counts.get(order.status, 0) + 1
             
-            # Get pending and active counts
+            # Get counts by status
             pending_orders = await self.get_pending_orders()
             active_orders = await self.get_active_orders()
+            completed_orders = await self.get_completed_orders()
+            
+            # Get today's orders
+            today_orders = await self.get_today_orders()
             
             return {
                 "total_orders": total_orders,
@@ -198,12 +202,45 @@ class AdminService:
                 "avg_order_value": avg_order_value,
                 "pending_orders": len(pending_orders),
                 "active_orders": len(active_orders),
+                "completed_orders": len(completed_orders),
+                "today_orders": len(today_orders),
                 "status_breakdown": status_counts,
                 "generated_at": datetime.now()
             }
         except Exception as e:
             logger.error("Error getting business analytics: %s", e)
             return {}
+
+    async def get_today_orders(self) -> List[Dict]:
+        """Get orders created today"""
+        try:
+            from datetime import datetime, date
+            orders = get_all_orders()
+            today = date.today()
+            
+            today_orders = [
+                order for order in orders 
+                if order.created_at and order.created_at.date() == today
+            ]
+            
+            # Convert to dict format
+            result = []
+            for order in today_orders:
+                result.append({
+                    "order_id": order.id,
+                    "order_number": order.order_number,
+                    "customer_name": order.customer.full_name if order.customer else "Unknown",
+                    "customer_phone": order.customer.phone_number if order.customer else "Unknown",
+                    "total": order.total,
+                    "status": order.status,
+                    "created_at": order.created_at
+                })
+            
+            logger.info("Retrieved %d orders from today", len(result))
+            return result
+        except Exception as e:
+            logger.error("Error getting today's orders: %s", e)
+            return []
 
     async def get_completed_orders(self) -> List[Dict]:
         """Get all completed (delivered) orders for admin dashboard"""
