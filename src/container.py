@@ -9,6 +9,7 @@ from telegram import Bot
 
 from src.services.cart_service import CartService
 from src.services.order_service import OrderService
+from src.services.admin_service import AdminService
 from src.services.delivery_service import DeliveryService
 from src.services.notification_service import NotificationService
 from src.config import get_config
@@ -47,10 +48,16 @@ class Container:
         return self.services['cart_service']
 
     def get_order_service(self) -> OrderService:
-        """Get order service instance"""
+        """Get order service instance for customer operations"""
         if 'order_service' not in self.services:
             self.services['order_service'] = OrderService()
         return self.services['order_service']
+
+    def get_admin_service(self) -> AdminService:
+        """Get admin service instance for admin operations"""
+        if 'admin_service' not in self.services:
+            self.services['admin_service'] = AdminService()
+        return self.services['admin_service']
 
     def get_delivery_service(self) -> DeliveryService:
         """Get delivery service instance"""

@@ -20,12 +20,30 @@ class NotificationService:
     async def send_admin_notification(self, message: str, order_id: Optional[int] = None) -> bool:
         """Send notification to admin"""
         try:
+            if not self.admin_chat_id:
+                logger.warning("Admin chat ID not configured, skipping admin notification")
+                return False
+                
             if order_id:
                 message = f"🆕 New Order #{order_id}\n\n{message}"
             
-            # In a real implementation, this would use the Telegram API
-            logger.info("Admin notification: %s", message)
-            return True
+            # Get bot instance from container
+            from src.container import get_container
+            container = get_container()
+            bot = container.get_bot()
+            
+            if bot:
+                await bot.send_message(
+                    chat_id=self.admin_chat_id,
+                    text=message,
+                    parse_mode="HTML"
+                )
+                logger.info("Admin notification sent to %s", self.admin_chat_id)
+                return True
+            else:
+                logger.error("Bot instance not available for admin notification")
+                return False
+                
         except Exception as e:
             logger.error("Failed to send admin notification: %s", e)
             return False
@@ -33,9 +51,23 @@ class NotificationService:
     async def send_customer_notification(self, chat_id: int, message: str) -> bool:
         """Send notification to customer"""
         try:
-            # In a real implementation, this would use the Telegram API
-            logger.info("Customer notification to %d: %s", chat_id, message)
-            return True
+            # Get bot instance from container
+            from src.container import get_container
+            container = get_container()
+            bot = container.get_bot()
+            
+            if bot:
+                await bot.send_message(
+                    chat_id=chat_id,
+                    text=message,
+                    parse_mode="HTML"
+                )
+                logger.info("Customer notification sent to %d", chat_id)
+                return True
+            else:
+                logger.error("Bot instance not available for customer notification")
+                return False
+                
         except Exception as e:
             logger.error("Failed to send customer notification: %s", e)
             return False
@@ -52,12 +84,24 @@ class NotificationService:
 
     def _format_order_notification(self, order_data: Dict) -> str:
         """Format order data for notification"""
+        items_text = ""
+        for i, item in enumerate(order_data.get('items', []), 1):
+            item_total = item.get("price", 0) * item.get("quantity", 1)
+            items_text += f"{i}. {item.get('product_name', 'Unknown')} x{item.get('quantity', 1)} - ₪{item_total:.2f}\n"
+        
         return f"""
-📦 New Order Details:
-Customer: {order_data.get('customer_name', 'Unknown')}
-Items: {len(order_data.get('items', []))} items
-Total: {order_data.get('total', 0):.2f} ILS
-Delivery: {order_data.get('delivery_method', 'Unknown')}
+🆕 <b>NEW ORDER RECEIVED!</b>
+
+📋 <b>Order #{order_data.get('order_number', 'Unknown')}</b>
+👤 <b>Customer:</b> {order_data.get('customer_name', 'Unknown')}
+📞 <b>Phone:</b> {order_data.get('customer_phone', 'Unknown')}
+🚚 <b>Delivery:</b> {order_data.get('delivery_method', 'Unknown').title()}
+
+📦 <b>Items:</b>
+{items_text}
+💰 <b>Total:</b> ₪{order_data.get('total', 0):.2f}
+
+<i>Order placed at {order_data.get('created_at', 'Unknown time')}</i>
         """.strip()
 
 # Global instance

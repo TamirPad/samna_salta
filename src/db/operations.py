@@ -775,60 +775,103 @@ def create_order(
     delivery_method: str = "pickup",
     delivery_address: str | None = None,
 ) -> Order | None:
-    """Create new order with items"""
-    session = get_db_session()
+    """Create a new order"""
     try:
-        # Generate order number
-        order_number = generate_order_number()
-
-        # Calculate delivery charge
-        delivery_charge = 5.0 if delivery_method == "delivery" else 0.0
-        subtotal = total_amount - delivery_charge
-
-        # Create order
-        order = Order(
-            customer_id=customer_id,
-            order_number=order_number,
-            delivery_method=delivery_method,
-            delivery_address=delivery_address,
-            delivery_charge=delivery_charge,
-            subtotal=subtotal,
-            total=total_amount,
-        )
-        session.add(order)
-        session.flush()  # Get the order ID
-
-        # Get customer's cart to create order items
-        customer = session.query(Customer).filter(Customer.id == customer_id).first()
-        if customer:
-            cart = (
-                session.query(Cart)
-                .filter(Cart.telegram_id == customer.telegram_id)
-                .first()
+        with get_db_manager().get_session_context() as session:
+            order = Order(
+                customer_id=customer_id,
+                order_number=generate_order_number(),
+                total=total_amount,
+                delivery_method=delivery_method,
+                delivery_address=delivery_address,
+                status="pending",
             )
-            if cart and cart.items:
-                for item_data in cart.items:
-                    order_item = OrderItem(
-                        order_id=order.id,
-                        product_name=item_data["product_name"],
-                        product_options=item_data.get("options"),
-                        quantity=item_data["quantity"],
-                        unit_price=item_data["price"],  # Use 'price' field from cart
-                        total_price=item_data["price"] * item_data["quantity"],
-                    )
-                    session.add(order_item)
-
-        session.commit()
-        session.refresh(order)
-        return order
-
-    except SQLAlchemyError as e:
-        session.rollback()
+            session.add(order)
+            session.commit()
+            session.refresh(order)
+            logger.info("Created order #%s for customer %s", order.order_number, customer_id)
+            return order
+    except Exception as e:
         logger.error("Failed to create order: %s", e)
         return None
-    finally:
-        session.close()
 
+@retry_on_database_error()
+def create_order_with_items(
+    customer_id: int,
+    order_number: str,
+    total_amount: float,
+    items: list[dict],
+    delivery_method: str = "pickup",
+    delivery_address: str | None = None,
+) -> Order | None:
+    """Create a new order with order items from cart items"""
+    try:
+        with get_db_manager().get_session_context() as session:
+            # Calculate subtotal and delivery charge
+            subtotal = total_amount
+            delivery_charge = 0.0  # For now, no delivery charge
+            
+            # Create the order
+            order = Order(
+                customer_id=customer_id,
+                order_number=order_number,
+                total=total_amount,
+                subtotal=subtotal,
+                delivery_charge=delivery_charge,
+                delivery_method=delivery_method,
+                delivery_address=delivery_address or "",
+                status="pending",
+                items=items  # Store items as JSON in the order
+            )
+            session.add(order)
+            session.flush()  # Get the order ID
+            
+            # Create order items
+            for item in items:
+                product_name = item.get("product_name", "Unknown Product")
+                quantity = item.get("quantity", 1)
+                unit_price = item.get("price", 0)
+                total_price = unit_price * quantity
+                
+                order_item = OrderItem(
+                    order_id=order.id,
+                    product_id=item.get("product_id"),
+                    product_name=product_name,
+                    product_options=item.get("options", {}),
+                    quantity=quantity,
+                    unit_price=unit_price,
+                    total_price=total_price
+                )
+                session.add(order_item)
+            
+            session.commit()
+            session.refresh(order)
+            logger.info("Created order #%s with %d items for customer %s", 
+                       order_number, len(items), customer_id)
+            return order
+    except Exception as e:
+        logger.error("Failed to create order with items: %s", e)
+        return None
+
+
+@retry_on_database_error()
+def update_order_status(order_id: int, new_status: str) -> bool:
+    """Update order status"""
+    try:
+        with get_db_manager().get_session_context() as session:
+            order = session.query(Order).filter(Order.id == order_id).first()
+            if order:
+                order.status = new_status
+                order.updated_at = datetime.now()
+                session.commit()
+                logger.info("Updated order %d status to %s", order_id, new_status)
+                return True
+            else:
+                logger.error("Order %d not found for status update", order_id)
+                return False
+    except Exception as e:
+        logger.error("Failed to update order status: %s", e)
+        return False
 
 def generate_order_number() -> str:
     """Generate unique order number with timestamp and random component"""

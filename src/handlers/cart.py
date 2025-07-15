@@ -171,6 +171,174 @@ class CartHandler:
             self.logger.error("Exception in handle_clear_cart: %s", e)
             await handle_error(update, e, "clearing cart")
 
+    async def handle_checkout(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle checkout process"""
+        try:
+            query = update.callback_query
+            await query.answer()
+
+            user_id = query.from_user.id
+            self.logger.info("🛒 CHECKOUT: User %s", user_id)
+
+            # Get cart service
+            cart_service = self.container.get_cart_service()
+            cart_items = cart_service.get_items(user_id)
+
+            if not cart_items:
+                await query.edit_message_text(
+                    "🛒 **Your cart is empty**\n\nPlease add some items before checkout.",
+                    parse_mode="HTML",
+                    reply_markup=self._get_back_to_menu_keyboard(),
+                )
+                return
+
+            # Calculate total
+            cart_total = cart_service.calculate_total(cart_items)
+
+            # Build checkout summary
+            message = "🛒 **Checkout Summary**\n\n"
+            
+            for i, item in enumerate(cart_items, 1):
+                item_total = item.get("price", 0) * item.get("quantity", 1)
+                message += f"{i}. **{item.get('product_name', 'Unknown Product')}**\n"
+                message += f"   • Quantity: {item.get('quantity', 1)}\n"
+                message += f"   • Price: ₪{item.get('price', 0):.2f}\n"
+                message += f"   • Total: ₪{item_total:.2f}\n\n"
+
+            message += f"💰 **Total: ₪{cart_total:.2f}**\n\n"
+            message += "Please select your delivery method:"
+
+            await query.edit_message_text(
+                message,
+                parse_mode="HTML",
+                reply_markup=self._get_delivery_method_keyboard(),
+            )
+
+        except Exception as e:
+            self.logger.error("Exception in handle_checkout: %s", e)
+            await handle_error(update, e, "checkout")
+
+    async def handle_delivery_method(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle delivery method selection"""
+        try:
+            query = update.callback_query
+            await query.answer()
+
+            user_id = query.from_user.id
+            delivery_method = query.data.replace("delivery_", "")
+            self.logger.info("🚚 DELIVERY METHOD: User %s selected %s", user_id, delivery_method)
+
+            # Get cart service
+            cart_service = self.container.get_cart_service()
+            
+            # Update cart with delivery method
+            success = cart_service.set_delivery_method(user_id, delivery_method)
+            
+            if not success:
+                await query.edit_message_text(
+                    "❌ Failed to set delivery method. Please try again.",
+                    parse_mode="HTML",
+                    reply_markup=self._get_back_to_cart_keyboard(),
+                )
+                return
+
+            # Get updated cart info
+            cart_items = cart_service.get_items(user_id)
+            cart_total = cart_service.calculate_total(cart_items)
+
+            # Build order confirmation
+            message = f"📋 **Order Confirmation**\n\n"
+            message += f"🚚 **Delivery Method:** {delivery_method.title()}\n\n"
+            
+            for i, item in enumerate(cart_items, 1):
+                item_total = item.get("price", 0) * item.get("quantity", 1)
+                message += f"{i}. **{item.get('product_name', 'Unknown Product')}**\n"
+                message += f"   • Quantity: {item.get('quantity', 1)}\n"
+                message += f"   • Price: ₪{item.get('price', 0):.2f}\n"
+                message += f"   • Total: ₪{item_total:.2f}\n\n"
+
+            message += f"💰 **Total: ₪{cart_total:.2f}**\n\n"
+            message += "Please confirm your order:"
+
+            await query.edit_message_text(
+                message,
+                parse_mode="HTML",
+                reply_markup=self._get_order_confirmation_keyboard(),
+            )
+
+        except Exception as e:
+            self.logger.error("Exception in handle_delivery_method: %s", e)
+            await handle_error(update, e, "delivery method selection")
+
+    async def handle_confirm_order(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle order confirmation"""
+        query = update.callback_query
+        await query.answer()
+        
+        user_id = update.effective_user.id
+        self.logger.info("✅ CONFIRM ORDER: User %s", user_id)
+        
+        try:
+            # Get cart service
+            cart_service = self.container.get_cart_service()
+            
+            # Get cart items
+            cart_items = cart_service.get_items(user_id)
+            if not cart_items:
+                await query.edit_message_text(
+                    i18n.get_text("CART_EMPTY_ORDER"),
+                    parse_mode="HTML"
+                )
+                return
+            
+            # Create order using order service
+            order_service = self.container.get_order_service()
+            order_result = await order_service.create_order(user_id, cart_items)
+            
+            if order_result.get("success"):
+                # Clear cart after successful order
+                cart_service.clear_cart(user_id)
+                
+                order_number = order_result.get("order_number")
+                order_total = order_result.get("total")
+                
+                # Send success message to customer
+                success_message = f"""
+✅ **Order Confirmed!**
+
+📋 **Order #{order_number}**
+💰 **Total: ₪{order_total:.2f}**
+
+Your order has been received and is being prepared. We'll notify you when it's ready!
+
+Thank you for choosing Samna Salta! 🇾🇪
+                """.strip()
+                
+                await query.edit_message_text(
+                    success_message,
+                    parse_mode="HTML",
+                    reply_markup=self._get_order_success_keyboard()
+                )
+                
+                self.logger.info("✅ ORDER CREATED: #%s for user %s", order_number, user_id)
+                
+            else:
+                error_msg = order_result.get("error", "Unknown error occurred")
+                self.logger.error("❌ ORDER CREATION FAILED: %s", error_msg)
+                await query.edit_message_text(
+                    f"❌ **Order Creation Failed**\n\n{error_msg}\n\nPlease try again or contact support.",
+                    parse_mode="HTML",
+                    reply_markup=self._get_back_to_cart_keyboard()
+                )
+                
+        except Exception as e:
+            self.logger.error("❌ ORDER CREATION ERROR: %s", e)
+            await query.edit_message_text(
+                "❌ **Order Creation Error**\n\nAn unexpected error occurred. Please try again.",
+                parse_mode="HTML",
+                reply_markup=self._get_back_to_cart_keyboard()
+            )
+
     def _parse_product_from_callback(self, callback_data: str) -> Dict[str, Any]:
         """Parse product information from callback data"""
         try:
@@ -231,16 +399,13 @@ class CartHandler:
             return None
 
     def _get_cart_success_keyboard(self) -> InlineKeyboardMarkup:
-        """Get keyboard for successful add to cart"""
+        """Get keyboard for successful cart addition"""
         keyboard = [
             [
-                InlineKeyboardButton("🛒 View Cart", callback_data="view_cart"),
+                InlineKeyboardButton("🛒 View Cart", callback_data="cart_view"),
                 InlineKeyboardButton("➕ Add More", callback_data="menu_main"),
             ],
-            [
-                InlineKeyboardButton("📋 Checkout", callback_data="checkout"),
-                InlineKeyboardButton("🏠 Main Menu", callback_data="menu_main"),
-            ],
+            [InlineKeyboardButton("🏠 Main Menu", callback_data="menu_main")],
         ]
         return InlineKeyboardMarkup(keyboard)
 
@@ -248,31 +413,62 @@ class CartHandler:
         """Get keyboard for cart actions"""
         keyboard = [
             [
-                InlineKeyboardButton("🗑️ Clear Cart", callback_data="clear_cart"),
-                InlineKeyboardButton("📋 Checkout", callback_data="checkout"),
+                InlineKeyboardButton("🗑️ Clear Cart", callback_data="cart_clear_confirm"),
+                InlineKeyboardButton("🛒 Checkout", callback_data="cart_checkout"),
             ],
-            [
-                InlineKeyboardButton("➕ Add More", callback_data="menu_main"),
-                InlineKeyboardButton("🏠 Main Menu", callback_data="menu_main"),
-            ],
+            [InlineKeyboardButton("🏠 Main Menu", callback_data="menu_main")],
         ]
         return InlineKeyboardMarkup(keyboard)
 
     def _get_empty_cart_keyboard(self) -> InlineKeyboardMarkup:
         """Get keyboard for empty cart"""
         keyboard = [
+            [InlineKeyboardButton("🏠 Main Menu", callback_data="menu_main")],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
+    def _get_back_to_menu_keyboard(self) -> InlineKeyboardMarkup:
+        """Get keyboard to go back to main menu"""
+        keyboard = [
+            [InlineKeyboardButton("🏠 Main Menu", callback_data="menu_main")],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
+    def _get_delivery_method_keyboard(self) -> InlineKeyboardMarkup:
+        """Get keyboard for delivery method selection"""
+        keyboard = [
             [
-                InlineKeyboardButton("🍽️ Browse Menu", callback_data="menu_main"),
+                InlineKeyboardButton("🚚 Pickup", callback_data="delivery_pickup"),
+                InlineKeyboardButton("🚚 Delivery", callback_data="delivery_delivery"),
+            ],
+            [InlineKeyboardButton("🛒 Back to Cart", callback_data="cart_view")],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
+    def _get_order_confirmation_keyboard(self) -> InlineKeyboardMarkup:
+        """Get keyboard for order confirmation"""
+        keyboard = [
+            [
+                InlineKeyboardButton("✅ Confirm Order", callback_data="confirm_order"),
+                InlineKeyboardButton("❌ Cancel", callback_data="cart_view"),
+            ],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
+    def _get_order_success_keyboard(self) -> InlineKeyboardMarkup:
+        """Get keyboard for successful order"""
+        keyboard = [
+            [
+                InlineKeyboardButton("🛒 New Order", callback_data="menu_main"),
                 InlineKeyboardButton("🏠 Main Menu", callback_data="menu_main"),
             ],
         ]
         return InlineKeyboardMarkup(keyboard)
 
-    def _get_back_to_menu_keyboard(self) -> InlineKeyboardMarkup:
-        """Get keyboard to go back to menu"""
+    def _get_back_to_cart_keyboard(self) -> InlineKeyboardMarkup:
+        """Get keyboard to go back to cart"""
         keyboard = [
-            [
-                InlineKeyboardButton("🏠 Back to Menu", callback_data="menu_main"),
-            ],
+            [InlineKeyboardButton("🛒 Back to Cart", callback_data="cart_view")],
+            [InlineKeyboardButton("🏠 Main Menu", callback_data="menu_main")],
         ]
         return InlineKeyboardMarkup(keyboard)

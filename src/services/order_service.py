@@ -1,113 +1,132 @@
 """
-Order service for managing order operations and product catalog.
+Order service for customer order operations.
 """
 
-from datetime import datetime
+import logging
 from typing import Dict, List, Optional
+from datetime import datetime
 
 from src.db.models import Order, Customer, Product
 from src.db.operations import (
-    create_order,
-    get_all_orders,
+    create_order_with_items,
+    get_customer_by_telegram_id,
     generate_order_number,
     get_all_products,
     get_product_by_name,
     get_product_by_id,
 )
-import logging
 from src.utils.helpers import is_hilbeh_available
 
 logger = logging.getLogger(__name__)
 
 class OrderService:
-    """Service for managing order operations and product catalog"""
+    """Service for customer order operations"""
 
-    @staticmethod
-    def create_order(
-        customer_id: int,
-        total_amount: float,
-        delivery_method: str = "pickup",
-        delivery_address: Optional[str] = None,
-    ) -> Optional[Order]:
-        """Create a new order"""
-        return create_order(
-            customer_id=customer_id,
-            total_amount=total_amount,
-            delivery_method=delivery_method,
-            delivery_address=delivery_address,
-        )
+    async def create_order(self, telegram_id: int, cart_items: List[Dict]) -> Dict:
+        """Create a new order from cart items"""
+        try:
+            # Get customer
+            customer = get_customer_by_telegram_id(telegram_id)
+            if not customer:
+                return {
+                    "success": False,
+                    "error": "Customer not found. Please register first."
+                }
+            
+            # Calculate total
+            total = sum(item.get("price", 0) * item.get("quantity", 1) for item in cart_items)
+            
+            # Generate order number
+            order_number = generate_order_number()
+            
+            # Create order with items
+            order = create_order_with_items(
+                customer_id=customer.id,
+                order_number=order_number,
+                total_amount=total,
+                items=cart_items
+            )
+            
+            if order:
+                logger.info("Successfully created order #%s for customer %s", order_number, customer.id)
+                
+                # Send admin notification
+                try:
+                    from src.container import get_container
+                    container = get_container()
+                    notification_service = container.get_notification_service()
+                    
+                    # Prepare order data for notification
+                    order_data = {
+                        "id": order.id,
+                        "order_number": order_number,
+                        "customer_name": customer.full_name,
+                        "customer_phone": customer.phone_number,
+                        "items": cart_items,
+                        "total": total,
+                        "delivery_method": order.delivery_method,
+                        "delivery_address": order.delivery_address,
+                        "customer_telegram_id": telegram_id
+                    }
+                    
+                    # Send admin notification
+                    await notification_service.notify_new_order(order_data)
+                    logger.info("Admin notification sent for order #%s", order_number)
+                    
+                except Exception as e:
+                    logger.error("Failed to send admin notification: %s", e)
+                    # Don't fail the order creation if notification fails
+                
+                return {
+                    "success": True,
+                    "order_number": order_number,
+                    "total": total,
+                    "order": order
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": "Failed to create order"
+                }
+                
+        except Exception as e:
+            logger.error("Exception creating order: %s", e)
+            return {
+                "success": False,
+                "error": str(e)
+            }
 
-    @staticmethod
-    def get_all_orders() -> List[Order]:
-        """Get all orders"""
-        return get_all_orders()
-
-    @staticmethod
-    def get_customer_orders(customer_id: int) -> List[Order]:
+    def get_customer_orders(self, customer_id: int) -> List[Order]:
         """Get orders for a specific customer"""
-        return [order for order in get_all_orders() if order.customer_id == customer_id]
-
-    @staticmethod
-    def get_orders_by_status(status: str) -> List[Order]:
-        """Get orders by status"""
-        return [order for order in get_all_orders() if order.status == status]
-
-    @staticmethod
-    def update_order_status(order_id: int, new_status: str) -> bool:
-        """Update order status"""
+        from src.db.operations import get_all_orders
         orders = get_all_orders()
-        for order in orders:
-            if order.id == order_id:
-                order.status = new_status
-                order.updated_at = datetime.now()
-                return True
-        return False
+        return [order for order in orders if order.customer_id == customer_id]
 
-    @staticmethod
-    def get_order_analytics() -> Dict:
-        """Get order analytics"""
+    def get_order_by_number(self, order_number: str) -> Optional[Order]:
+        """Get order by order number"""
+        from src.db.operations import get_all_orders
         orders = get_all_orders()
-        total_orders = len(orders)
-        total_revenue = sum(order.total for order in orders)
-        status_counts = {}
-        for order in orders:
-            status_counts[order.status] = status_counts.get(order.status, 0) + 1
-
-        return {
-            "total_orders": total_orders,
-            "total_revenue": total_revenue,
-            "status_breakdown": status_counts,
-        }
-
-    @staticmethod
-    def generate_order_number() -> str:
-        """Generate a unique order number"""
-        return generate_order_number()
+        return next((order for order in orders if order.order_number == order_number), None)
 
     # Product catalog methods
-    @staticmethod
-    def get_all_products() -> List[Product]:
+    def get_all_products(self) -> List[Product]:
         """Get all active products"""
         return get_all_products()
 
-    @staticmethod
-    def get_products_by_category(category: str) -> List[Product]:
+    def get_products_by_category(self, category: str) -> List[Product]:
         """Get products by category"""
         products = get_all_products()
         return [p for p in products if p.category == category and p.is_active]
 
-    @staticmethod
-    def get_product_by_name(name: str) -> Optional[Product]:
+    def get_product_by_name(self, name: str) -> Optional[Product]:
         """Get product by name"""
         return get_product_by_name(name)
 
-    @staticmethod
-    def get_product_by_id(product_id: int) -> Optional[Product]:
+    def get_product_by_id(self, product_id: int) -> Optional[Product]:
         """Get product by ID"""
         return get_product_by_id(product_id)
 
-    @staticmethod
-    def check_product_availability(product_name: str) -> Dict:
+    def check_product_availability(self, product_name: str) -> Dict:
         """Check if a product is available"""
         product = get_product_by_name(product_name)
         

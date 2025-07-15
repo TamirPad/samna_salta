@@ -165,4 +165,24 @@ class CartService:
             return success
         except Exception as e:
             logger.error("Exception updating cart: %s", e)
+            return False
+
+    def set_delivery_method(self, telegram_id: int, delivery_method: str) -> bool:
+        """Set delivery method for cart"""
+        try:
+            # Get current cart items
+            current_items = self.get_items(telegram_id)
+            if not current_items:
+                logger.error("No items in cart for user %s", telegram_id)
+                return False
+            
+            # Update cart with delivery method
+            success = self.update_cart(telegram_id, current_items, delivery_method)
+            if success:
+                logger.info("Successfully set delivery method '%s' for user %s", delivery_method, telegram_id)
+            else:
+                logger.error("Failed to set delivery method for user %s", telegram_id)
+            return success
+        except Exception as e:
+            logger.error("Exception setting delivery method: %s", e)
             return False 

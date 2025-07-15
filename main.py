@@ -24,6 +24,7 @@ from src.container import get_container
 from src.handlers.start import start_handler
 from src.handlers.menu import menu_handler
 from src.handlers.cart import CartHandler
+from src.handlers.admin import register_admin_handlers
 from src.utils.logger import ProductionLogger
 
 # Load environment variables
@@ -65,7 +66,7 @@ def main():
 
         # Initialize container
         container = get_container()
-        container.bot = application.bot
+        container.set_bot(application.bot)
         logger.info("Dependency container initialized")
         
         # Register handlers
@@ -82,8 +83,14 @@ def main():
         cart_handler = CartHandler()
         application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^add_"))
         application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^(kubaneh_|samneh_|red_bisbas_|hawaij_coffee_spice|white_coffee)"))
-        application.add_handler(CallbackQueryHandler(cart_handler.handle_view_cart, pattern="^view_cart"))
-        application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart, pattern="^clear_cart"))
+        application.add_handler(CallbackQueryHandler(cart_handler.handle_view_cart, pattern="^cart_view"))
+        application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart, pattern="^cart_clear"))
+        application.add_handler(CallbackQueryHandler(cart_handler.handle_checkout, pattern="^cart_checkout"))
+        application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_method, pattern="^delivery_"))
+        application.add_handler(CallbackQueryHandler(cart_handler.handle_confirm_order, pattern="^confirm_order"))
+        
+        # Register admin handlers
+        register_admin_handlers(application)
         
         # Start polling (blocking call)
         logger.info("Starting bot polling...")
