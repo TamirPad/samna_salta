@@ -75,6 +75,8 @@ class AdminHandler:
             await self._show_active_orders(query)
         elif data == "admin_all_orders":
             await self._show_all_orders(query)
+        elif data == "admin_completed_orders":
+            await self._show_completed_orders(query)
         elif data == "admin_update_status":
             return await self._start_status_update(query)
         elif data == "admin_analytics":
@@ -131,7 +133,7 @@ class AdminHandler:
                         i18n.get_text("ADMIN_ALL_ORDERS"), callback_data="admin_all_orders"
                     ),
                     InlineKeyboardButton(
-                        i18n.get_text("ADMIN_UPDATE_STATUS"), callback_data="admin_update_status"
+                        i18n.get_text("ADMIN_COMPLETED_ORDERS"), callback_data="admin_completed_orders"
                     ),
                 ],
                 [InlineKeyboardButton(i18n.get_text("ADMIN_ANALYTICS"), callback_data="admin_analytics")],
@@ -373,6 +375,54 @@ class AdminHandler:
 
         except BusinessLogicError as e:
             self.logger.error("💥 ALL ORDERS ERROR: %s", e)
+            await query.message.reply_text(i18n.get_text("ALL_ORDERS_ERROR"))
+
+    async def _show_completed_orders(self, query: CallbackQuery) -> None:
+        """Show completed (delivered) orders"""
+        try:
+            orders = await self.admin_service.get_completed_orders()
+
+            if not orders:
+                text = i18n.get_text("ADMIN_COMPLETED_ORDERS_TITLE") + "\n\n" + i18n.get_text("ADMIN_NO_COMPLETED_ORDERS")
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD"), callback_data="admin_back"
+                        )
+                    ]
+                ]
+            else:
+                text = f"{i18n.get_text('ADMIN_COMPLETED_ORDERS_TITLE')} ({len(orders)})"
+                keyboard = []
+                for order in orders[:15]:  # Show max 15
+                    order_summary = (
+                        f"#{order['order_number']} (ID {order['order_id']}) - {order['customer_name']} - "
+                        f"₪{order['total']:.2f}"
+                    )
+                    keyboard.append(
+                        [
+                            InlineKeyboardButton(
+                                order_summary,
+                                callback_data=f"admin_order_{order['order_id']}",
+                            )
+                        ]
+                    )
+                keyboard.append(
+                    [
+                        InlineKeyboardButton(
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD"), callback_data="admin_back"
+                        )
+                    ]
+                )
+
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await query.edit_message_text(
+                text, parse_mode="HTML", reply_markup=reply_markup
+            )
+
+        except BusinessLogicError as e:
+            self.logger.error("💥 COMPLETED ORDERS ERROR: %s", e)
             await query.message.reply_text(i18n.get_text("ALL_ORDERS_ERROR"))
 
     async def _show_order_details(self, query: CallbackQuery, order_id: int) -> None:

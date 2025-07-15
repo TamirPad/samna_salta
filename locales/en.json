@@ -196,6 +196,9 @@
   "ADMIN_ORDER_ID_PROMPT": "Please enter the Order ID to update (the small number inside the \"ID ...\" parentheses).\nFor example, if the line reads '#ORD-20250705... (ID 20) - John', you should send 20.",
   "ADMIN_ORDER_ID_NOT_FOUND": "❌ Order not found. Make sure to send the numeric ID shown in the list.",
   "ADMIN_ORDER_ID_TRY_ANOTHER": "❌ Order not found. Try another ID.",
+  "ADMIN_COMPLETED_ORDERS": "✅ Completed Orders",
+  "ADMIN_COMPLETED_ORDERS_TITLE": "✅ <b>COMPLETED ORDERS</b>",
+  "ADMIN_NO_COMPLETED_ORDERS": "✅ No completed orders found.",
   
   "CLEAR_CART": "🗑️ Clear Cart",
   "CHANGE_DELIVERY": "🚚 Change Delivery",

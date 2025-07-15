@@ -205,6 +205,29 @@ class AdminService:
             logger.error("Error getting business analytics: %s", e)
             return {}
 
+    async def get_completed_orders(self) -> List[Dict]:
+        """Get all completed (delivered) orders for admin dashboard"""
+        try:
+            orders = get_all_orders()
+            completed_orders = [order for order in orders if order.status == "delivered"]
+            # Convert to dict format expected by admin handler
+            result = []
+            for order in completed_orders:
+                result.append({
+                    "order_id": order.id,
+                    "order_number": order.order_number,
+                    "customer_name": order.customer.full_name if order.customer else "Unknown",
+                    "customer_phone": order.customer.phone_number if order.customer else "Unknown",
+                    "total": order.total,
+                    "status": order.status,
+                    "created_at": order.created_at
+                })
+            logger.info("Retrieved %d completed orders", len(result))
+            return result
+        except Exception as e:
+            logger.error("Error getting completed orders: %s", e)
+            return []
+
     def get_order_analytics(self) -> Dict:
         """Get order analytics for admin reports"""
         orders = get_all_orders()
