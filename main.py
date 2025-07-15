@@ -1,171 +1,102 @@
 #!/usr/bin/env python3
 """
-Main entry point for the Samna Salta Telegram Bot
+Samna Salta - Traditional Yemenite Food Bot
+Main application entry point
 """
 
+import asyncio
 import logging
+import os
+import signal
 import sys
 from pathlib import Path
-import threading
-import os
-from flask import Flask
 
-# Add current directory to Python path for deployment
-sys.path.insert(0, str(Path(__file__).parent))
+# Add src to path
+sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from dotenv import load_dotenv
-from telegram.ext import Application, ContextTypes
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler
+from telegram import Update
 
-from src.infrastructure.configuration.config import get_config
-from src.infrastructure.container.dependency_injection import initialize_container
-from src.infrastructure.database.operations import init_db
-from src.infrastructure.logging.logging_config import ProductionLogger
-from src.presentation.telegram_bot.handlers import register_handlers
+from src.config import get_config
+from src.db.operations import init_db, init_default_products
+from src.container import get_container
+from src.handlers.start import start_handler
+from src.handlers.menu import menu_handler
+from src.handlers.cart import CartHandler
+from src.utils.logger import ProductionLogger
 
 # Load environment variables
 load_dotenv()
 
-# Minimal Flask app for Render health check
-app = Flask(__name__)
+# Setup logging
+ProductionLogger.setup_logging()
+logger = logging.getLogger(__name__)
 
-@app.route("/")
-def health_check():
-    return "OK", 200
 
-def run_flask():
-    """Function to run Flask in a background thread"""
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+def signal_handler(signum, frame):
+    """Handle shutdown signals gracefully"""
+    logger.info("Received shutdown signal, stopping bot...")
+    sys.exit(0)
+
+
+async def ping_handler(update, context):
+    await update.message.reply_text('pong')
+
 
 def main():
-    """Main function to run the bot (runs in main thread for asyncio compatibility)"""
-    # Setup production logging
-    ProductionLogger.setup_logging()
-    logger = logging.getLogger(__name__)
-
-    # Log Python version for debugging
-    python_version = sys.version_info
-    logger.info(
-        f"Starting bot with Python {python_version.major}.{python_version.minor}.{python_version.micro}"
-    )
-
+    """Main application function"""
     try:
+        logger.info("Starting Samna Salta Bot...")
+        
         # Load configuration
-        logger.info("Loading configuration...")
         config = get_config()
+        logger.info("Configuration loaded successfully")
 
         # Initialize database
         logger.info("Initializing database...")
         init_db()
+        init_default_products()
+        logger.info("Database initialized successfully")
 
         # Create application
         logger.info("Creating Telegram application...")
         application = Application.builder().token(config.bot_token).build()
 
-        # Add error handler for application-level errors
-        async def error_handler(
-            update: object, context: ContextTypes.DEFAULT_TYPE
-        ) -> None:
-            """Central error handler – logs and tries to notify the user."""
-            logger.error("Exception while handling an update: %s", context.error, exc_info=True)
-
-            # Ignore polling conflicts gracefully
-            if "Conflict: terminated by other getUpdates request" in str(context.error):
-                logger.warning("Bot conflict detected – another instance may be running")
-                return
-
-            # Determine the Telegram user (Update or CallbackQuery)
-            tg_user = None
-            if update is not None:
-                if hasattr(update, "effective_user") and update.effective_user:
-                    tg_user = update.effective_user
-                elif hasattr(update, "from_user") and update.from_user:  # CallbackQuery
-                    tg_user = update.from_user
-
-            # Attempt to notify the user
-            if tg_user is not None:
-                try:
-                    if hasattr(update, "message") and update.message:
-                        await update.message.reply_text(
-                            "Sorry, something went wrong. Please try again."
-                        )
-                    elif hasattr(update, "callback_query") and update.callback_query:
-                        await update.callback_query.message.reply_text(
-                            "Sorry, something went wrong. Please try again."
-                        )
-                    elif hasattr(update, "answer"):
-                        # Fallback for bare CallbackQuery objects passed erroneously
-                        await update.answer(text="An error occurred. Please try again.")
-                except Exception as send_err:  # pragma: no cover
-                    logger.error("Failed to send error message to user: %s", send_err)
-
-        # Register the error handler
-        application.add_error_handler(error_handler)
-
-        # Initialize dependency container with bot instance
-        logger.info("Initializing dependency container...")
-        initialize_container(bot=application.bot)
-
-        # Register Clean Architecture handlers
-        logger.info("Registering Clean Architecture handlers...")
-        register_handlers(application)
-
-        # Start the bot
-        logger.info("Starting bot...")
-        logger.info(f"Bot token: {config.bot_token[:10]}...")
-        logger.info(f"Admin chat ID: {config.admin_chat_id}")
-
-        # Run polling with error handling and retry logic
-        max_retries = 3
-        retry_count = 0
-
-        while retry_count < max_retries:
-            try:
-                logger.info(
-                    f"Starting polling (attempt {retry_count + 1}/{max_retries})..."
-                )
-                application.run_polling(
-                    allowed_updates=["message", "callback_query"],
-                    drop_pending_updates=True,
-                )
-                break  # If successful, exit the retry loop
-
-            except Exception as e:
-                retry_count += 1
-                if "Conflict: terminated by other getUpdates request" in str(e):
-                    logger.warning(
-                        f"Bot conflict detected on attempt {retry_count}. Waiting 30 seconds before retry..."
-                    )
-                    if retry_count < max_retries:
-                        import time
-
-                        time.sleep(30)  # Wait 30 seconds before retrying
-                    else:
-                        logger.error(
-                            "Max retries reached. Bot conflict could not be resolved."
-                        )
-                        raise
-                else:
-                    logger.error(f"Unexpected error on attempt {retry_count}: {e}")
-                    if retry_count >= max_retries:
-                        raise
+        # Initialize container
+        container = get_container()
+        container.bot = application.bot
+        logger.info("Dependency container initialized")
+        
+        # Register handlers
+        logger.info("Registering handlers...")
+        
+        # Start command
+        application.add_handler(CommandHandler("start", start_handler))
+        application.add_handler(CommandHandler("ping", ping_handler))
+        
+        # Menu handlers
+        application.add_handler(CallbackQueryHandler(menu_handler, pattern="^menu_"))
+        
+        # Cart handlers
+        cart_handler = CartHandler()
+        application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^add_"))
+        application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^(kubaneh_|samneh_|red_bisbas_|hawaij_coffee_spice|white_coffee)"))
+        application.add_handler(CallbackQueryHandler(cart_handler.handle_view_cart, pattern="^view_cart"))
+        application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart, pattern="^clear_cart"))
+        
+        # Start polling (blocking call)
+        logger.info("Starting bot polling...")
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
+        logger.info("Bot started successfully! Ready to receive messages.")
 
     except Exception as e:
-        logger.error(f"Error starting bot: {e}")
-        raise
+        logger.error("Failed to start bot: %s", e)
+        sys.exit(1)
+
 
 if __name__ == "__main__":
-    # Ensure data directory exists
-    Path("data").mkdir(exist_ok=True)
-
-    # Start Flask in a background thread for health checks
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
-
-    # Run the bot in the main thread (required for asyncio)
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("Bot stopped by user")
-    except Exception as e:
-        print(f"Error: {e}")
+    # Set up signal handlers
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    main()
