@@ -76,7 +76,7 @@ class NotificationService:
     async def notify_new_order(self, order_data: Dict) -> bool:
         """Notify admin about new order"""
         message = self._format_order_notification(order_data)
-        return await self.send_admin_notification(message, order_data.get("id"))
+        return await self.send_admin_notification(message)
 
     async def notify_order_status_update(self, order_id: str, new_status: str, customer_chat_id: int, delivery_method: str = "pickup") -> bool:
         """Notify customer about order status update"""

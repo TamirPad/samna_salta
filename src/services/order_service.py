@@ -71,7 +71,6 @@ class OrderService:
                     
                     # Prepare order data for notification
                     order_data = {
-                        "id": order.id,
                         "order_number": order_number,
                         "customer_name": customer.full_name,
                         "customer_phone": customer.phone_number,
