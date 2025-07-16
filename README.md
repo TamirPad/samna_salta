@@ -91,7 +91,13 @@ samna_salta/
 4. Set environment variables:
    - `BOT_TOKEN`: Your bot token from @BotFather
    - `ADMIN_CHAT_ID`: Your Telegram chat ID
+   - `WEBHOOK_URL`: Your Render app URL (e.g., https://your-app.onrender.com)
 5. Deploy - Render automatically handles the rest!
+6. After deployment, set up the webhook:
+   ```bash
+   # Set the webhook URL for your bot
+   python scripts/setup_webhook.py set
+   ```
 
 ### Option 2: Local Development
 
@@ -112,7 +118,11 @@ samna_salta/
 
 3. **Run the Bot**
    ```bash
-   python main.py
+   # For development (polling mode)
+   python -m uvicorn src.main:app --reload
+   
+   # For production (webhook mode)
+   python -m uvicorn src.main:app --host 0.0.0.0 --port 8000
    ```
 
 ## ⚙️ Configuration
@@ -217,6 +227,11 @@ The codebase is designed for easy updates:
 1. **Bot not responding**: Check bot token and internet connection
 2. **Orders not received**: Verify admin chat ID is correct
 3. **Database errors**: Check file permissions and disk space
+4. **Webhook conflicts**: If you see "terminated by other getUpdates request" errors:
+   - Ensure only one bot instance is running
+   - Use webhook mode for production (Render deployment)
+   - Run `python scripts/setup_webhook.py remove` to clear any existing webhooks
+   - Then run `python scripts/setup_webhook.py set` to set the correct webhook
 
 ### Logs Analysis
 - Check `logs/errors.log` for specific error messages
