@@ -75,31 +75,13 @@ samna_salta/
 └── config/                        # Configuration files
 ```
 
-## 🚀 Quick Start Guide
+## 🏃‍♂️ Quick Start
 
 ### Prerequisites
-- Python 3.11+ (recommended for optimal performance)
+- Python 3.11+
 - Telegram Bot Token (get from @BotFather)
-- Your Telegram Chat ID (for admin notifications)
 
-### Option 1: Cloud Deployment (Recommended)
-
-**Deploy to Render (Free Tier)**
-1. Fork this repository to your GitHub account
-2. Connect to [Render.com](https://render.com) and create a Web Service
-3. Connect your forked repository
-4. Set environment variables:
-   - `BOT_TOKEN`: Your bot token from @BotFather
-   - `ADMIN_CHAT_ID`: Your Telegram chat ID
-   - `WEBHOOK_URL`: Your Render app URL (e.g., https://your-app.onrender.com)
-5. Deploy - Render automatically handles the rest!
-6. After deployment, set up the webhook:
-   ```bash
-   # Set the webhook URL for your bot
-   python scripts/setup_webhook.py set
-   ```
-
-### Option 2: Local Development
+### Installation
 
 1. **Clone and Setup**
    ```bash
@@ -117,12 +99,36 @@ samna_salta/
    ```
 
 3. **Run the Bot**
+
+   **For Local Development (Polling Mode):**
    ```bash
-   # For development (polling mode)
-   python -m uvicorn src.main:app --reload
-   
-   # For production (webhook mode)
-   python -m uvicorn src.main:app --host 0.0.0.0 --port 8000
+   python main.py
+   ```
+   This automatically runs in polling mode when no production environment variables are set.
+
+   **For Production Deployment (Webhook Mode):**
+   ```bash
+   # Set production environment variables
+   export WEBHOOK_URL=https://your-app.onrender.com
+   export PORT=8000
+   python main.py
+   ```
+   This automatically runs in webhook mode when WEBHOOK_URL or PORT is set.
+
+### Deployment to Render
+
+1. Fork this repository to your GitHub account
+2. Connect to [Render.com](https://render.com) and create a Web Service
+3. Connect your forked repository
+4. Set environment variables:
+   - `BOT_TOKEN`: Your bot token from @BotFather
+   - `ADMIN_CHAT_ID`: Your Telegram chat ID
+   - `WEBHOOK_URL`: Your Render app URL (e.g., https://your-app.onrender.com)
+5. Deploy - Render automatically handles the rest!
+6. After deployment, set up the webhook:
+   ```bash
+   # Set the webhook URL for your bot
+   python scripts/setup_webhook.py set
    ```
 
 ## ⚙️ Configuration
