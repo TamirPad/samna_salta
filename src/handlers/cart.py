@@ -69,8 +69,10 @@ class CartHandler:
                 )
 
                 # Send success message
+                from src.utils.helpers import translate_product_name
+                translated_product_name = translate_product_name(product_info['display_name'], product_info.get('options', {}), user_id)
                 message = i18n.get_text("CART_SUCCESS_MESSAGE", user_id=user_id).format(
-                    product_name=product_info['display_name'],
+                    product_name=translated_product_name,
                     item_count=item_count,
                     cart_total=cart_total
                 )

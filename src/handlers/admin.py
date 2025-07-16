@@ -224,9 +224,9 @@ class AdminHandler:
 {i18n.get_text("ANALYTICS_DASHBOARD_TITLE", user_id=user_id)}
 
 {i18n.get_text("ANALYTICS_QUICK_OVERVIEW", user_id=user_id)}
-• Today: {quick_overview.get('today', {}).get('orders', 0)} orders, ₪{quick_overview.get('today', {}).get('revenue', 0):.2f}
-• This Week: {quick_overview.get('this_week', {}).get('orders', 0)} orders, ₪{quick_overview.get('this_week', {}).get('revenue', 0):.2f}
-• This Month: {quick_overview.get('this_month', {}).get('orders', 0)} orders, ₪{quick_overview.get('this_month', {}).get('revenue', 0):.2f}
+• {i18n.get_text("ANALYTICS_LABEL_TODAY", user_id=user_id)}: {quick_overview.get('today', {}).get('orders', 0)} {i18n.get_text("ANALYTICS_LABEL_ORDERS", user_id=user_id).lower()}, ₪{quick_overview.get('today', {}).get('revenue', 0):.2f}
+• {i18n.get_text("ANALYTICS_LABEL_THIS_WEEK", user_id=user_id)}: {quick_overview.get('this_week', {}).get('orders', 0)} {i18n.get_text("ANALYTICS_LABEL_ORDERS", user_id=user_id).lower()}, ₪{quick_overview.get('this_week', {}).get('revenue', 0):.2f}
+• {i18n.get_text("ANALYTICS_LABEL_THIS_MONTH", user_id=user_id)}: {quick_overview.get('this_month', {}).get('orders', 0)} {i18n.get_text("ANALYTICS_LABEL_ORDERS", user_id=user_id).lower()}, ₪{quick_overview.get('this_month', {}).get('revenue', 0):.2f}
 
 {i18n.get_text("ANALYTICS_SELECT_REPORT", user_id=user_id)}
         """.strip()
@@ -299,19 +299,19 @@ class AdminHandler:
 {i18n.get_text('ANALYTICS_REVENUE_TITLE', user_id=user_id)}
 
 {i18n.get_text('ANALYTICS_OVERALL_PERFORMANCE', user_id=user_id)}
-• Total Revenue: ₪{fmt(revenue_data.get('total_revenue'))}
-• Total Orders: {revenue_data.get('total_orders', 0)}
-• Average Order Value: ₪{fmt(revenue_data.get('avg_order_value'))}
+• {i18n.get_text('ANALYTICS_LABEL_TOTAL_REVENUE', user_id=user_id)}: ₪{fmt(revenue_data.get('total_revenue'))}
+• {i18n.get_text('ANALYTICS_LABEL_TOTAL_ORDERS', user_id=user_id)}: {revenue_data.get('total_orders', 0)}
+• {i18n.get_text('ANALYTICS_LABEL_AVG_VALUE', user_id=user_id)}: ₪{fmt(revenue_data.get('avg_order_value'))}
 
 {i18n.get_text('ANALYTICS_DELIVERY_ANALYSIS', user_id=user_id)}
-• Delivery Orders: {revenue_data.get('delivery_orders', 0)} (₪{fmt(revenue_data.get('delivery_revenue'))})
-• Pickup Orders: {revenue_data.get('pickup_orders', 0)} (₪{fmt(revenue_data.get('pickup_revenue'))})
+• {i18n.get_text('ANALYTICS_LABEL_DELIVERY_ORDERS', user_id=user_id)}: {revenue_data.get('delivery_orders', 0)} (₪{fmt(revenue_data.get('delivery_revenue'))})
+• {i18n.get_text('ANALYTICS_LABEL_PICKUP_ORDERS', user_id=user_id)}: {revenue_data.get('pickup_orders', 0)} (₪{fmt(revenue_data.get('pickup_revenue'))})
 • Delivery %: {fmt((revenue_data.get('delivery_orders', 0) / revenue_data.get('total_orders', 1) * 100) if revenue_data.get('total_orders', 1) else 0, '.1f', 'N/A')}%
 
 {i18n.get_text('ANALYTICS_RECENT_PERFORMANCE', user_id=user_id)}
-• Today: ₪{fmt(quick_overview.get('today', {}).get('revenue'))}
-• This Week: ₪{fmt(quick_overview.get('this_week', {}).get('revenue'))}
-• This Month: ₪{fmt(quick_overview.get('this_month', {}).get('revenue'))}
+• {i18n.get_text('ANALYTICS_LABEL_TODAY', user_id=user_id)}: ₪{fmt(quick_overview.get('today', {}).get('revenue'))}
+• {i18n.get_text('ANALYTICS_LABEL_THIS_WEEK', user_id=user_id)}: ₪{fmt(quick_overview.get('this_week', {}).get('revenue'))}
+• {i18n.get_text('ANALYTICS_LABEL_THIS_MONTH', user_id=user_id)}: ₪{fmt(quick_overview.get('this_month', {}).get('revenue'))}
 
 <i>{i18n.get_text('ANALYTICS_REPORT_PERIOD', user_id=user_id).format(days=analytics_data.get('period', {}).get('days', 30))}</i>
         """.strip()
@@ -346,20 +346,20 @@ class AdminHandler:
 {i18n.get_text('ANALYTICS_ORDER_TITLE', user_id=user_id)}
 
 {i18n.get_text('ANALYTICS_ORDER_STATUS', user_id=user_id)}
-• Pending: {order_data.get('pending_orders', 0)}
-• Active: {order_data.get('active_orders', 0)}
-• Completed: {order_data.get('completed_orders', 0)}
-• Cancelled: {order_data.get('cancelled_orders', 0)}
+• {i18n.get_text('ANALYTICS_LABEL_PENDING', user_id=user_id)}: {order_data.get('pending_orders', 0)}
+• {i18n.get_text('ANALYTICS_LABEL_ACTIVE', user_id=user_id)}: {order_data.get('active_orders', 0)}
+• {i18n.get_text('ANALYTICS_LABEL_COMPLETED', user_id=user_id)}: {order_data.get('completed_orders', 0)}
+• {i18n.get_text('ANALYTICS_LABEL_CANCELLED', user_id=user_id)}: {order_data.get('cancelled_orders', 0)}
 
 {i18n.get_text('ANALYTICS_PROCESSING_METRICS', user_id=user_id)}
-• Completion Rate: {fmt(completion_rate, '.1f')}%
-• Avg Processing Time: {fmt(avg_processing_time, '.1f')} hours
-• Total Orders: {order_data.get('total_orders', 0)}
+• {i18n.get_text('ANALYTICS_LABEL_COMPLETION_RATE', user_id=user_id)}: {fmt(completion_rate, '.1f')}%
+• {i18n.get_text('ANALYTICS_LABEL_AVG_PROCESSING_TIME', user_id=user_id)}: {fmt(avg_processing_time, '.1f')} hours
+• {i18n.get_text('ANALYTICS_LABEL_TOTAL_ORDERS', user_id=user_id)}: {order_data.get('total_orders', 0)}
 
 {i18n.get_text('ANALYTICS_RECENT_ACTIVITY', user_id=user_id)}
-• Today: {quick_overview.get('today', {}).get('orders', 0)} orders
-• This Week: {quick_overview.get('this_week', {}).get('orders', 0)} orders
-• This Month: {quick_overview.get('this_month', {}).get('orders', 0)} orders
+• {i18n.get_text('ANALYTICS_LABEL_TODAY', user_id=user_id)}: {quick_overview.get('today', {}).get('orders', 0)} {i18n.get_text('ANALYTICS_LABEL_ORDERS', user_id=user_id).lower()}
+• {i18n.get_text('ANALYTICS_LABEL_THIS_WEEK', user_id=user_id)}: {quick_overview.get('this_week', {}).get('orders', 0)} {i18n.get_text('ANALYTICS_LABEL_ORDERS', user_id=user_id).lower()}
+• {i18n.get_text('ANALYTICS_LABEL_THIS_MONTH', user_id=user_id)}: {quick_overview.get('this_month', {}).get('orders', 0)} {i18n.get_text('ANALYTICS_LABEL_ORDERS', user_id=user_id).lower()}
 
 <i>{i18n.get_text('ANALYTICS_REPORT_PERIOD', user_id=user_id).format(days=analytics_data.get('period', {}).get('days', 30))}</i>
         """.strip()
@@ -396,11 +396,13 @@ class AdminHandler:
             top_products = products[:5]
             product_lines = []
             for i, product in enumerate(top_products, 1):
+                from src.utils.helpers import translate_product_name
+                translated_product_name = translate_product_name(product['product_name'], product.get('options', {}), user_id)
                 product_lines.append(
-                    f"{i}. {product['product_name']}\n"
-                    f"   • Orders: {product.get('total_orders', 0)}\n"
-                    f"   • Revenue: ₪{fmt(product.get('total_revenue'))}\n"
-                    f"   • Avg Value: ₪{fmt(product.get('avg_order_value'))}"
+                    f"{i}. {translated_product_name}\n"
+                    f"   • {i18n.get_text('ANALYTICS_LABEL_ORDERS', user_id=user_id)}: {product.get('total_orders', 0)}\n"
+                    f"   • {i18n.get_text('ANALYTICS_LABEL_REVENUE', user_id=user_id)}: ₪{fmt(product.get('total_revenue'))}\n"
+                    f"   • {i18n.get_text('ANALYTICS_LABEL_AVG_VALUE', user_id=user_id)}: ₪{fmt(product.get('avg_order_value'))}"
                 )
             report_text = f"""
 {i18n.get_text('ANALYTICS_PRODUCT_TITLE', user_id=user_id)}
@@ -410,9 +412,9 @@ class AdminHandler:
 {chr(10).join(product_lines)}
 
 {i18n.get_text('ANALYTICS_PRODUCT_SUMMARY', user_id=user_id)}
-• Total Products: {len(products)}
-• Total Product Revenue: ₪{fmt(sum(p.get('total_revenue', 0) or 0 for p in products))}
-• Most Popular: {products[0]['product_name'] if products else 'N/A'}
+• {i18n.get_text('ANALYTICS_LABEL_TOTAL_PRODUCTS', user_id=user_id)}: {len(products)}
+• {i18n.get_text('ANALYTICS_LABEL_TOTAL_PRODUCT_REVENUE', user_id=user_id)}: ₪{fmt(sum(p.get('total_revenue', 0) or 0 for p in products))}
+• {i18n.get_text('ANALYTICS_LABEL_MOST_POPULAR', user_id=user_id)}: {translate_product_name(products[0]['product_name'], products[0].get('options', {}), user_id) if products else 'N/A'}
 
 <i>{i18n.get_text('ANALYTICS_REPORT_PERIOD', user_id=user_id).format(days=analytics_data.get('period', {}).get('days', 30))}</i>
             """.strip()
@@ -449,9 +451,9 @@ class AdminHandler:
             for i, customer in enumerate(top_customers, 1):
                 customer_lines.append(
                     f"{i}. {customer['customer_name']}\n"
-                    f"   • Orders: {customer.get('total_orders', 0)}\n"
-                    f"   • Total Spent: ₪{fmt(customer.get('total_spent'))}\n"
-                    f"   • Avg Order: ₪{fmt(customer.get('avg_order_value'))}"
+                    f"   • {i18n.get_text('ANALYTICS_LABEL_ORDERS', user_id=user_id)}: {customer.get('total_orders', 0)}\n"
+                    f"   • {i18n.get_text('ANALYTICS_LABEL_TOTAL_SPENT', user_id=user_id)}: ₪{fmt(customer.get('total_spent'))}\n"
+                    f"   • {i18n.get_text('ANALYTICS_LABEL_AVG_ORDER', user_id=user_id)}: ₪{fmt(customer.get('avg_order_value'))}"
                 )
             total_customers = len(customers)
             total_customer_revenue = sum(c.get('total_spent', 0) or 0 for c in customers)
@@ -464,10 +466,10 @@ class AdminHandler:
 {chr(10).join(customer_lines)}
 
 {i18n.get_text('ANALYTICS_CUSTOMER_METRICS', user_id=user_id)}
-• Total Customers: {total_customers}
-• Total Customer Revenue: ₪{fmt(total_customer_revenue)}
-• Average Customer Value: ₪{fmt(avg_customer_value)}
-• Best Customer: {customers[0]['customer_name'] if customers else 'N/A'}
+• {i18n.get_text('ANALYTICS_LABEL_TOTAL_CUSTOMERS', user_id=user_id)}: {total_customers}
+• {i18n.get_text('ANALYTICS_LABEL_TOTAL_CUSTOMER_REVENUE', user_id=user_id)}: ₪{fmt(total_customer_revenue)}
+• {i18n.get_text('ANALYTICS_LABEL_AVERAGE_CUSTOMER_VALUE', user_id=user_id)}: ₪{fmt(avg_customer_value)}
+• {i18n.get_text('ANALYTICS_LABEL_BEST_CUSTOMER', user_id=user_id)}: {customers[0]['customer_name'] if customers else 'N/A'}
 
 <i>{i18n.get_text('ANALYTICS_REPORT_PERIOD', user_id=user_id).format(days=analytics_data.get('period', {}).get('days', 30))}</i>
             """.strip()
@@ -503,16 +505,16 @@ class AdminHandler:
 {i18n.get_text('ANALYTICS_TRENDS_TITLE', user_id=user_id)}
 
 {i18n.get_text('ANALYTICS_TREND_ANALYSIS', user_id=user_id)}
-• Revenue Trend: {revenue_trend}
-• Order Volume Trend: {order_trend}
+• {i18n.get_text('ANALYTICS_LABEL_REVENUE_TREND', user_id=user_id)}: {revenue_trend}
+• {i18n.get_text('ANALYTICS_LABEL_ORDER_VOLUME_TREND', user_id=user_id)}: {order_trend}
 
 {i18n.get_text('ANALYTICS_RECENT_TRENDS', user_id=user_id)}
 {chr(10).join(recent_summary)}
 
 {i18n.get_text('ANALYTICS_TREND_INSIGHTS', user_id=user_id)}
-• Daily revenue patterns show business performance
-• Order volume indicates customer demand
-• Compare with previous periods for growth analysis
+• {i18n.get_text('ANALYTICS_INSIGHT_DAILY_REVENUE', user_id=user_id)}
+• {i18n.get_text('ANALYTICS_INSIGHT_ORDER_VOLUME', user_id=user_id)}
+• {i18n.get_text('ANALYTICS_INSIGHT_COMPARE_PERIODS', user_id=user_id)}
 
 <i>{i18n.get_text('ANALYTICS_REPORT_PERIOD', user_id=user_id).format(days=analytics_data.get('period', {}).get('days', 30))}</i>
         """.strip()
@@ -548,35 +550,35 @@ class AdminHandler:
 {i18n.get_text('ANALYTICS_FULL_TITLE', user_id=user_id)}
 
 {i18n.get_text('ANALYTICS_FINANCIAL_SUMMARY', user_id=user_id)}
-• Total Revenue: ₪{fmt(total_revenue)}
-• Total Orders: {total_orders}
-• Average Order Value: ₪{fmt(avg_order_value)}
-• Completion Rate: {fmt(completion_rate, '.1f')}%
+• {i18n.get_text('ANALYTICS_LABEL_TOTAL_REVENUE', user_id=user_id)}: ₪{fmt(total_revenue)}
+• {i18n.get_text('ANALYTICS_LABEL_TOTAL_ORDERS', user_id=user_id)}: {total_orders}
+• {i18n.get_text('ANALYTICS_LABEL_AVG_VALUE', user_id=user_id)}: ₪{fmt(avg_order_value)}
+• {i18n.get_text('ANALYTICS_LABEL_COMPLETION_RATE', user_id=user_id)}: {fmt(completion_rate, '.1f')}%
 
 📦 <b>Order Status:</b>
-• Pending: {order_data.get('pending_orders', 0)}
-• Active: {order_data.get('active_orders', 0)}
-• Completed: {order_data.get('completed_orders', 0)}
-• Cancelled: {order_data.get('cancelled_orders', 0)}
+• {i18n.get_text('ANALYTICS_LABEL_PENDING', user_id=user_id)}: {order_data.get('pending_orders', 0)}
+• {i18n.get_text('ANALYTICS_LABEL_ACTIVE', user_id=user_id)}: {order_data.get('active_orders', 0)}
+• {i18n.get_text('ANALYTICS_LABEL_COMPLETED', user_id=user_id)}: {order_data.get('completed_orders', 0)}
+• {i18n.get_text('ANALYTICS_LABEL_CANCELLED', user_id=user_id)}: {order_data.get('cancelled_orders', 0)}
 
 {i18n.get_text('ANALYTICS_DELIVERY_MIX', user_id=user_id)}
-• Delivery: {revenue_data.get('delivery_orders', 0)} orders (₪{fmt(revenue_data.get('delivery_revenue'))})
-• Pickup: {revenue_data.get('pickup_orders', 0)} orders (₪{fmt(revenue_data.get('pickup_revenue'))})
+• {i18n.get_text('ANALYTICS_LABEL_DELIVERY_ORDERS', user_id=user_id)}: {revenue_data.get('delivery_orders', 0)} {i18n.get_text('ANALYTICS_LABEL_ORDERS', user_id=user_id).lower()} (₪{fmt(revenue_data.get('delivery_revenue'))})
+• {i18n.get_text('ANALYTICS_LABEL_PICKUP_ORDERS', user_id=user_id)}: {revenue_data.get('pickup_orders', 0)} {i18n.get_text('ANALYTICS_LABEL_ORDERS', user_id=user_id).lower()} (₪{fmt(revenue_data.get('pickup_revenue'))})
 
 {i18n.get_text('ANALYTICS_PRODUCT_PERFORMANCE_SUMMARY', user_id=user_id)}
-• Total Products: {len(products)}
-• Top Product: {products[0]['product_name'] if products else 'N/A'}
-• Product Revenue: ₪{fmt(sum(p.get('total_revenue', 0) or 0 for p in products))}
+• {i18n.get_text('ANALYTICS_LABEL_TOTAL_PRODUCTS', user_id=user_id)}: {len(products)}
+• {i18n.get_text('ANALYTICS_LABEL_MOST_POPULAR', user_id=user_id)}: {products[0]['product_name'] if products else 'N/A'}
+• {i18n.get_text('ANALYTICS_LABEL_PRODUCT_REVENUE', user_id=user_id)}: ₪{fmt(sum(p.get('total_revenue', 0) or 0 for p in products))}
 
 {i18n.get_text('ANALYTICS_CUSTOMER_INSIGHTS', user_id=user_id)}
-• Total Customers: {len(customers)}
-• Best Customer: {customers[0]['customer_name'] if customers else 'N/A'}
-• Customer Revenue: ₪{fmt(sum(c.get('total_spent', 0) or 0 for c in customers))}
+• {i18n.get_text('ANALYTICS_LABEL_TOTAL_CUSTOMERS', user_id=user_id)}: {len(customers)}
+• {i18n.get_text('ANALYTICS_LABEL_BEST_CUSTOMER', user_id=user_id)}: {customers[0]['customer_name'] if customers else 'N/A'}
+• {i18n.get_text('ANALYTICS_LABEL_CUSTOMER_REVENUE', user_id=user_id)}: ₪{fmt(sum(c.get('total_spent', 0) or 0 for c in customers))}
 
 {i18n.get_text('ANALYTICS_RECENT_PERFORMANCE', user_id=user_id)}
-• Today: {quick_overview.get('today', {}).get('orders', 0)} orders, ₪{fmt(quick_overview.get('today', {}).get('revenue'))}
-• This Week: {quick_overview.get('this_week', {}).get('orders', 0)} orders, ₪{fmt(quick_overview.get('this_week', {}).get('revenue'))}
-• This Month: {quick_overview.get('this_month', {}).get('orders', 0)} orders, ₪{fmt(quick_overview.get('this_month', {}).get('revenue'))}
+• {i18n.get_text('ANALYTICS_LABEL_TODAY', user_id=user_id)}: {quick_overview.get('today', {}).get('orders', 0)} {i18n.get_text('ANALYTICS_LABEL_ORDERS', user_id=user_id).lower()}, ₪{fmt(quick_overview.get('today', {}).get('revenue'))}
+• {i18n.get_text('ANALYTICS_LABEL_THIS_WEEK', user_id=user_id)}: {quick_overview.get('this_week', {}).get('orders', 0)} {i18n.get_text('ANALYTICS_LABEL_ORDERS', user_id=user_id).lower()}, ₪{fmt(quick_overview.get('this_week', {}).get('revenue'))}
+• {i18n.get_text('ANALYTICS_LABEL_THIS_MONTH', user_id=user_id)}: {quick_overview.get('this_month', {}).get('orders', 0)} {i18n.get_text('ANALYTICS_LABEL_ORDERS', user_id=user_id).lower()}, ₪{fmt(quick_overview.get('this_month', {}).get('revenue'))}
 
 <i>{i18n.get_text('ANALYTICS_REPORT_PERIOD', user_id=user_id).format(days=analytics_data.get('period', {}).get('days', 30))}</i>
 <i>{i18n.get_text('ANALYTICS_GENERATED_AT', user_id=user_id).format(datetime=analytics_data.get('generated_at', ''))}</i>
@@ -795,13 +797,14 @@ class AdminHandler:
         """Show details for a specific order."""
         try:
             self.logger.info("📊 SHOWING ORDER DETAILS FOR #%s", order_id)
-            order_details = await self._get_formatted_order_details(order_id)
+            user_id = query.from_user.id
+            order_details = await self._get_formatted_order_details(order_id, user_id)
 
             if not order_details:
-                await query.edit_message_text(i18n.get_text("ADMIN_ORDER_NOT_FOUND", user_id=query.from_user.id))
+                await query.edit_message_text(i18n.get_text("ADMIN_ORDER_NOT_FOUND", user_id=user_id))
                 return
 
-            keyboard = self._create_order_details_keyboard(order_id)
+            keyboard = self._create_order_details_keyboard(order_id, user_id)
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             await query.edit_message_text(
@@ -833,9 +836,8 @@ class AdminHandler:
             details.append(f"\n{i18n.get_text('ADMIN_ITEMS_LABEL', user_id=user_id)}")
             for item in order_info["items"]:
                 price = item.get('total_price', item.get('price', 0))
-                # Translate product name
                 from src.utils.helpers import translate_product_name
-                translated_name = translate_product_name(item["product_name"])
+                translated_name = translate_product_name(item["product_name"], item.get("options", {}), user_id)
                 details.append(
                     i18n.get_text("ADMIN_ITEM_LINE", user_id=user_id).format(
                         name=translated_name,

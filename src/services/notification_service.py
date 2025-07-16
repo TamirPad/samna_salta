@@ -112,7 +112,9 @@ class NotificationService:
         items_text = ""
         for i, item in enumerate(order_data.get('items', []), 1):
             item_total = item.get("price", 0) * item.get("quantity", 1)
-            items_text += f"{i}. {item.get('product_name', 'Unknown')} x{item.get('quantity', 1)} - ₪{item_total:.2f}\n"
+            from src.utils.helpers import translate_product_name
+            translated_product_name = translate_product_name(item.get('product_name', 'Unknown'), item.get('options', {}), user_id)
+            items_text += f"{i}. {translated_product_name} x{item.get('quantity', 1)} - ₪{item_total:.2f}\n"
         
         # Format delivery info
         delivery_method = order_data.get('delivery_method', 'Unknown').title()

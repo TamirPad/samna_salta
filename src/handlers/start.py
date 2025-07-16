@@ -725,9 +725,11 @@ class OnboardingHandler:
             if order.get("items"):
                 details.append(f"\n{i18n.get_text('CUSTOMER_ORDER_ITEMS', user_id=user_id)}")
                 for item in order["items"]:
+                    from src.utils.helpers import translate_product_name
+                    translated_name = translate_product_name(item["product_name"], item.get("options", {}), user_id)
                     details.append(
                         i18n.get_text("CUSTOMER_ORDER_ITEM_LINE", user_id=user_id).format(
-                            name=item["product_name"],
+                            name=translated_name,
                             quantity=item["quantity"],
                             price=item["total_price"]
                         )
