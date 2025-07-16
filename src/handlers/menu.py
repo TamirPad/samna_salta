@@ -140,7 +140,7 @@ class MenuHandler:
         text = i18n.get_text("HAWAIJ_SOUP_DESC")
         await query.edit_message_text(
             text,
-            reply_markup=get_direct_add_keyboard("Hawaij soup spice"),
+            reply_markup=get_direct_add_keyboard("Hawaij soup spice", include_info=False),
             parse_mode="HTML",
         )
 

@@ -64,7 +64,7 @@ class OnboardingHandler:
                     f"🇾🇪 <b>Welcome to Samna Salta!</b> 🇾🇪\n\n"
                     f"👋 <b>Hello {existing_customer.full_name}!</b>\n\n"
                     f"Welcome back to the best traditional Yemenite food experience!\n\n"
-                    f"What would you like to order today?"
+                    f"Press the button below to continue"
                 )
                 await update.message.reply_text(
                     welcome_message,
