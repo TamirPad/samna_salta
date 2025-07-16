@@ -33,11 +33,16 @@ def setup_bot():
     config = get_config()
     logger.info("Configuration loaded successfully")
 
-    # Initialize database
+    # Initialize database with retry logic
     logger.info("Initializing database...")
-    init_db()
-    init_default_products()
-    logger.info("Database initialized successfully")
+    try:
+        init_db()
+        # init_default_products() is now called within init_db()
+        logger.info("Database initialization completed")
+    except Exception as e:
+        logger.error(f"Database initialization failed: {e}")
+        logger.warning("Bot will start with limited functionality - database features may not work")
+        # Continue with bot startup even if database fails
 
     # Create application
     logger.info("Creating Telegram application...")
@@ -166,7 +171,24 @@ def run_webhook():
     @app.get("/health")
     async def health_check(background_tasks: BackgroundTasks):
         """Health check endpoint for Render"""
-        return {"status": "ok", "message": "Bot is running"}
+        from src.db.operations import get_database_status
+        
+        db_status = get_database_status()
+        
+        if db_status["connected"]:
+            return {
+                "status": "ok", 
+                "message": "Bot is running",
+                "database": "connected",
+                "database_type": db_status["database_type"]
+            }
+        else:
+            return {
+                "status": "degraded", 
+                "message": "Bot is running but database is unavailable",
+                "database": "disconnected",
+                "database_error": db_status["error"]
+            }
 
     @app.post("/webhook")
     async def webhook_handler(request: Request):

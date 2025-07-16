@@ -406,18 +406,43 @@ def retry_on_database_error(
 
 
 def init_db():
-    """Initialize database tables"""
-    try:
-        engine = get_db_manager().get_engine()
-        get_db_manager().create_tables()
-        logger.info("Database tables created successfully")
+    """Initialize database tables with connection retry logic"""
+    max_retries = 3
+    retry_delay = 5  # seconds
+    
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Database initialization attempt {attempt + 1}/{max_retries}")
+            
+            # Test connection first
+            engine = get_db_manager().get_engine()
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+                logger.info("Database connection test successful")
+            
+            # Create tables
+            get_db_manager().create_tables()
+            logger.info("Database tables created successfully")
 
-        # Initialize default products
-        init_default_products()
-
-    except SQLAlchemyError as e:
-        logger.error("Failed to initialize database: %s", e)
-        raise
+            # Initialize default products
+            init_default_products()
+            
+            logger.info("Database initialization completed successfully")
+            return
+            
+        except SQLAlchemyError as e:
+            logger.error(f"Database initialization attempt {attempt + 1} failed: {e}")
+            
+            if attempt < max_retries - 1:
+                logger.info(f"Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                logger.error("All database initialization attempts failed")
+                # Don't raise the exception - let the application continue
+                # This allows the bot to start even if database is temporarily unavailable
+                logger.warning("Continuing without database initialization - some features may be limited")
+                return
 
 
 def init_default_products():
@@ -956,3 +981,45 @@ def get_all_orders() -> list[Order]:
         )
     finally:
         session.close()
+
+
+def check_database_connection() -> bool:
+    """Check if database connection is available"""
+    try:
+        engine = get_db_manager().get_engine()
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True
+    except Exception as e:
+        logger.error(f"Database connection check failed: {e}")
+        return False
+
+
+def get_database_status() -> dict:
+    """Get comprehensive database status information"""
+    status = {
+        "connected": False,
+        "error": None,
+        "connection_string": None,
+        "database_type": None
+    }
+    
+    try:
+        config = get_config()
+        
+        # Determine which connection string is being used
+        if config.supabase_connection_string:
+            status["connection_string"] = "supabase"
+            status["database_type"] = "postgresql"
+        else:
+            status["connection_string"] = "local"
+            status["database_type"] = "sqlite" if "sqlite" in config.database_url else "other"
+        
+        # Test connection
+        status["connected"] = check_database_connection()
+        
+    except Exception as e:
+        status["error"] = str(e)
+        logger.error(f"Error getting database status: {e}")
+    
+    return status
