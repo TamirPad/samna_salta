@@ -142,8 +142,28 @@ class CartHandler:
             self.logger.error("Exception in handle_view_cart: %s", e)
             await handle_error(update, e, "viewing cart")
 
+    async def handle_clear_cart_confirmation(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle clear cart confirmation dialog"""
+        try:
+            query = update.callback_query
+            await query.answer()
+
+            user_id = query.from_user.id
+            self.logger.info("🗑️ CLEAR CART CONFIRMATION: User %s", user_id)
+
+            # Show confirmation dialog
+            await query.edit_message_text(
+                i18n.get_text("CLEAR_CART_CONFIRMATION", user_id=user_id),
+                parse_mode="HTML",
+                reply_markup=self._get_clear_cart_confirmation_keyboard(user_id),
+            )
+
+        except Exception as e:
+            self.logger.error("Exception in handle_clear_cart_confirmation: %s", e)
+            await handle_error(update, e, "clear cart confirmation")
+
     async def handle_clear_cart(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle clearing cart"""
+        """Handle clearing cart after confirmation"""
         try:
             query = update.callback_query
             await query.answer()
@@ -587,6 +607,11 @@ class CartHandler:
             [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main")],
         ]
         return InlineKeyboardMarkup(keyboard)
+
+    def _get_clear_cart_confirmation_keyboard(self, user_id: int = None) -> InlineKeyboardMarkup:
+        """Get clear cart confirmation keyboard"""
+        from src.keyboards.menu_keyboards import get_clear_cart_confirmation_keyboard
+        return get_clear_cart_confirmation_keyboard(user_id)
 
     async def _show_order_confirmation(self, query, cart_service, user_id):
         """Show order confirmation for callback queries"""

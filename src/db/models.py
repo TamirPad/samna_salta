@@ -36,6 +36,7 @@ class Customer(Base):
     full_name: Mapped[str] = mapped_column(String(100), nullable=False)
     phone_number: Mapped[str] = mapped_column(String(20), nullable=False)
     delivery_address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    language: Mapped[str] = mapped_column(String(10), default="en", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

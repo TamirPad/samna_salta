@@ -49,15 +49,15 @@ def get_kubaneh_menu_keyboard(user_id: int = None):
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_kubaneh_oil_keyboard(kubaneh_type: str):
+def get_kubaneh_oil_keyboard(kubaneh_type: str, user_id: int = None):
     """Get Kubaneh oil selection keyboard"""
     keyboard = [
         [
             InlineKeyboardButton(
-                i18n.get_text("OIL_OLIVE"), callback_data=f"kubaneh_{kubaneh_type}_olive_oil"
+                i18n.get_text("OIL_OLIVE", user_id=user_id), callback_data=f"kubaneh_{kubaneh_type}_olive_oil"
             ),
             InlineKeyboardButton(
-                i18n.get_text("OIL_SAMNEH"), callback_data=f"kubaneh_{kubaneh_type}_samneh"
+                i18n.get_text("OIL_SAMNEH", user_id=user_id), callback_data=f"kubaneh_{kubaneh_type}_samneh"
             ),
         ],
         [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_kubaneh")],
@@ -79,12 +79,12 @@ def get_samneh_menu_keyboard(user_id: int = None):
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_samneh_size_keyboard(smoking_type: str):
+def get_samneh_size_keyboard(smoking_type: str, user_id: int = None):
     """Get Samneh size selection keyboard"""
     keyboard = [
         [
-                    InlineKeyboardButton(i18n.get_text("SIZE_SMALL", user_id=user_id), callback_data=f"samneh_{smoking_type}_small"),
-        InlineKeyboardButton(i18n.get_text("SIZE_LARGE", user_id=user_id), callback_data=f"samneh_{smoking_type}_large"),
+            InlineKeyboardButton(i18n.get_text("SIZE_SMALL", user_id=user_id), callback_data=f"samneh_{smoking_type}_small"),
+            InlineKeyboardButton(i18n.get_text("SIZE_LARGE", user_id=user_id), callback_data=f"samneh_{smoking_type}_large"),
         ],
         [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_samneh")],
     ]
@@ -149,7 +149,7 @@ def get_hilbeh_menu_keyboard(user_id: int = None):
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_cart_keyboard():
+def get_cart_keyboard(user_id: int = None):
     """Get cart view keyboard"""
     keyboard = [
         [InlineKeyboardButton(i18n.get_text("CHANGE_DELIVERY", user_id=user_id), callback_data="cart_change_delivery")],
@@ -163,7 +163,7 @@ def get_cart_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_cart_delivery_method_keyboard():
+def get_cart_delivery_method_keyboard(user_id: int = None):
     """Get delivery method selection keyboard for cart"""
     keyboard = [
         [InlineKeyboardButton(i18n.get_text("DELIVERY_PICKUP", user_id=user_id), callback_data="cart_delivery_pickup")],
@@ -174,7 +174,7 @@ def get_cart_delivery_method_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_clear_cart_confirmation_keyboard():
+def get_clear_cart_confirmation_keyboard(user_id: int = None):
     """Get clear cart confirmation keyboard"""
     keyboard = [
         [InlineKeyboardButton(i18n.get_text("CLEAR_CART_YES", user_id=user_id), callback_data="cart_clear_yes")],
@@ -184,7 +184,7 @@ def get_clear_cart_confirmation_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_back_to_cart_keyboard():
+def get_back_to_cart_keyboard(user_id: int = None):
     """Get back to cart keyboard"""
     keyboard = [
         [InlineKeyboardButton(i18n.get_text("BACK_TO_CART", user_id=user_id), callback_data="cart_view")],

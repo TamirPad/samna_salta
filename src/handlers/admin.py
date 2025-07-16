@@ -46,7 +46,7 @@ class AdminHandler:
         # Check if user is admin
         if not await self._is_admin_user(user_id):
             await update.message.reply_text(
-                i18n.get_text("ADMIN_ACCESS_DENIED")
+                i18n.get_text("ADMIN_ACCESS_DENIED", user_id=user_id)
             )
             return
 
@@ -63,7 +63,7 @@ class AdminHandler:
 
         user_id = update.effective_user.id
         if not await self._is_admin_user(user_id):
-            await query.message.reply_text(i18n.get_text("ADMIN_ACCESS_DENIED"))
+            await query.message.reply_text(i18n.get_text("ADMIN_ACCESS_DENIED", user_id=user_id))
             return
 
         data = query.data
@@ -99,6 +99,9 @@ class AdminHandler:
         """Show main admin dashboard"""
         try:
             self.logger.info("📊 LOADING ADMIN DASHBOARD")
+            
+            # Get user_id from update
+            user_id = update.effective_user.id
 
             # Get order statistics
             pending_orders = await self.admin_service.get_pending_orders()
@@ -115,33 +118,33 @@ class AdminHandler:
             )
 
             dashboard_text = (
-                i18n.get_text("ADMIN_DASHBOARD_TITLE") + "\n\n" +
-                i18n.get_text("ADMIN_ORDER_STATS") + "\n" +
-                i18n.get_text("ADMIN_PENDING_COUNT").format(count=len(pending_orders)) + "\n" +
-                i18n.get_text("ADMIN_ACTIVE_COUNT").format(count=len(active_orders)) + "\n" +
-                i18n.get_text("ADMIN_COMPLETED_COUNT").format(count=len(completed_orders)) + "\n" +
-                i18n.get_text("ADMIN_TOTAL_TODAY").format(count=len(today_orders)) + "\n\n" +
-                i18n.get_text("ADMIN_QUICK_ACTIONS")
+                i18n.get_text("ADMIN_DASHBOARD_TITLE", user_id=user_id) + "\n\n" +
+                i18n.get_text("ADMIN_ORDER_STATS", user_id=user_id) + "\n" +
+                i18n.get_text("ADMIN_PENDING_COUNT", user_id=user_id).format(count=len(pending_orders)) + "\n" +
+                i18n.get_text("ADMIN_ACTIVE_COUNT", user_id=user_id).format(count=len(active_orders)) + "\n" +
+                i18n.get_text("ADMIN_COMPLETED_COUNT", user_id=user_id).format(count=len(completed_orders)) + "\n" +
+                i18n.get_text("ADMIN_TOTAL_TODAY", user_id=user_id).format(count=len(today_orders)) + "\n\n" +
+                i18n.get_text("ADMIN_QUICK_ACTIONS", user_id=user_id)
             )
 
             keyboard = [
                 [
                     InlineKeyboardButton(
-                        i18n.get_text("ADMIN_PENDING_ORDERS"), callback_data="admin_pending_orders"
+                        i18n.get_text("ADMIN_PENDING_ORDERS", user_id=user_id), callback_data="admin_pending_orders"
                     ),
                     InlineKeyboardButton(
-                        i18n.get_text("ADMIN_ACTIVE_ORDERS"), callback_data="admin_active_orders"
+                        i18n.get_text("ADMIN_ACTIVE_ORDERS", user_id=user_id), callback_data="admin_active_orders"
                     ),
                 ],
                 [
                     InlineKeyboardButton(
-                        i18n.get_text("ADMIN_ALL_ORDERS"), callback_data="admin_all_orders"
+                        i18n.get_text("ADMIN_ALL_ORDERS", user_id=user_id), callback_data="admin_all_orders"
                     ),
                     InlineKeyboardButton(
-                        i18n.get_text("ADMIN_COMPLETED_ORDERS"), callback_data="admin_completed_orders"
+                        i18n.get_text("ADMIN_COMPLETED_ORDERS", user_id=user_id), callback_data="admin_completed_orders"
                     ),
                 ],
-                [InlineKeyboardButton(i18n.get_text("ADMIN_ANALYTICS"), callback_data="admin_analytics")],
+                [InlineKeyboardButton(i18n.get_text("ADMIN_ANALYTICS", user_id=user_id), callback_data="admin_analytics")],
             ]
 
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -172,9 +175,9 @@ class AdminHandler:
 
         if message_sender:
             try:
-                await message_sender.reply_text(
-                    i18n.get_text("ADMIN_ERROR_MESSAGE")
-                )
+                            await message_sender.reply_text(
+                i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=update.effective_user.id)
+            )
             except Exception as e:
                 self.logger.error(
                     "💥 CRITICAL: Failed to send error message to user %s: %s",
@@ -212,7 +215,7 @@ class AdminHandler:
             keyboard = [
                 [
                     InlineKeyboardButton(
-                        i18n.get_text("ADMIN_BACK_TO_DASHBOARD"), callback_data="admin_back"
+                        i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
                     )
                 ]
             ]
@@ -236,19 +239,19 @@ class AdminHandler:
 
             if not orders:
                 text = (
-                    i18n.get_text("ADMIN_PENDING_ORDERS_TITLE") + "\n\n" + i18n.get_text("ADMIN_NO_PENDING_ORDERS")
+                    i18n.get_text("ADMIN_PENDING_ORDERS_TITLE", user_id=query.from_user.id) + "\n\n" + i18n.get_text("ADMIN_NO_PENDING_ORDERS", user_id=query.from_user.id)
                 )
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD"), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
                         )
                     ]
                 ]
             else:
                 text = (
-                    f"{i18n.get_text('ADMIN_PENDING_ORDERS_TITLE')} ({len(orders)})\n\n"
-                    f"{i18n.get_text('ADMIN_PENDING_ORDERS_LIST')}"
+                    f"{i18n.get_text('ADMIN_PENDING_ORDERS_TITLE', user_id=query.from_user.id)} ({len(orders)})\n\n"
+                    f"{i18n.get_text('ADMIN_PENDING_ORDERS_LIST', user_id=query.from_user.id)}"
                 )
 
                 keyboard = []
@@ -269,7 +272,7 @@ class AdminHandler:
                 keyboard.append(
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD"), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
                         )
                     ]
                 )
@@ -290,18 +293,18 @@ class AdminHandler:
             orders = await self.admin_service.get_active_orders()
 
             if not orders:
-                text = i18n.get_text("ADMIN_ACTIVE_ORDERS_TITLE") + "\n\n" + i18n.get_text("ADMIN_NO_ACTIVE_ORDERS")
+                text = i18n.get_text("ADMIN_ACTIVE_ORDERS_TITLE", user_id=query.from_user.id) + "\n\n" + i18n.get_text("ADMIN_NO_ACTIVE_ORDERS", user_id=query.from_user.id)
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD"), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
                         )
                     ]
                 ]
             else:
                 text = (
-                    f"{i18n.get_text('ADMIN_ACTIVE_ORDERS_TITLE')} ({len(orders)})\n\n"
-                    f"{i18n.get_text('ADMIN_ACTIVE_ORDERS_LIST')}"
+                    f"{i18n.get_text('ADMIN_ACTIVE_ORDERS_TITLE', user_id=query.from_user.id)} ({len(orders)})\n\n"
+                    f"{i18n.get_text('ADMIN_ACTIVE_ORDERS_LIST', user_id=query.from_user.id)}"
                 )
                 keyboard = []
                 for order in orders[:10]:  # Show max 10 orders
@@ -320,7 +323,7 @@ class AdminHandler:
                 keyboard.append(
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD"), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
                         )
                     ]
                 )
@@ -341,16 +344,16 @@ class AdminHandler:
             orders = await self.admin_service.get_all_orders()
 
             if not orders:
-                text = i18n.get_text("ADMIN_ALL_ORDERS_TITLE") + "\n\n" + i18n.get_text("ADMIN_NO_ORDERS_FOUND")
+                text = i18n.get_text("ADMIN_ALL_ORDERS_TITLE", user_id=query.from_user.id) + "\n\n" + i18n.get_text("ADMIN_NO_ORDERS_FOUND", user_id=query.from_user.id)
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD"), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
                         )
                     ]
                 ]
             else:
-                text = f"{i18n.get_text('ADMIN_ALL_ORDERS_TITLE')} ({len(orders)})"
+                text = f"{i18n.get_text('ADMIN_ALL_ORDERS_TITLE', user_id=query.from_user.id)} ({len(orders)})"
                 keyboard = []
                 for order in orders[:15]:  # Show max 15
                     order_summary = (
@@ -368,7 +371,7 @@ class AdminHandler:
                 keyboard.append(
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD"), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
                         )
                     ]
                 )
@@ -389,16 +392,16 @@ class AdminHandler:
             orders = await self.admin_service.get_completed_orders()
 
             if not orders:
-                text = i18n.get_text("ADMIN_COMPLETED_ORDERS_TITLE") + "\n\n" + i18n.get_text("ADMIN_NO_COMPLETED_ORDERS")
+                text = i18n.get_text("ADMIN_COMPLETED_ORDERS_TITLE", user_id=query.from_user.id) + "\n\n" + i18n.get_text("ADMIN_NO_COMPLETED_ORDERS", user_id=query.from_user.id)
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD"), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
                         )
                     ]
                 ]
             else:
-                text = f"{i18n.get_text('ADMIN_COMPLETED_ORDERS_TITLE')} ({len(orders)})"
+                text = f"{i18n.get_text('ADMIN_COMPLETED_ORDERS_TITLE', user_id=query.from_user.id)} ({len(orders)})"
                 keyboard = []
                 for order in orders[:15]:  # Show max 15
                     order_summary = (
@@ -416,7 +419,7 @@ class AdminHandler:
                 keyboard.append(
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD"), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
                         )
                     ]
                 )
@@ -438,7 +441,7 @@ class AdminHandler:
             order_details = await self._get_formatted_order_details(order_id)
 
             if not order_details:
-                await query.edit_message_text(i18n.get_text("ADMIN_ORDER_NOT_FOUND"))
+                await query.edit_message_text(i18n.get_text("ADMIN_ORDER_NOT_FOUND", user_id=query.from_user.id))
                 return
 
             keyboard = self._create_order_details_keyboard(order_id)
@@ -452,7 +455,7 @@ class AdminHandler:
             self.logger.error("💥 ORDER DETAILS ERROR: %s", e)
             await query.message.reply_text(i18n.get_text("ORDER_DETAILS_ERROR"))
 
-    async def _get_formatted_order_details(self, order_id: int) -> str | None:
+    async def _get_formatted_order_details(self, order_id: int, user_id: int = None) -> str | None:
         """Helper to get and format order details."""
         order_info = await self.admin_service.get_order_by_id(order_id)
 
@@ -460,24 +463,24 @@ class AdminHandler:
             return None
 
         details = [
-            i18n.get_text("ADMIN_ORDER_DETAILS_TITLE").format(number=order_info["order_number"], id=order_info["order_id"]),
-            i18n.get_text("ADMIN_CUSTOMER_LABEL").format(name=order_info["customer_name"]),
-            i18n.get_text("ADMIN_PHONE_LABEL").format(phone=order_info["customer_phone"]),
-            i18n.get_text("ADMIN_STATUS_LABEL").format(status=order_info["status"].capitalize()),
-            i18n.get_text("ADMIN_TOTAL_LABEL").format(amount=order_info["total"]),
-            i18n.get_text("ADMIN_CREATED_LABEL").format(
+            i18n.get_text("ADMIN_ORDER_DETAILS_TITLE", user_id=user_id).format(number=order_info["order_number"], id=order_info["order_id"]),
+            i18n.get_text("ADMIN_CUSTOMER_LABEL", user_id=user_id).format(name=order_info["customer_name"]),
+            i18n.get_text("ADMIN_PHONE_LABEL", user_id=user_id).format(phone=order_info["customer_phone"]),
+            i18n.get_text("ADMIN_STATUS_LABEL", user_id=user_id).format(status=order_info["status"].capitalize()),
+            i18n.get_text("ADMIN_TOTAL_LABEL", user_id=user_id).format(amount=order_info["total"]),
+            i18n.get_text("ADMIN_CREATED_LABEL", user_id=user_id).format(
                 datetime=(order_info["created_at"] or datetime.utcnow()).strftime('%Y-%m-%d %H:%M')
             ),
         ]
         if order_info.get("items"):
-            details.append(f"\n{i18n.get_text('ADMIN_ITEMS_LABEL')}")
+            details.append(f"\n{i18n.get_text('ADMIN_ITEMS_LABEL', user_id=user_id)}")
             for item in order_info["items"]:
                 price = item.get('total_price', item.get('price', 0))
                 # Translate product name
                 from src.utils.helpers import translate_product_name
                 translated_name = translate_product_name(item["product_name"])
                 details.append(
-                    i18n.get_text("ADMIN_ITEM_LINE").format(
+                    i18n.get_text("ADMIN_ITEM_LINE", user_id=user_id).format(
                         name=translated_name,
                         quantity=item["quantity"],
                         price=price
@@ -486,21 +489,21 @@ class AdminHandler:
         return "\n".join(details)
 
     def _create_order_details_keyboard(
-        self, order_id: int
+        self, order_id: int, user_id: int = None
     ) -> list[list[InlineKeyboardButton]]:
         """Creates the keyboard for the order details view."""
         statuses = ["pending", "confirmed", "preparing", "ready", "delivered"]
         keyboard = [
             [
                 InlineKeyboardButton(
-                    i18n.get_text("ADMIN_SET_STATUS").format(status=status.capitalize()),
+                    i18n.get_text("ADMIN_SET_STATUS", user_id=user_id).format(status=status.capitalize()),
                     callback_data=f"admin_status_{order_id}_{status}",
                 )
             ]
             for status in statuses
         ]
         keyboard.append(
-            [InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_DASHBOARD"), callback_data="admin_back")]
+            [InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back")]
         )
         return keyboard
 
@@ -527,18 +530,18 @@ class AdminHandler:
             )
 
             if success:
-                await query.answer(i18n.get_text("ADMIN_STATUS_UPDATED").format(status=new_status))
+                await query.answer(i18n.get_text("ADMIN_STATUS_UPDATED", user_id=admin_telegram_id).format(status=new_status))
                 await self._show_order_details(query, order_id)
             else:
-                await query.message.reply_text(i18n.get_text("ADMIN_STATUS_UPDATE_ERROR").format(error="Failed to update status"))
+                await query.message.reply_text(i18n.get_text("ADMIN_STATUS_UPDATE_ERROR", user_id=admin_telegram_id).format(error="Failed to update status"))
 
         except (BusinessLogicError, ValueError) as e:
             self.logger.error("💥 STATUS UPDATE ERROR: %s", e, exc_info=True)
-            await query.message.reply_text(i18n.get_text("ADMIN_STATUS_UPDATE_ERROR").format(error=e))
+            await query.message.reply_text(i18n.get_text("ADMIN_STATUS_UPDATE_ERROR", user_id=admin_telegram_id).format(error=e))
 
     async def _start_status_update(self, query: CallbackQuery) -> int:
         """Start conversation to update an order's status."""
-        await query.message.reply_text(i18n.get_text("ADMIN_ORDER_ID_PROMPT"))
+        await query.message.reply_text(i18n.get_text("ADMIN_ORDER_ID_PROMPT", user_id=query.from_user.id))
         return AWAITING_ORDER_ID
 
     async def show_order_details_for_status_update(
@@ -569,16 +572,16 @@ class AdminHandler:
                 order_id = matching["order_id"]
 
         if order_id is None:
-            await update.message.reply_text(i18n.get_text("ADMIN_ORDER_ID_NOT_FOUND"))
+            await update.message.reply_text(i18n.get_text("ADMIN_ORDER_ID_NOT_FOUND", user_id=update.effective_user.id))
             return AWAITING_ORDER_ID
 
         # Fetch formatted details and send as a regular message with inline keyboard
-        order_details = await self._get_formatted_order_details(order_id)
+        order_details = await self._get_formatted_order_details(order_id, update.effective_user.id)
         if not order_details:
-            await update.message.reply_text(i18n.get_text("ADMIN_ORDER_ID_TRY_ANOTHER"))
+            await update.message.reply_text(i18n.get_text("ADMIN_ORDER_ID_TRY_ANOTHER", user_id=update.effective_user.id))
             return AWAITING_ORDER_ID
 
-        keyboard = self._create_order_details_keyboard(order_id)
+        keyboard = self._create_order_details_keyboard(order_id, update.effective_user.id)
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         await update.message.reply_text(
@@ -592,7 +595,7 @@ class AdminHandler:
         """Check if a user is an admin."""
         # Simple admin check - compare with configured admin chat ID
         config = self.container.get_config()
-        admin_chat_id = getattr(config, 'admin_chat_id', None)
+        admin_chat_id = getattr(config, 'admin', {}).get('chat_id', None)
         
         if admin_chat_id:
             # Convert to int if it's a string
