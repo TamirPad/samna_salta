@@ -265,6 +265,7 @@
   "PENDING_ORDERS_ERROR": "שגיאה בטעינת הזמנות ממתינות",
   "ACTIVE_ORDERS_ERROR": "שגיאה בטעינת הזמנות פעילות",
   "ALL_ORDERS_ERROR": "שגיאה בטעינת כל ההזמנות",
+  "COMPLETED_ORDERS_ERROR": "שגיאה בטעינת הזמנות שהושלמו",
   "ORDER_DETAILS_ERROR": "שגיאה בטעינת פרטי הזמנה",
   
   "ORDER_DETAILS_HEADER": "📋 <b>פרטי הזמנה:</b>",

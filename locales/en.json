@@ -202,6 +202,20 @@
   "PRODUCT_HAWAIJ_SOUP": "Hawaij for Soup - Yemeni spice blend for soup",
   "PRODUCT_HAWAIJ_COFFEE": "Hawaij for Coffee - Yemeni spice blend for coffee",
   "PRODUCT_WHITE_COFFEE": "White Coffee - Traditional Yemeni hot and sweet drink",
+  
+  "KUBANEH_DESC": "🍞 <b>Kubaneh</b>\n\nChoose your preferred kubaneh type:\n\n• <b>Classic</b> - Traditional rich Yemeni bread\n• <b>Seeded</b> - With sesame and cumin seeds\n• <b>Herb</b> - With aromatic herbs\n• <b>Aromatic</b> - With special spices\n\n<i>Price: 25 ₪ per unit</i>",
+  "SAMNEH_DESC": "🧈 <b>Samneh</b>\n\nChoose your preferred samneh type:\n\n• <b>Smoked</b> - Rich smoky flavor\n• <b>Not Smoked</b> - Pure and natural\n\n<i>Price: 15 ₪</i>",
+  "RED_BISBAS_DESC": "🌶️ <b>Red Bisbas</b>\n\nTraditional Yemeni spicy sauce - perfect for adding heat to your dishes!\n\n<i>Price: 12 ₪</i>",
+  "HILBEH_DESC_AVAILABLE": "🌿 <b>Hilbeh</b>\n\nTraditional Yemeni fenugreek sauce - a unique and tasty addition to your meal!\n\nAvailable today! ✅\n\n<i>Price: 18 ₪</i>",
+  "HAWAIJ_SOUP_DESC": "🥘 <b>Hawaij for Soup</b>\n\nPerfect Yemeni spice blend for soups and stews - adds authentic flavor!\n\n<i>Price: 8 ₪</i>",
+  "HAWAIJ_COFFEE_DESC": "☕ <b>Hawaij for Coffee</b>\n\nYemeni spice blend for coffee - transforms your coffee experience!\n\n<i>Price: 8 ₪</i>",
+  "WHITE_COFFEE_DESC": "☕ <b>White Coffee</b>\n\nTraditional Yemeni caffeine-free drink - hot, sweet, and comforting!\n\n<i>Price: 10 ₪</b>",
+  
+  "INVALID_PRODUCT_SELECTION": "❌ Invalid product selection. Please try again",
+  "ADD_SUCCESS": "✅ <b>{item} added to cart!</b>\n\n🛒 Cart total: ₪{total:.2f}\n📦 Items in cart: {count}",
+  "ADD_FAILURE": "❌ Could not add {item} to cart\n\nError: {error}",
+  "ADD_ERROR": "❌ An error occurred while adding to cart. Please try again",
+  
   "MENU_FUNCTIONALITY_AVAILABLE": "Menu functionality is working perfectly!",
   "MENU_ERROR_OCCURRED": "An error occurred. Please try again.",
   "AVAILABILITY_CHECK_ERROR": "❌ {error}",
