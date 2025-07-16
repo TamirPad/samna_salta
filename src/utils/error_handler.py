@@ -326,7 +326,7 @@ class ErrorHandler:
         update: Update,
     ):
         """Send a user-friendly error message"""
-        user_message = "An unexpected error occurred. Please try again later."
+        user_message = "Something went wrong. Please try again later."
         if isinstance(error, ApplicationError):
             user_message = error.message
 
@@ -584,8 +584,8 @@ async def handle_error(update: Update, error: Exception, operation: str = "unkno
             str(error)
         )
 
-        # Send user-friendly error message
-        error_message = "❌ Something went wrong. Please try again or contact support."
+        # Send user-friendly error message with helpful guidance
+        error_message = "❌ Something went wrong. Please try again or contact support if the problem persists."
         
         if hasattr(update, 'callback_query') and update.callback_query:
             try:

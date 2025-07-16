@@ -61,10 +61,10 @@ class OnboardingHandler:
             if existing_customer:
                 # Welcome back existing customer with main page
                 welcome_message = (
-                    f"🇾🇪 **Welcome to Samna Salta!** 🇾🇪\n\n"
-                    f"👋 **Hello {existing_customer.full_name}!**\n\n"
+                    f"🇾🇪 <b>Welcome to Samna Salta!</b> 🇾🇪\n\n"
+                    f"👋 <b>Hello {existing_customer.full_name}!</b>\n\n"
                     f"Welcome back to the best traditional Yemenite food experience!\n\n"
-                    f"What would you like to do today?"
+                    f"What would you like to order today?"
                 )
                 await update.message.reply_text(
                     welcome_message,
@@ -163,8 +163,8 @@ class OnboardingHandler:
                 await update.message.reply_text(
                     i18n.get_text("WELCOME_BACK_UPDATED").format(name=result["customer"].full_name) + "\n\n" +
                     i18n.get_text("INFO_UPDATED") + "\n\n" +
-                    f"🇾🇪 **Welcome to Samna Salta!** 🇾🇪\n\n"
-                    f"What would you like to do today?",
+                    f"🇾🇪 <b>Welcome to Samna Salta!</b> 🇾🇪\n\n"
+                    f"What would you like to order today?",
                     reply_markup=self._get_main_page_keyboard(),
                     parse_mode="HTML"
                 )
@@ -219,8 +219,8 @@ class OnboardingHandler:
 
                 await query.edit_message_text(
                     i18n.get_text("REGISTRATION_COMPLETE") + "\n\n" +
-                    f"🇾🇪 **Welcome to Samna Salta!** 🇾🇪\n\n"
-                    f"What would you like to do today?",
+                    f"🇾🇪 <b>Welcome to Samna Salta!</b> 🇾🇪\n\n"
+                    f"What would you like to order today?",
                     reply_markup=self._get_main_page_keyboard(),
                     parse_mode="HTML"
                 )
@@ -348,10 +348,10 @@ class OnboardingHandler:
             
             if customer:
                 info_text = (
-                    f"👤 **My Information**\n\n"
-                    f"**Name:** {customer.full_name}\n"
-                    f"**Phone:** {customer.phone_number}\n"
-                    f"**Delivery Address:** {customer.delivery_address or 'Not set'}\n\n"
+                    f"👤 <b>My Information</b>\n\n"
+                    f"<b>Name:</b> {customer.full_name}\n"
+                    f"<b>Phone:</b> {customer.phone_number}\n"
+                    f"<b>Delivery Address:</b> {customer.delivery_address or 'Not set'}\n\n"
                     f"To update your information, please contact support."
                 )
             else:
@@ -396,16 +396,16 @@ class OnboardingHandler:
             
             if customer:
                 welcome_message = (
-                    f"🇾🇪 **Welcome to Samna Salta!** 🇾🇪\n\n"
-                    f"👋 **Hello {customer.full_name}!**\n\n"
+                    f"🇾🇪 <b>Welcome to Samna Salta!</b> 🇾🇪\n\n"
+                    f"👋 <b>Hello {customer.full_name}!</b>\n\n"
                     f"Welcome back to the best traditional Yemenite food experience!\n\n"
-                    f"What would you like to do today?"
+                    f"What would you like to order today?"
                 )
             else:
                 welcome_message = (
-                    f"🇾🇪 **Welcome to Samna Salta!** 🇾🇪\n\n"
+                    f"🇾🇪 <b>Welcome to Samna Salta!</b> 🇾🇪\n\n"
                     f"Welcome to the best traditional Yemenite food experience!\n\n"
-                    f"What would you like to do today?"
+                    f"What would you like to order today?"
                 )
 
             await query.edit_message_text(

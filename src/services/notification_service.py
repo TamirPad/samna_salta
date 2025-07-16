@@ -100,7 +100,7 @@ class NotificationService:
                 message += "\n\n" + i18n.get_text("PICKUP_READY_INFO")
         
         # Add order number to the message
-        full_message = f"{i18n.get_text('CUSTOMER_ORDER_UPDATE_HEADER')}\n\n📋 **{i18n.get_text('ORDER_NUMBER_LABEL')} #{order_id}**\n\n{message}"
+        full_message = f"{i18n.get_text('CUSTOMER_ORDER_UPDATE_HEADER')}\n\n📋 <b>{i18n.get_text('ORDER_NUMBER_LABEL')} #{order_id}</b>\n\n{message}"
         
         return await self.send_customer_notification(customer_chat_id, full_message)
 

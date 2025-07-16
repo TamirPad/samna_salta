@@ -69,8 +69,8 @@ class CartHandler:
                 )
 
                 # Send success message
-                message = f"✅ **{product_info['display_name']}** added to cart!\n\n"
-                message += f"🛒 **Cart Summary:**\n"
+                message = f"✅ <b>{product_info['display_name']}</b> added to cart!\n\n"
+                message += f"🛒 <b>Cart Summary:</b>\n"
                 message += f"• Items: {item_count}\n"
                 message += f"• Total: ₪{cart_total:.2f}\n\n"
                 message += "What would you like to do next?"
@@ -107,7 +107,7 @@ class CartHandler:
 
             if not cart_items:
                 await query.edit_message_text(
-                    "🛒 **Your cart is empty**\n\nBrowse our menu to add some delicious items!",
+                    "🛒 <b>Your cart is empty</b>\n\nReady to add some delicious items? Browse our menu to get started!",
                     parse_mode="HTML",
                     reply_markup=self._get_empty_cart_keyboard(),
                 )
@@ -117,17 +117,17 @@ class CartHandler:
             cart_total = cart_service.calculate_total(cart_items)
 
             # Build cart display
-            message = "🛒 **Your Cart**\n\n"
+            message = "🛒 <b>Your Cart</b>\n\n"
             
             for i, item in enumerate(cart_items, 1):
                 item_total = item.get("price", 0) * item.get("quantity", 1)
-                message += f"{i}. **{item.get('product_name', 'Unknown Product')}**\n"
+                message += f"{i}. <b>{item.get('product_name', 'Unknown Product')}</b>\n"
                 message += f"   • Quantity: {item.get('quantity', 1)}\n"
                 message += f"   • Price: ₪{item.get('price', 0):.2f}\n"
                 message += f"   • Total: ₪{item_total:.2f}\n\n"
 
-            message += f"💰 **Total: ₪{cart_total:.2f}**\n\n"
-            message += "What would you like to do?"
+            message += f"💰 <b>Total: ₪{cart_total:.2f}</b>\n\n"
+            message += "What would you like to do next?"
 
             await query.edit_message_text(
                 message,
@@ -155,9 +155,9 @@ class CartHandler:
             if success:
                 self.logger.info("✅ CART CLEARED: User %s", user_id)
                 await query.edit_message_text(
-                    "🗑️ **Cart cleared successfully!**\n\nYour cart is now empty.",
+                    "🗑️ <b>Cart cleared successfully!</b>\n\nYour cart is now empty.",
                     parse_mode="HTML",
-                    reply_markup=self._get_back_to_menu_keyboard(),
+                    reply_markup=self._get_empty_cart_keyboard(),
                 )
             else:
                 self.logger.error("❌ CART CLEAR FAILED: User %s", user_id)
@@ -186,9 +186,9 @@ class CartHandler:
 
             if not cart_items:
                 await query.edit_message_text(
-                    "🛒 **Your cart is empty**\n\nPlease add some items before checkout.",
+                    "🛒 <b>Your cart is empty</b>\n\nPlease add some items before checkout.",
                     parse_mode="HTML",
-                    reply_markup=self._get_back_to_menu_keyboard(),
+                    reply_markup=self._get_empty_cart_keyboard(),
                 )
                 return
 
@@ -196,16 +196,16 @@ class CartHandler:
             cart_total = cart_service.calculate_total(cart_items)
 
             # Build checkout summary
-            message = "🛒 **Checkout Summary**\n\n"
+            message = "🛒 <b>Checkout Summary</b>\n\n"
             
             for i, item in enumerate(cart_items, 1):
                 item_total = item.get("price", 0) * item.get("quantity", 1)
-                message += f"{i}. **{item.get('product_name', 'Unknown Product')}**\n"
+                message += f"{i}. <b>{item.get('product_name', 'Unknown Product')}</b>\n"
                 message += f"   • Quantity: {item.get('quantity', 1)}\n"
                 message += f"   • Price: ₪{item.get('price', 0):.2f}\n"
                 message += f"   • Total: ₪{item_total:.2f}\n\n"
 
-            message += f"💰 **Total: ₪{cart_total:.2f}**\n\n"
+            message += f"💰 <b>Total: ₪{cart_total:.2f}</b>\n\n"
             message += "Please select your delivery method:"
 
             await query.edit_message_text(
@@ -249,7 +249,7 @@ class CartHandler:
                 if customer and customer.delivery_address:
                     # Customer has a saved address - ask if they want to use it
                     message = (
-                        f"📍 **Current delivery address:**\n"
+                        f"📍 <b>Current delivery address:</b>\n"
                         f"{customer.delivery_address}\n\n"
                         f"Would you like to use this address or enter a new one?"
                     )
@@ -261,10 +261,9 @@ class CartHandler:
                 else:
                     # No saved address - ask for new address
                     await query.edit_message_text(
-                        "📍 **Delivery Address Required** 📍\n\n"
+                        "📍 <b>Delivery Address Required</b> 📍\n\n"
                         "To continue with delivery, please provide your full delivery address:",
                         parse_mode="HTML",
-                        reply_markup=self._get_back_to_cart_keyboard(),
                     )
                     # Set context to expect address input
                     context.user_data["expecting_delivery_address"] = True
@@ -306,10 +305,9 @@ class CartHandler:
             elif choice == "new_address":
                 # Ask for new address
                 await query.edit_message_text(
-                    "📍 **Enter Delivery Address** 📍\n\n"
+                    "📍 <b>Enter Delivery Address</b> 📍\n\n"
                     "Please provide your full delivery address (street, number, city):",
                     parse_mode="HTML",
-                    reply_markup=self._get_back_to_cart_keyboard(),
                 )
                 # Set context to expect address input
                 context.user_data["expecting_delivery_address"] = True
@@ -371,7 +369,7 @@ class CartHandler:
 
             # Show order confirmation
             await update.message.reply_text(
-                f"✅ **Delivery Address Saved** ✅\n\n"
+                f"✅ <b>Delivery Address Saved</b> ✅\n\n"
                 f"New address: {address}\n\n"
                 "Proceeding to order confirmation...",
                 parse_mode="HTML",
@@ -418,10 +416,10 @@ class CartHandler:
                 
                 # Send success message to customer
                 success_message = f"""
-✅ **Order Confirmed!**
+✅ <b>Order Confirmed!</b>
 
-📋 **Order #{order_number}**
-💰 **Total: ₪{order_total:.2f}**
+📋 <b>Order #{order_number}</b>
+💰 <b>Total: ₪{order_total:.2f}</b>
 
 Your order has been received and is being prepared. We'll notify you when it's ready!
 
@@ -440,7 +438,7 @@ Thank you for choosing Samna Salta! 🇾🇪
                 error_msg = order_result.get("error", "Unknown error occurred")
                 self.logger.error("❌ ORDER CREATION FAILED: %s", error_msg)
                 await query.edit_message_text(
-                    f"❌ **Order Creation Failed**\n\n{error_msg}\n\nPlease try again or contact support.",
+                    f"❌ <b>Order Creation Failed</b>\n\n{error_msg}\n\nPlease try again or contact support.",
                     parse_mode="HTML",
                     reply_markup=self._get_back_to_cart_keyboard()
                 )
@@ -448,7 +446,7 @@ Thank you for choosing Samna Salta! 🇾🇪
         except Exception as e:
             self.logger.error("❌ ORDER CREATION ERROR: %s", e)
             await query.edit_message_text(
-                "❌ **Order Creation Error**\n\nAn unexpected error occurred. Please try again.",
+                "❌ <b>Order Creation Error</b>\n\nAn unexpected error occurred. Please try again.",
                 parse_mode="HTML",
                 reply_markup=self._get_back_to_cart_keyboard()
             )
@@ -607,22 +605,22 @@ Thank you for choosing Samna Salta! 🇾🇪
             cart_info = cart_service.get_cart_info(user_id)
 
             # Build order confirmation
-            message = f"📋 **Order Confirmation**\n\n"
-            message += f"🚚 **Delivery Method:** {cart_info.get('delivery_method', 'pickup').title()}\n"
+            message = f"📋 <b>Order Confirmation</b>\n\n"
+            message += f"🚚 <b>Delivery Method:</b> {cart_info.get('delivery_method', 'pickup').title()}\n"
             
             if cart_info.get('delivery_method') == 'delivery' and cart_info.get('delivery_address'):
-                message += f"📍 **Delivery Address:** {cart_info.get('delivery_address')}\n"
+                message += f"📍 <b>Delivery Address:</b> {cart_info.get('delivery_address')}\n"
             
             message += "\n"
             
             for i, item in enumerate(cart_items, 1):
                 item_total = item.get("price", 0) * item.get("quantity", 1)
-                message += f"{i}. **{item.get('product_name', 'Unknown Product')}**\n"
+                message += f"{i}. <b>{item.get('product_name', 'Unknown Product')}</b>\n"
                 message += f"   • Quantity: {item.get('quantity', 1)}\n"
                 message += f"   • Price: ₪{item.get('price', 0):.2f}\n"
                 message += f"   • Total: ₪{item_total:.2f}\n\n"
 
-            message += f"💰 **Total: ₪{cart_total:.2f}**\n\n"
+            message += f"💰 <b>Total: ₪{cart_total:.2f}</b>\n\n"
             message += "Please confirm your order:"
 
             await query.edit_message_text(
@@ -648,22 +646,22 @@ Thank you for choosing Samna Salta! 🇾🇪
             cart_info = cart_service.get_cart_info(user_id)
 
             # Build order confirmation
-            confirmation_message = f"📋 **Order Confirmation**\n\n"
-            confirmation_message += f"🚚 **Delivery Method:** {cart_info.get('delivery_method', 'pickup').title()}\n"
+            confirmation_message = f"📋 <b>Order Confirmation</b>\n\n"
+            confirmation_message += f"🚚 <b>Delivery Method:</b> {cart_info.get('delivery_method', 'pickup').title()}\n"
             
             if cart_info.get('delivery_method') == 'delivery' and cart_info.get('delivery_address'):
-                confirmation_message += f"📍 **Delivery Address:** {cart_info.get('delivery_address')}\n"
+                confirmation_message += f"📍 <b>Delivery Address:</b> {cart_info.get('delivery_address')}\n"
             
             confirmation_message += "\n"
             
             for i, item in enumerate(cart_items, 1):
                 item_total = item.get("price", 0) * item.get("quantity", 1)
-                confirmation_message += f"{i}. **{item.get('product_name', 'Unknown Product')}**\n"
+                confirmation_message += f"{i}. <b>{item.get('product_name', 'Unknown Product')}</b>\n"
                 confirmation_message += f"   • Quantity: {item.get('quantity', 1)}\n"
                 confirmation_message += f"   • Price: ₪{item.get('price', 0):.2f}\n"
                 confirmation_message += f"   • Total: ₪{item_total:.2f}\n\n"
 
-            confirmation_message += f"💰 **Total: ₪{cart_total:.2f}**\n\n"
+            confirmation_message += f"💰 <b>Total: ₪{cart_total:.2f}</b>\n\n"
             confirmation_message += "Please confirm your order:"
 
             await message.reply_text(
