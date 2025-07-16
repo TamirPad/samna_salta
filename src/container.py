@@ -12,6 +12,7 @@ from src.services.order_service import OrderService
 from src.services.admin_service import AdminService
 from src.services.delivery_service import DeliveryService
 from src.services.notification_service import NotificationService
+from src.services.customer_order_service import CustomerOrderService
 from src.config import get_config
 
 logger = logging.getLogger(__name__)
@@ -70,6 +71,12 @@ class Container:
         if 'notification_service' not in self.services:
             self.services['notification_service'] = NotificationService()
         return self.services['notification_service']
+
+    def get_customer_order_service(self) -> CustomerOrderService:
+        """Get customer order service instance"""
+        if 'customer_order_service' not in self.services:
+            self.services['customer_order_service'] = CustomerOrderService()
+        return self.services['customer_order_service']
 
     def get_config(self) -> Any:
         """Get configuration"""

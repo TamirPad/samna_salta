@@ -4,7 +4,7 @@ Onboarding Handler for the Telegram bot.
 
 import logging
 
-from telegram import Update, CallbackQuery
+from telegram import Update, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -337,8 +337,6 @@ class OnboardingHandler:
 
     def _get_language_selection_keyboard(self):
         """Get language selection keyboard for onboarding"""
-        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-        
         keyboard = [
             [
                 InlineKeyboardButton("🇺🇸 English", callback_data="language_en"),
@@ -348,13 +346,15 @@ class OnboardingHandler:
         return InlineKeyboardMarkup(keyboard)
 
     def _get_main_page_keyboard(self, user_id: int = None):
-        """Get main page keyboard with Menu and My Info buttons"""
-        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-        
+        """Get main page keyboard with Menu, My Info, and Order tracking buttons"""
         keyboard = [
             [
                 InlineKeyboardButton(i18n.get_text("BUTTON_MENU", user_id=user_id), callback_data="main_menu"),
                 InlineKeyboardButton(i18n.get_text("BUTTON_MY_INFO", user_id=user_id), callback_data="main_my_info"),
+            ],
+            [
+                InlineKeyboardButton(i18n.get_text("BUTTON_ACTIVE_ORDERS", user_id=user_id), callback_data="main_active_orders"),
+                InlineKeyboardButton(i18n.get_text("BUTTON_COMPLETED_ORDERS", user_id=user_id), callback_data="main_completed_orders"),
             ],
         ]
         return InlineKeyboardMarkup(keyboard)
@@ -376,12 +376,19 @@ class OnboardingHandler:
                 await self._show_menu(query)
             elif data == "main_page":
                 await self._show_main_page(query)
+            elif data == "main_active_orders":
+                await self._show_customer_active_orders(query)
+            elif data == "main_completed_orders":
+                await self._show_customer_completed_orders(query)
             elif data == "language_selection":
                 # Route language selection to My Info handler
                 await self._show_my_info(query)
             elif data.startswith("language_"):
                 # Handle language change from My Info
                 await self._handle_language_change_from_my_info(query)
+            elif data.startswith("customer_order_"):
+                # Handle customer order details
+                await self._show_customer_order_details(query)
             else:
                 self.logger.warning("⚠️ UNKNOWN MAIN PAGE CALLBACK: %s", data)
 
@@ -478,7 +485,6 @@ class OnboardingHandler:
 
     def _get_my_info_keyboard(self, user_id: int):
         """Get My Info keyboard with language selection"""
-        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
         from src.utils.language_manager import language_manager
         
         current_lang = language_manager.get_user_language(user_id)
@@ -492,8 +498,6 @@ class OnboardingHandler:
 
     def _get_back_to_main_keyboard(self, user_id: int = None):
         """Get keyboard to go back to main page"""
-        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-        
         keyboard = [
             [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="main_page")],
         ]
@@ -580,6 +584,170 @@ class OnboardingHandler:
             self.logger.error("Error handling language change from my info: %s", e)
             await query.edit_message_text(
                 i18n.get_text("UNEXPECTED_ERROR", user_id=user_id),
+                reply_markup=self._get_back_to_main_keyboard(user_id)
+            )
+
+    async def _show_customer_active_orders(self, query: CallbackQuery):
+        """Show customer's active orders"""
+        try:
+            user_id = query.from_user.id
+            customer_order_service = self.container.get_customer_order_service()
+            
+            orders = customer_order_service.get_customer_active_orders(user_id)
+            
+            if not orders:
+                text = (
+                    i18n.get_text("CUSTOMER_ACTIVE_ORDERS_TITLE", user_id=user_id) + "\n\n" + 
+                    i18n.get_text("CUSTOMER_NO_ACTIVE_ORDERS", user_id=user_id)
+                )
+                keyboard = [
+                    [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="main_page")]
+                ]
+            else:
+                text = f"{i18n.get_text('CUSTOMER_ACTIVE_ORDERS_TITLE', user_id=user_id)} ({len(orders)})"
+                keyboard = []
+                
+                for order in orders:
+                    order_summary = (
+                        f"#{order['order_number']} - {order['status'].capitalize()} - "
+                        f"₪{order['total']:.2f}"
+                    )
+                    keyboard.append([
+                        InlineKeyboardButton(
+                            order_summary,
+                            callback_data=f"customer_order_{order['order_id']}"
+                        )
+                    ])
+                
+                keyboard.append([
+                    InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="main_page")
+                ])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(
+                text, parse_mode="HTML", reply_markup=reply_markup
+            )
+            
+        except Exception as e:
+            self.logger.error("Error showing customer active orders: %s", e)
+            await query.edit_message_text(
+                i18n.get_text("CUSTOMER_ORDERS_ERROR", user_id=user_id),
+                reply_markup=self._get_back_to_main_keyboard(user_id)
+            )
+
+    async def _show_customer_completed_orders(self, query: CallbackQuery):
+        """Show customer's completed orders"""
+        try:
+            user_id = query.from_user.id
+            customer_order_service = self.container.get_customer_order_service()
+            
+            orders = customer_order_service.get_customer_completed_orders(user_id)
+            
+            if not orders:
+                text = (
+                    i18n.get_text("CUSTOMER_COMPLETED_ORDERS_TITLE", user_id=user_id) + "\n\n" + 
+                    i18n.get_text("CUSTOMER_NO_COMPLETED_ORDERS", user_id=user_id)
+                )
+                keyboard = [
+                    [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="main_page")]
+                ]
+            else:
+                text = f"{i18n.get_text('CUSTOMER_COMPLETED_ORDERS_TITLE', user_id=user_id)} ({len(orders)})"
+                keyboard = []
+                
+                for order in orders:
+                    order_summary = (
+                        f"#{order['order_number']} - {order['status'].capitalize()} - "
+                        f"₪{order['total']:.2f}"
+                    )
+                    keyboard.append([
+                        InlineKeyboardButton(
+                            order_summary,
+                            callback_data=f"customer_order_{order['order_id']}"
+                        )
+                    ])
+                
+                keyboard.append([
+                    InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="main_page")
+                ])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(
+                text, parse_mode="HTML", reply_markup=reply_markup
+            )
+            
+        except Exception as e:
+            self.logger.error("Error showing customer completed orders: %s", e)
+            await query.edit_message_text(
+                i18n.get_text("CUSTOMER_ORDERS_ERROR", user_id=user_id),
+                reply_markup=self._get_back_to_main_keyboard(user_id)
+            )
+
+    async def _show_customer_order_details(self, query: CallbackQuery):
+        """Show details for a specific customer order"""
+        try:
+            user_id = query.from_user.id
+            data = query.data
+            
+            # Extract order ID from callback data
+            order_id = int(data.split("_")[-1])
+            
+            customer_order_service = self.container.get_customer_order_service()
+            order = customer_order_service.get_customer_order_by_id(order_id, user_id)
+            
+            if not order:
+                await query.edit_message_text(
+                    i18n.get_text("CUSTOMER_ORDER_NOT_FOUND", user_id=user_id),
+                    reply_markup=self._get_back_to_main_keyboard(user_id)
+                )
+                return
+            
+            # Format order details
+            details = [
+                i18n.get_text("CUSTOMER_ORDER_DETAILS_TITLE", user_id=user_id).format(number=order["order_number"]),
+                i18n.get_text("CUSTOMER_ORDER_STATUS", user_id=user_id).format(status=order["status"].capitalize()),
+                i18n.get_text("CUSTOMER_ORDER_TOTAL", user_id=user_id).format(total=order["total"]),
+                i18n.get_text("CUSTOMER_ORDER_DATE", user_id=user_id).format(
+                    date=order["created_at"].strftime('%Y-%m-%d %H:%M') if order["created_at"] else "Unknown"
+                ),
+                i18n.get_text("CUSTOMER_ORDER_DELIVERY_METHOD", user_id=user_id).format(
+                    method=order["delivery_method"].capitalize() if order["delivery_method"] else "Unknown"
+                ),
+            ]
+            
+            if order.get("delivery_address"):
+                details.append(
+                    i18n.get_text("CUSTOMER_ORDER_DELIVERY_ADDRESS", user_id=user_id).format(
+                        address=order["delivery_address"]
+                    )
+                )
+            
+            if order.get("items"):
+                details.append(f"\n{i18n.get_text('CUSTOMER_ORDER_ITEMS', user_id=user_id)}")
+                for item in order["items"]:
+                    details.append(
+                        i18n.get_text("CUSTOMER_ORDER_ITEM_LINE", user_id=user_id).format(
+                            name=item["product_name"],
+                            quantity=item["quantity"],
+                            price=item["total_price"]
+                        )
+                    )
+            
+            text = "\n".join(details)
+            
+            keyboard = [
+                [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="main_page")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                text, parse_mode="HTML", reply_markup=reply_markup
+            )
+            
+        except Exception as e:
+            self.logger.error("Error showing customer order details: %s", e)
+            await query.edit_message_text(
+                i18n.get_text("CUSTOMER_ORDERS_ERROR", user_id=user_id),
                 reply_markup=self._get_back_to_main_keyboard(user_id)
             )
 
