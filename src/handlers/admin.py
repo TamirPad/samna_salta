@@ -257,7 +257,7 @@ class AdminHandler:
                 keyboard = []
                 for order in orders:  # Show all pending orders
                     order_summary = (
-                        f"#{order['order_number']} (ID {order['order_id']}) - {order['customer_name']} - "
+                        f"#{order['order_id']} - {order['customer_name']} - "
                         f"₪{order['total']:.2f}"
                     )
                     keyboard.append(
@@ -309,7 +309,7 @@ class AdminHandler:
                 keyboard = []
                 for order in orders[:10]:  # Show max 10 orders
                     order_summary = (
-                        f"#{order['order_number']} (ID {order['order_id']}) - {order['customer_name']} - "
+                        f"#{order['order_id']} - {order['customer_name']} - "
                         f"{order['status'].capitalize()}"
                     )
                     keyboard.append(
@@ -357,7 +357,7 @@ class AdminHandler:
                 keyboard = []
                 for order in orders[:15]:  # Show max 15
                     order_summary = (
-                        f"#{order['order_number']} (ID {order['order_id']}) - {order['customer_name']} - "
+                        f"#{order['order_id']} - {order['customer_name']} - "
                         f"{order['status'].capitalize()}"
                     )
                     keyboard.append(
@@ -405,7 +405,7 @@ class AdminHandler:
                 keyboard = []
                 for order in orders[:15]:  # Show max 15
                     order_summary = (
-                        f"#{order['order_number']} (ID {order['order_id']}) - {order['customer_name']} - "
+                        f"#{order['order_id']} - {order['customer_name']} - "
                         f"₪{order['total']:.2f}"
                     )
                     keyboard.append(

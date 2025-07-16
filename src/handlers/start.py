@@ -609,7 +609,7 @@ class OnboardingHandler:
                 
                 for order in orders:
                     order_summary = (
-                        f"#{order['order_number']} - {order['status'].capitalize()} - "
+                        f"#{order['order_id']} - {order['status'].capitalize()} - "
                         f"₪{order['total']:.2f}"
                     )
                     keyboard.append([
@@ -657,7 +657,7 @@ class OnboardingHandler:
                 
                 for order in orders:
                     order_summary = (
-                        f"#{order['order_number']} - {order['status'].capitalize()} - "
+                        f"#{order['order_id']} - {order['status'].capitalize()} - "
                         f"₪{order['total']:.2f}"
                     )
                     keyboard.append([
