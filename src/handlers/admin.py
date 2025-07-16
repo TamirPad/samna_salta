@@ -4,6 +4,7 @@ Admin Handler for the Telegram bot.
 
 import logging
 from datetime import datetime
+from typing import Dict
 
 from telegram import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
@@ -81,6 +82,8 @@ class AdminHandler:
             return await self._start_status_update(query)
         elif data == "admin_analytics":
             await self._show_analytics(query)
+        elif data.startswith("analytics_"):
+            await self._handle_analytics_callback(update, None)
         elif data.startswith("admin_order_"):
             order_id = int(data.split("_")[-1])
             await self._show_order_details(query, order_id)
@@ -187,50 +190,404 @@ class AdminHandler:
                 )
 
     async def _show_analytics(self, query: CallbackQuery) -> None:
-        """Show business analytics report"""
+        """Show enhanced business analytics report"""
         try:
-            self.logger.info("📊 GENERATING ANALYTICS REPORT")
+            self.logger.info("📊 GENERATING ENHANCED ANALYTICS REPORT")
+            user_id = query.from_user.id
 
-            # Get analytics data using admin service
+            # Get comprehensive analytics data
             analytics_data = await self.admin_service.get_business_analytics()
+            
+            if not analytics_data:
+                await query.message.reply_text(i18n.get_text("ANALYTICS_ERROR", user_id=user_id))
+                return
 
-            # Format the report
-            report = f"""
-📊 <b>Business Analytics Report</b>
-
-📈 <b>Overview:</b>
-• Total Orders: {analytics_data.get('total_orders', 0)}
-• Total Revenue: ₪{analytics_data.get('total_revenue', 0):.2f}
-• Average Order Value: ₪{analytics_data.get('avg_order_value', 0):.2f}
-
-📋 <b>Current Status:</b>
-• Pending Orders: {analytics_data.get('pending_orders', 0)}
-• Active Orders: {analytics_data.get('active_orders', 0)}
-• Completed Orders: {analytics_data.get('completed_orders', 0)}
-• Orders Today: {analytics_data.get('today_orders', 0)}
-
-<i>Report generated at {analytics_data.get('generated_at', datetime.now()).strftime('%Y-%m-%d %H:%M')}</i>
-            """.strip()
-
-            keyboard = [
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
-                    )
-                ]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            await query.edit_message_text(
-                text=report, parse_mode="HTML", reply_markup=reply_markup
-            )
+            # Create analytics dashboard with multiple views
+            await self._show_analytics_main_menu(query, analytics_data)
 
         except BusinessLogicError as e:
             self.logger.error("💥 ANALYTICS ERROR: %s", e)
-            await query.message.reply_text(i18n.get_text("ANALYTICS_ERROR"))
+            await query.message.reply_text(i18n.get_text("ANALYTICS_ERROR", user_id=query.from_user.id))
         except Exception as e:
             self.logger.critical("💥 CRITICAL ANALYTICS ERROR: %s", e, exc_info=True)
-            await query.message.reply_text(i18n.get_text("ANALYTICS_CRITICAL_ERROR"))
+            await query.message.reply_text(i18n.get_text("ANALYTICS_CRITICAL_ERROR", user_id=query.from_user.id))
+
+    async def _show_analytics_main_menu(self, query: CallbackQuery, analytics_data: Dict) -> None:
+        """Show analytics main menu with different report options"""
+        user_id = query.from_user.id
+        
+        # Get quick overview data
+        quick_overview = analytics_data.get('quick_overview', {})
+        
+        # Format the main analytics menu
+        menu_text = f"""
+{i18n.get_text("ANALYTICS_DASHBOARD_TITLE", user_id=user_id)}
+
+{i18n.get_text("ANALYTICS_QUICK_OVERVIEW", user_id=user_id)}
+• Today: {quick_overview.get('today', {}).get('orders', 0)} orders, ₪{quick_overview.get('today', {}).get('revenue', 0):.2f}
+• This Week: {quick_overview.get('this_week', {}).get('orders', 0)} orders, ₪{quick_overview.get('this_week', {}).get('revenue', 0):.2f}
+• This Month: {quick_overview.get('this_month', {}).get('orders', 0)} orders, ₪{quick_overview.get('this_month', {}).get('revenue', 0):.2f}
+
+{i18n.get_text("ANALYTICS_SELECT_REPORT", user_id=user_id)}
+        """.strip()
+
+        keyboard = [
+            [
+                InlineKeyboardButton(i18n.get_text("ANALYTICS_REVENUE_REPORT", user_id=user_id), callback_data="analytics_revenue"),
+                InlineKeyboardButton(i18n.get_text("ANALYTICS_ORDER_REPORT", user_id=user_id), callback_data="analytics_orders")
+            ],
+            [
+                InlineKeyboardButton(i18n.get_text("ANALYTICS_PRODUCT_REPORT", user_id=user_id), callback_data="analytics_products"),
+                InlineKeyboardButton(i18n.get_text("ANALYTICS_CUSTOMER_REPORT", user_id=user_id), callback_data="analytics_customers")
+            ],
+            [
+                InlineKeyboardButton(i18n.get_text("ANALYTICS_TRENDS_REPORT", user_id=user_id), callback_data="analytics_trends"),
+                InlineKeyboardButton(i18n.get_text("ANALYTICS_FULL_REPORT", user_id=user_id), callback_data="analytics_full")
+            ],
+            [
+                InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back")
+            ]
+        ]
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            text=menu_text, parse_mode="HTML", reply_markup=reply_markup
+        )
+
+    async def _handle_analytics_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        query = update.callback_query
+        data = query.data
+        user_id = query.from_user.id
+        
+        try:
+            analytics_data = await self.admin_service.get_business_analytics()
+            
+            if data == "analytics_revenue":
+                await self._show_revenue_report(query, analytics_data)
+            elif data == "analytics_orders":
+                await self._show_order_report(query, analytics_data)
+            elif data == "analytics_products":
+                await self._show_product_report(query, analytics_data)
+            elif data == "analytics_customers":
+                await self._show_customer_report(query, analytics_data)
+            elif data == "analytics_trends":
+                await self._show_trends_report(query, analytics_data)
+            elif data == "analytics_full":
+                await self._show_full_report(query, analytics_data)
+            elif data == "analytics_back":
+                await self._show_analytics_main_menu(query, analytics_data)
+                
+        except Exception as e:
+            self.logger.error("Error handling analytics callback: %s", e)
+            await query.message.reply_text(i18n.get_text("ANALYTICS_ERROR", user_id=user_id))
+
+    async def _show_revenue_report(self, query: CallbackQuery, analytics_data: Dict) -> None:
+        user_id = query.from_user.id
+        revenue_data = analytics_data.get('revenue', {})
+        quick_overview = analytics_data.get('quick_overview', {})
+
+        def fmt(val, fmtstr=".2f", na="N/A"):
+            if val is None:
+                return na
+            try:
+                return f"{val:{fmtstr}}"
+            except Exception:
+                return na
+
+        report_text = f"""
+{i18n.get_text('ANALYTICS_REVENUE_TITLE', user_id=user_id)}
+
+{i18n.get_text('ANALYTICS_OVERALL_PERFORMANCE', user_id=user_id)}
+• Total Revenue: ₪{fmt(revenue_data.get('total_revenue'))}
+• Total Orders: {revenue_data.get('total_orders', 0)}
+• Average Order Value: ₪{fmt(revenue_data.get('avg_order_value'))}
+
+{i18n.get_text('ANALYTICS_DELIVERY_ANALYSIS', user_id=user_id)}
+• Delivery Orders: {revenue_data.get('delivery_orders', 0)} (₪{fmt(revenue_data.get('delivery_revenue'))})
+• Pickup Orders: {revenue_data.get('pickup_orders', 0)} (₪{fmt(revenue_data.get('pickup_revenue'))})
+• Delivery %: {fmt((revenue_data.get('delivery_orders', 0) / revenue_data.get('total_orders', 1) * 100) if revenue_data.get('total_orders', 1) else 0, '.1f', 'N/A')}%
+
+{i18n.get_text('ANALYTICS_RECENT_PERFORMANCE', user_id=user_id)}
+• Today: ₪{fmt(quick_overview.get('today', {}).get('revenue'))}
+• This Week: ₪{fmt(quick_overview.get('this_week', {}).get('revenue'))}
+• This Month: ₪{fmt(quick_overview.get('this_month', {}).get('revenue'))}
+
+<i>{i18n.get_text('ANALYTICS_REPORT_PERIOD', user_id=user_id).format(days=analytics_data.get('period', {}).get('days', 30))}</i>
+        """.strip()
+        
+        keyboard = [
+            [InlineKeyboardButton(i18n.get_text("ANALYTICS_BACK_TO_ANALYTICS", user_id=user_id), callback_data="analytics_back")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            text=report_text, parse_mode="HTML", reply_markup=reply_markup
+        )
+
+    async def _show_order_report(self, query: CallbackQuery, analytics_data: Dict) -> None:
+        user_id = query.from_user.id
+        order_data = analytics_data.get('orders', {})
+        quick_overview = analytics_data.get('quick_overview', {})
+
+        def fmt(val, fmtstr=".1f", na="N/A"):
+            if val is None:
+                return na
+            try:
+                return f"{val:{fmtstr}}"
+            except Exception:
+                return na
+
+        total_processed = order_data.get('completed_orders', 0) + order_data.get('cancelled_orders', 0)
+        completion_rate = (order_data.get('completed_orders', 0) / total_processed * 100) if total_processed > 0 else None
+        avg_processing_time = order_data.get('avg_processing_time')
+
+        report_text = f"""
+{i18n.get_text('ANALYTICS_ORDER_TITLE', user_id=user_id)}
+
+{i18n.get_text('ANALYTICS_ORDER_STATUS', user_id=user_id)}
+• Pending: {order_data.get('pending_orders', 0)}
+• Active: {order_data.get('active_orders', 0)}
+• Completed: {order_data.get('completed_orders', 0)}
+• Cancelled: {order_data.get('cancelled_orders', 0)}
+
+{i18n.get_text('ANALYTICS_PROCESSING_METRICS', user_id=user_id)}
+• Completion Rate: {fmt(completion_rate, '.1f')}%
+• Avg Processing Time: {fmt(avg_processing_time, '.1f')} hours
+• Total Orders: {order_data.get('total_orders', 0)}
+
+{i18n.get_text('ANALYTICS_RECENT_ACTIVITY', user_id=user_id)}
+• Today: {quick_overview.get('today', {}).get('orders', 0)} orders
+• This Week: {quick_overview.get('this_week', {}).get('orders', 0)} orders
+• This Month: {quick_overview.get('this_month', {}).get('orders', 0)} orders
+
+<i>{i18n.get_text('ANALYTICS_REPORT_PERIOD', user_id=user_id).format(days=analytics_data.get('period', {}).get('days', 30))}</i>
+        """.strip()
+        
+        keyboard = [
+            [InlineKeyboardButton(i18n.get_text("ANALYTICS_BACK_TO_ANALYTICS", user_id=user_id), callback_data="analytics_back")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            text=report_text, parse_mode="HTML", reply_markup=reply_markup
+        )
+
+    async def _show_product_report(self, query: CallbackQuery, analytics_data: Dict) -> None:
+        user_id = query.from_user.id
+        products = analytics_data.get('products', [])
+
+        def fmt(val, fmtstr=".2f", na="N/A"):
+            if val is None:
+                return na
+            try:
+                return f"{val:{fmtstr}}"
+            except Exception:
+                return na
+
+        if not products:
+            report_text = f"""
+{i18n.get_text('ANALYTICS_PRODUCT_TITLE', user_id=user_id)}
+
+{i18n.get_text('ANALYTICS_PRODUCT_PERFORMANCE', user_id=user_id)}
+{i18n.get_text('ANALYTICS_NO_DATA', user_id=user_id)}
+            """.strip()
+        else:
+            top_products = products[:5]
+            product_lines = []
+            for i, product in enumerate(top_products, 1):
+                product_lines.append(
+                    f"{i}. {product['product_name']}\n"
+                    f"   • Orders: {product.get('total_orders', 0)}\n"
+                    f"   • Revenue: ₪{fmt(product.get('total_revenue'))}\n"
+                    f"   • Avg Value: ₪{fmt(product.get('avg_order_value'))}"
+                )
+            report_text = f"""
+{i18n.get_text('ANALYTICS_PRODUCT_TITLE', user_id=user_id)}
+
+{i18n.get_text('ANALYTICS_TOP_PRODUCTS', user_id=user_id)}
+
+{chr(10).join(product_lines)}
+
+{i18n.get_text('ANALYTICS_PRODUCT_SUMMARY', user_id=user_id)}
+• Total Products: {len(products)}
+• Total Product Revenue: ₪{fmt(sum(p.get('total_revenue', 0) or 0 for p in products))}
+• Most Popular: {products[0]['product_name'] if products else 'N/A'}
+
+<i>{i18n.get_text('ANALYTICS_REPORT_PERIOD', user_id=user_id).format(days=analytics_data.get('period', {}).get('days', 30))}</i>
+            """.strip()
+        keyboard = [
+            [InlineKeyboardButton(i18n.get_text("ANALYTICS_BACK_TO_ANALYTICS", user_id=user_id), callback_data="analytics_back")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            text=report_text, parse_mode="HTML", reply_markup=reply_markup
+        )
+
+    async def _show_customer_report(self, query: CallbackQuery, analytics_data: Dict) -> None:
+        user_id = query.from_user.id
+        customers = analytics_data.get('customers', [])
+
+        def fmt(val, fmtstr=".2f", na="N/A"):
+            if val is None:
+                return na
+            try:
+                return f"{val:{fmtstr}}"
+            except Exception:
+                return na
+
+        if not customers:
+            report_text = f"""
+{i18n.get_text('ANALYTICS_CUSTOMER_TITLE', user_id=user_id)}
+
+{i18n.get_text('ANALYTICS_CUSTOMER_BEHAVIOR', user_id=user_id)}
+{i18n.get_text('ANALYTICS_NO_DATA', user_id=user_id)}
+            """.strip()
+        else:
+            top_customers = customers[:5]
+            customer_lines = []
+            for i, customer in enumerate(top_customers, 1):
+                customer_lines.append(
+                    f"{i}. {customer['customer_name']}\n"
+                    f"   • Orders: {customer.get('total_orders', 0)}\n"
+                    f"   • Total Spent: ₪{fmt(customer.get('total_spent'))}\n"
+                    f"   • Avg Order: ₪{fmt(customer.get('avg_order_value'))}"
+                )
+            total_customers = len(customers)
+            total_customer_revenue = sum(c.get('total_spent', 0) or 0 for c in customers)
+            avg_customer_value = total_customer_revenue / total_customers if total_customers > 0 else None
+            report_text = f"""
+{i18n.get_text('ANALYTICS_CUSTOMER_TITLE', user_id=user_id)}
+
+{i18n.get_text('ANALYTICS_TOP_CUSTOMERS', user_id=user_id)}
+
+{chr(10).join(customer_lines)}
+
+{i18n.get_text('ANALYTICS_CUSTOMER_METRICS', user_id=user_id)}
+• Total Customers: {total_customers}
+• Total Customer Revenue: ₪{fmt(total_customer_revenue)}
+• Average Customer Value: ₪{fmt(avg_customer_value)}
+• Best Customer: {customers[0]['customer_name'] if customers else 'N/A'}
+
+<i>{i18n.get_text('ANALYTICS_REPORT_PERIOD', user_id=user_id).format(days=analytics_data.get('period', {}).get('days', 30))}</i>
+            """.strip()
+        keyboard = [
+            [InlineKeyboardButton(i18n.get_text("ANALYTICS_BACK_TO_ANALYTICS", user_id=user_id), callback_data="analytics_back")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            text=report_text, parse_mode="HTML", reply_markup=reply_markup
+        )
+
+    async def _show_trends_report(self, query: CallbackQuery, analytics_data: Dict) -> None:
+        user_id = query.from_user.id
+        trends = analytics_data.get('trends', {})
+        daily_revenue = trends.get('daily_revenue', {})
+        daily_orders = trends.get('daily_orders', {})
+        recent_days = sorted(daily_revenue.keys())[-7:] if daily_revenue else []
+        if recent_days:
+            recent_revenue = [daily_revenue.get(day, 0) for day in recent_days]
+            recent_orders = [daily_orders.get(day, 0) for day in recent_days]
+            revenue_trend = i18n.get_text('ANALYTICS_GROWING_TREND', user_id=user_id) if len(recent_revenue) > 1 and recent_revenue[-1] > recent_revenue[0] else i18n.get_text('ANALYTICS_DECLINING_TREND', user_id=user_id)
+            order_trend = i18n.get_text('ANALYTICS_GROWING_TREND', user_id=user_id) if len(recent_orders) > 1 and recent_orders[-1] > recent_orders[0] else i18n.get_text('ANALYTICS_DECLINING_TREND', user_id=user_id)
+            recent_summary = []
+            for day in recent_days[-3:]:
+                revenue = daily_revenue.get(day, 0)
+                orders = daily_orders.get(day, 0)
+                recent_summary.append(f"• {day}: {orders} orders, ₪{revenue:.2f}")
+        else:
+            revenue_trend = i18n.get_text('ANALYTICS_NO_DATA_TREND', user_id=user_id)
+            order_trend = i18n.get_text('ANALYTICS_NO_DATA_TREND', user_id=user_id)
+            recent_summary = [i18n.get_text('ANALYTICS_NO_RECENT_DATA', user_id=user_id)]
+        report_text = f"""
+{i18n.get_text('ANALYTICS_TRENDS_TITLE', user_id=user_id)}
+
+{i18n.get_text('ANALYTICS_TREND_ANALYSIS', user_id=user_id)}
+• Revenue Trend: {revenue_trend}
+• Order Volume Trend: {order_trend}
+
+{i18n.get_text('ANALYTICS_RECENT_TRENDS', user_id=user_id)}
+{chr(10).join(recent_summary)}
+
+{i18n.get_text('ANALYTICS_TREND_INSIGHTS', user_id=user_id)}
+• Daily revenue patterns show business performance
+• Order volume indicates customer demand
+• Compare with previous periods for growth analysis
+
+<i>{i18n.get_text('ANALYTICS_REPORT_PERIOD', user_id=user_id).format(days=analytics_data.get('period', {}).get('days', 30))}</i>
+        """.strip()
+        keyboard = [
+            [InlineKeyboardButton(i18n.get_text("ANALYTICS_BACK_TO_ANALYTICS", user_id=user_id), callback_data="analytics_back")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            text=report_text, parse_mode="HTML", reply_markup=reply_markup
+        )
+
+    async def _show_full_report(self, query: CallbackQuery, analytics_data: Dict) -> None:
+        user_id = query.from_user.id
+        revenue_data = analytics_data.get('revenue', {})
+        order_data = analytics_data.get('orders', {})
+        products = analytics_data.get('products', [])
+        customers = analytics_data.get('customers', [])
+        quick_overview = analytics_data.get('quick_overview', {})
+
+        def fmt(val, fmtstr=".2f", na="N/A"):
+            if val is None:
+                return na
+            try:
+                return f"{val:{fmtstr}}"
+            except Exception:
+                return na
+
+        total_revenue = revenue_data.get('total_revenue')
+        total_orders = order_data.get('total_orders', 0)
+        avg_order_value = revenue_data.get('avg_order_value')
+        completion_rate = (order_data.get('completed_orders', 0) / total_orders * 100) if total_orders > 0 else None
+        report_text = f"""
+{i18n.get_text('ANALYTICS_FULL_TITLE', user_id=user_id)}
+
+{i18n.get_text('ANALYTICS_FINANCIAL_SUMMARY', user_id=user_id)}
+• Total Revenue: ₪{fmt(total_revenue)}
+• Total Orders: {total_orders}
+• Average Order Value: ₪{fmt(avg_order_value)}
+• Completion Rate: {fmt(completion_rate, '.1f')}%
+
+📦 <b>Order Status:</b>
+• Pending: {order_data.get('pending_orders', 0)}
+• Active: {order_data.get('active_orders', 0)}
+• Completed: {order_data.get('completed_orders', 0)}
+• Cancelled: {order_data.get('cancelled_orders', 0)}
+
+{i18n.get_text('ANALYTICS_DELIVERY_MIX', user_id=user_id)}
+• Delivery: {revenue_data.get('delivery_orders', 0)} orders (₪{fmt(revenue_data.get('delivery_revenue'))})
+• Pickup: {revenue_data.get('pickup_orders', 0)} orders (₪{fmt(revenue_data.get('pickup_revenue'))})
+
+{i18n.get_text('ANALYTICS_PRODUCT_PERFORMANCE_SUMMARY', user_id=user_id)}
+• Total Products: {len(products)}
+• Top Product: {products[0]['product_name'] if products else 'N/A'}
+• Product Revenue: ₪{fmt(sum(p.get('total_revenue', 0) or 0 for p in products))}
+
+{i18n.get_text('ANALYTICS_CUSTOMER_INSIGHTS', user_id=user_id)}
+• Total Customers: {len(customers)}
+• Best Customer: {customers[0]['customer_name'] if customers else 'N/A'}
+• Customer Revenue: ₪{fmt(sum(c.get('total_spent', 0) or 0 for c in customers))}
+
+{i18n.get_text('ANALYTICS_RECENT_PERFORMANCE', user_id=user_id)}
+• Today: {quick_overview.get('today', {}).get('orders', 0)} orders, ₪{fmt(quick_overview.get('today', {}).get('revenue'))}
+• This Week: {quick_overview.get('this_week', {}).get('orders', 0)} orders, ₪{fmt(quick_overview.get('this_week', {}).get('revenue'))}
+• This Month: {quick_overview.get('this_month', {}).get('orders', 0)} orders, ₪{fmt(quick_overview.get('this_month', {}).get('revenue'))}
+
+<i>{i18n.get_text('ANALYTICS_REPORT_PERIOD', user_id=user_id).format(days=analytics_data.get('period', {}).get('days', 30))}</i>
+<i>{i18n.get_text('ANALYTICS_GENERATED_AT', user_id=user_id).format(datetime=analytics_data.get('generated_at', ''))}</i>
+        """.strip()
+        keyboard = [
+            [InlineKeyboardButton(i18n.get_text("ANALYTICS_BACK_TO_ANALYTICS", user_id=user_id), callback_data="analytics_back")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            text=report_text, parse_mode="HTML", reply_markup=reply_markup
+        )
 
     async def _show_pending_orders(self, query: CallbackQuery) -> None:
         """Show pending orders"""
@@ -638,6 +995,11 @@ def register_admin_handlers(application: Application):
     )
 
     application.add_handler(conv_handler)
+
+    # Analytics callback handlers
+    application.add_handler(
+        CallbackQueryHandler(handler._handle_analytics_callback, pattern="^analytics_")
+    )
 
 
 # Simple handler function for compatibility
