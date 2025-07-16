@@ -159,9 +159,9 @@ def validate_phone_number(phone: str) -> bool:
     return mobile_part in SecurityPatterns.ISRAELI_MOBILE_PREFIXES
 
 @cached(ttl=3600)  # Cache for 1 hour
-def translate_product_name(product_name: str, options: dict = None) -> str:
+def translate_product_name(product_name: str, options: dict = None, user_id: int = None) -> str:
     """Translate a product name from database format to localized display name"""
-    from src.utils.i18n import tr
+    from src.utils.i18n import i18n
     
     product_name_lower = product_name.lower()
     
@@ -169,36 +169,36 @@ def translate_product_name(product_name: str, options: dict = None) -> str:
         if options and "type" in options:
             kubaneh_type = options["type"]
             type_key = f"KUBANEH_{kubaneh_type.upper()}"
-            type_display = tr(type_key)
-            return tr("KUBANEH_DISPLAY_NAME").format(type=type_display)
-        return tr("PRODUCT_KUBANEH_CLASSIC")
+            type_display = i18n.get_text(type_key, user_id=user_id)
+            return i18n.get_text("KUBANEH_DISPLAY_NAME", user_id=user_id).format(type=type_display)
+        return i18n.get_text("PRODUCT_KUBANEH_CLASSIC", user_id=user_id)
     
     elif "samneh" in product_name_lower:
         if options and "smoking" in options:
             smoking_type = options["smoking"].replace(" ", "_")
             type_key = f"SAMNEH_{smoking_type.upper()}"
-            type_display = tr(type_key)
-            return tr("SAMNEH_DISPLAY_NAME").format(type=type_display)
-        return tr("PRODUCT_SAMNEH_SMOKED")
+            type_display = i18n.get_text(type_key, user_id=user_id)
+            return i18n.get_text("SAMNEH_DISPLAY_NAME", user_id=user_id).format(type=type_display)
+        return i18n.get_text("PRODUCT_SAMNEH_SMOKED", user_id=user_id)
     
     elif "red bisbas" in product_name_lower or "bisbas" in product_name_lower:
         if options and "size" in options:
             size = options["size"]
             size_key = f"SIZE_{size.upper()}"
-            size_display = tr(size_key)
-            return tr("RED_BISBAS_DISPLAY_NAME").format(size=size_display)
-        return tr("PRODUCT_RED_BISBAS")
+            size_display = i18n.get_text(size_key, user_id=user_id)
+            return i18n.get_text("RED_BISBAS_DISPLAY_NAME", user_id=user_id).format(size=size_display)
+        return i18n.get_text("PRODUCT_RED_BISBAS", user_id=user_id)
     
     elif "hilbeh" in product_name_lower:
-        return tr("PRODUCT_HILBEH")
+        return i18n.get_text("PRODUCT_HILBEH", user_id=user_id)
     
     elif "hawaij" in product_name_lower and "soup" in product_name_lower:
-        return tr("PRODUCT_HAWAIJ_SOUP")
+        return i18n.get_text("PRODUCT_HAWAIJ_SOUP", user_id=user_id)
     
     elif "hawaij" in product_name_lower and "coffee" in product_name_lower:
-        return tr("PRODUCT_HAWAIJ_COFFEE")
+        return i18n.get_text("PRODUCT_HAWAIJ_COFFEE", user_id=user_id)
     
     elif "white coffee" in product_name_lower:
-        return tr("PRODUCT_WHITE_COFFEE")
+        return i18n.get_text("PRODUCT_WHITE_COFFEE", user_id=user_id)
     
     return product_name

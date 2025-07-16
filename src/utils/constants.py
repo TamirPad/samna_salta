@@ -136,7 +136,7 @@ class ErrorCodes:
     RATE_LIMIT_ERROR: Final[str] = "RATE_LIMIT_ERROR"
 
     # User-friendly messages
-    GENERIC_ERROR_MESSAGE: Final[str] = "An error occurred. Please try again."
+    GENERIC_ERROR_MESSAGE: Final[str] = "Something went wrong. Please try again."
     DATABASE_ERROR_MESSAGE: Final[
         str
     ] = "Sorry, there was a problem with our system. Please try again in a moment."
@@ -333,21 +333,21 @@ class ErrorMessages:
     """Standardized error messages"""
     
     # Validation errors
-    INVALID_NAME_FORMAT: Final[str] = "Invalid name format"
-    NAME_TOO_SHORT: Final[str] = "Name must be at least 2 characters"
-    NAME_TOO_LONG: Final[str] = "Name is too long"
+    INVALID_NAME_FORMAT: Final[str] = "Please enter a valid name with letters only"
+    NAME_TOO_SHORT: Final[str] = "Name must be at least 2 characters long"
+    NAME_TOO_LONG: Final[str] = "Name is too long (maximum 100 characters)"
     NAME_MUST_CONTAIN_LETTERS: Final[str] = "Name must contain letters"
-    INVALID_ADDRESS_FORMAT: Final[str] = "Invalid address format"
-    ADDRESS_TOO_SHORT: Final[str] = "Please provide a complete address"
-    ADDRESS_TOO_LONG: Final[str] = "Address is too long"
-    INVALID_PHONE_FORMAT: Final[str] = "Please enter a valid Israeli phone number"
+    INVALID_ADDRESS_FORMAT: Final[str] = "Please enter a valid address"
+    ADDRESS_TOO_SHORT: Final[str] = "Please provide a complete address (at least 10 characters)"
+    ADDRESS_TOO_LONG: Final[str] = "Address is too long (maximum 500 characters)"
+    INVALID_PHONE_FORMAT: Final[str] = "Please enter a valid Israeli phone number (e.g., 050-1234567)"
     
     # Session errors
-    SESSION_EXPIRED: Final[str] = "Session expired. Please start again with /start"
+    SESSION_EXPIRED: Final[str] = "Your session has expired. Please start again with /start"
     
     # General errors
-    ERROR_TRY_START_AGAIN: Final[str] = "An error occurred. Please try starting again with /start"
-    MENU_FUNCTIONALITY_AVAILABLE: Final[str] = "This menu functionality is available"
-    MENU_ERROR_OCCURRED: Final[str] = "An error occurred while processing your request"
-    VALIDATION_ERROR: Final[str] = "Validation error: {error}"
+    ERROR_TRY_START_AGAIN: Final[str] = "Something went wrong. Please try starting again with /start"
+    MENU_FUNCTIONALITY_AVAILABLE: Final[str] = "Menu functionality is working perfectly!"
+    MENU_ERROR_OCCURRED: Final[str] = "An error occurred while processing your request. Please try again."
+    VALIDATION_ERROR: Final[str] = "Please check your input: {error}"
     PLEASE_TRY_AGAIN: Final[str] = "Please try again"

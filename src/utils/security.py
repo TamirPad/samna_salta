@@ -189,7 +189,7 @@ def rate_limit(max_requests: int = 10, window_seconds: int = 60):
             if backend.is_blocked(user_id):
                 logger.warning("Blocked user %s attempted access", user_id)
                 await update.message.reply_text(
-                    "Access temporarily restricted. Please contact support."
+                    "Access temporarily restricted. Please wait a moment before trying again or contact support if you need immediate assistance."
                 )
                 return
 
@@ -197,7 +197,7 @@ def rate_limit(max_requests: int = 10, window_seconds: int = 60):
             if backend.is_rate_limited(user_id, max_requests, window_seconds):
                 logger.warning("Rate limit exceeded for user %s", user_id)
                 await update.message.reply_text(
-                    "Too many requests. Please wait a moment before trying again."
+                    "You're making requests too quickly. Please wait a moment before trying again."
                 )
                 return
 

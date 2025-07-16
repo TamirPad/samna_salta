@@ -95,7 +95,11 @@ class DatabaseManager:
 
     def _create_engine(self) -> Engine:
         """Create database engine with environment-specific settings"""
-        database_url = self.config.database_url
+        # Prioritize Supabase connection string if available
+        if self.config.supabase_connection_string:
+            database_url = self.config.supabase_connection_string
+        else:
+            database_url = self.config.database_url
 
         # Base engine configuration
         engine_kwargs: dict[str, Any] = {
@@ -116,7 +120,7 @@ class DatabaseManager:
                 }
             )
         else:
-            # Non-SQLite: configure pool sizing
+            # PostgreSQL/Supabase: configure pool sizing
             if self.config.environment == "production":
                 pool_size = DatabaseSettings.PRODUCTION_POOL_SIZE
                 max_overflow = DatabaseSettings.PRODUCTION_MAX_OVERFLOW
@@ -432,55 +436,42 @@ def init_default_products():
                 "category": "bread",
                 "description": "Traditional Yemenite bread",
                 "price": 25.00,
-                "options": {
-                    "type": ["Classic", "Seeded", "Herb", "Aromatic"],
-                    "oil": ["Olive oil", "Samneh"],
-                },
             },
             {
                 "name": "Samneh",
                 "category": "spread",
                 "description": "Traditional clarified butter",
                 "price": 15.00,
-                "options": {
-                    "smoking": ["Smoked", "Not smoked"],
-                    "size": ["Small", "Large"],
-                },
             },
             {
                 "name": "Red Bisbas",
                 "category": "spice",
                 "description": "Traditional Yemenite spice blend",
                 "price": 12.00,
-                "options": {"size": ["Small", "Large"]},
             },
             {
                 "name": "Hawaij soup spice",
                 "category": "spice",
                 "description": "Traditional soup spice blend",
                 "price": 8.00,
-                "options": {},
             },
             {
                 "name": "Hawaij coffee spice",
                 "category": "spice",
                 "description": "Traditional coffee spice blend",
                 "price": 8.00,
-                "options": {},
             },
             {
                 "name": "White coffee",
                 "category": "beverage",
                 "description": "Traditional Yemenite white coffee",
                 "price": 10.00,
-                "options": {},
             },
             {
                 "name": "Hilbeh",
                 "category": "spread",
                 "description": "Traditional fenugreek spread (available Wed-Fri only)",
                 "price": 18.00,
-                "options": {},
             },
         ]
 
@@ -505,7 +496,7 @@ def init_default_products():
 # Customer operations
 @retry_on_database_error()
 def get_or_create_customer(
-    telegram_id: int, full_name: str, phone_number: str
+    telegram_id: int, full_name: str, phone_number: str, language: str = "en"
 ) -> Customer:
     """Get existing customer or create new one"""
     session = get_db_session()
@@ -526,7 +517,7 @@ def get_or_create_customer(
 
         # Create new customer
         customer = Customer(
-            telegram_id=telegram_id, full_name=full_name, phone_number=phone_number
+            telegram_id=telegram_id, full_name=full_name, phone_number=phone_number, language=language
         )
         session.add(customer)
         session.commit()
@@ -801,6 +792,29 @@ def update_customer_delivery_address(telegram_id: int, delivery_address: str) ->
     except SQLAlchemyError as e:
         session.rollback()
         logger.error("Failed to update customer delivery address: %s", e)
+        return False
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def update_customer_language(telegram_id: int, language: str) -> bool:
+    """Update customer's language preference"""
+    session = get_db_session()
+    try:
+        customer = session.query(Customer).filter(Customer.telegram_id == telegram_id).first()
+        if customer:
+            customer.language = language
+            customer.updated_at = datetime.now()
+            session.commit()
+            logger.info("Updated language preference for customer %s to %s", telegram_id, language)
+            return True
+        else:
+            logger.error("Customer %s not found for language update", telegram_id)
+            return False
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error("Failed to update customer language: %s", e)
         return False
     finally:
         session.close()

@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from src.config import get_config
 from src.db.operations import init_db, init_default_products
 from src.container import get_container
-from src.handlers.start import start_handler, OnboardingHandler
+from src.handlers.start import start_handler, OnboardingHandler, register_start_handlers
 from src.handlers.menu import menu_handler
 from src.handlers.cart import CartHandler
 from src.handlers.admin import register_admin_handlers
@@ -51,13 +51,21 @@ def setup_bot():
     # Register handlers
     logger.info("Registering handlers...")
     
-    # Start command
-    application.add_handler(CommandHandler("start", start_handler))
+    # Register onboarding conversation handler (includes /start command)
+    register_start_handlers(application)
+    
+    # Ping command
     application.add_handler(CommandHandler("ping", ping_handler))
     
     # Main page handlers (My Info, Menu navigation)
     onboarding_handler = OnboardingHandler()
     application.add_handler(CallbackQueryHandler(onboarding_handler.handle_main_page_callback, pattern="^main_"))
+    
+    # Language selection handlers
+    application.add_handler(CallbackQueryHandler(onboarding_handler.handle_main_page_callback, pattern="^language_"))
+    
+    # Customer order tracking handlers
+    application.add_handler(CallbackQueryHandler(onboarding_handler.handle_main_page_callback, pattern="^customer_order_"))
     
     # Menu handlers
     application.add_handler(CallbackQueryHandler(menu_handler, pattern="^menu_"))
@@ -67,7 +75,8 @@ def setup_bot():
     application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^add_"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^(kubaneh_|samneh_|red_bisbas_|hawaij_coffee_spice|white_coffee)"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_view_cart, pattern="^cart_view"))
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart, pattern="^cart_clear"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart_confirmation, pattern="^cart_clear_confirm"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart, pattern="^cart_clear_yes"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_checkout, pattern="^cart_checkout"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_address_choice, pattern="^delivery_address_"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_method, pattern="^delivery_"))

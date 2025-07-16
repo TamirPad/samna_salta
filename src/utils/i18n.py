@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 DEFAULT_LANGUAGE = "en"
 FALLBACK_LANGUAGE = "en"
 
+# Import language manager
+from src.utils.language_manager import language_manager
+
 class I18nManager:
     """Manages translations and internationalization"""
 
@@ -46,8 +49,12 @@ class I18nManager:
                 except Exception as e:
                     logger.error("Failed to load translations for %s: %s", language, e)
 
-    def get_text(self, key: str, language: Optional[str] = None) -> str:
+    def get_text(self, key: str, language: Optional[str] = None, user_id: Optional[int] = None) -> str:
         """Get translated text for a key"""
+        # If no language specified, try to get from user preferences
+        if language is None and user_id is not None:
+            language = language_manager.get_user_language(user_id)
+        
         language = language or DEFAULT_LANGUAGE
 
         # Try requested language
@@ -69,10 +76,10 @@ class I18nManager:
 # Global instance
 i18n = I18nManager()
 
-def _(key: str, language: Optional[str] = None) -> str:
+def _(key: str, language: Optional[str] = None, user_id: Optional[int] = None) -> str:
     """Shorthand function to get translated text"""
-    return i18n.get_text(key, language)
+    return i18n.get_text(key, language, user_id)
 
-def tr(key: str, language: Optional[str] = None) -> str:
+def tr(key: str, language: Optional[str] = None, user_id: Optional[int] = None) -> str:
     """Translation function alias for backward compatibility"""
-    return i18n.get_text(key, language) 
+    return i18n.get_text(key, language, user_id) 

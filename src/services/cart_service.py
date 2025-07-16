@@ -41,7 +41,7 @@ class CartService:
             "errors": errors
         }
 
-    def register_customer(self, telegram_id: int, full_name: str, phone: str) -> Dict[str, any]:
+    def register_customer(self, telegram_id: int, full_name: str, phone: str, language: str = "en") -> Dict[str, any]:
         """Register a new customer or update existing one"""
         try:
             # Check if customer already exists
@@ -59,7 +59,7 @@ class CartService:
                 }
             else:
                 # Create new customer
-                customer = get_or_create_customer(telegram_id, full_name, phone)
+                customer = get_or_create_customer(telegram_id, full_name, phone, language)
                 if customer:
                     return {
                         "success": True,

@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     database_url: str = Field(
         default="sqlite:///data/samna_salta.db", description="Database connection URL"
     )
+    supabase_connection_string: str = Field(
+        default="", description="Supabase PostgreSQL connection string"
+    )
 
     # Redis configuration (for rate limiting in production)
     redis_url: str = Field(
@@ -156,19 +159,32 @@ class ConfigValidator:
             self.errors.append("Configuration not loaded")
             return
             
-        if not self.config.database_url:
-            self.errors.append("DATABASE_URL is required")
-        if self.config.database_url.startswith(ConfigValidation.SQLITE_PREFIX):
-            db_path = self.config.database_url.replace(ConfigValidation.SQLITE_PREFIX, "")
+        # Check for Supabase connection string first
+        if self.config.supabase_connection_string:
+            database_url = self.config.supabase_connection_string
+            self.warnings.append("Using Supabase PostgreSQL connection")
+        elif self.config.database_url:
+            database_url = self.config.database_url
+        else:
+            self.errors.append("Either DATABASE_URL or SUPABASE_CONNECTION_STRING is required")
+            return
+            
+        if database_url.startswith(ConfigValidation.SQLITE_PREFIX):
+            db_path = database_url.replace(ConfigValidation.SQLITE_PREFIX, "")
             if not Path(db_path).parent.exists():
                 self.errors.append(f"Database directory does not exist: {Path(db_path).parent}")
             if not Path(db_path).exists():
                 self.warnings.append(f"Database file will be created: {db_path}")
+        elif database_url.startswith("postgresql://"):
+            self.warnings.append("Using PostgreSQL database")
+        else:
+            self.warnings.append(f"Unknown database type: {database_url.split('://')[0]}")
+            
         # Attempt connection
         try:
             # Import here to avoid circular import
             from sqlalchemy import create_engine
-            engine = create_engine(self.config.database_url)
+            engine = create_engine(database_url)
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
             self.warnings.append("Database connection successful")
