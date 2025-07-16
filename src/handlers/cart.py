@@ -121,9 +121,12 @@ class CartHandler:
             
             for i, item in enumerate(cart_items, 1):
                 item_total = item.get("price", 0) * item.get("quantity", 1)
+                # Translate product name
+                from src.utils.helpers import translate_product_name
+                translated_product_name = translate_product_name(item.get('product_name', 'Unknown Product'), item.get('options', {}), user_id)
                 message += i18n.get_text("CART_ITEM_FORMAT", user_id=user_id).format(
                     index=i,
-                    product_name=item.get('product_name', 'Unknown Product'),
+                    product_name=translated_product_name,
                     quantity=item.get('quantity', 1),
                     price=item.get('price', 0),
                     item_total=item_total
@@ -223,9 +226,12 @@ class CartHandler:
             
             for i, item in enumerate(cart_items, 1):
                 item_total = item.get("price", 0) * item.get("quantity", 1)
+                # Translate product name
+                from src.utils.helpers import translate_product_name
+                translated_product_name = translate_product_name(item.get('product_name', 'Unknown Product'), item.get('options', {}), user_id)
                 message += i18n.get_text("CART_ITEM_FORMAT", user_id=user_id).format(
                     index=i,
-                    product_name=item.get('product_name', 'Unknown Product'),
+                    product_name=translated_product_name,
                     quantity=item.get('quantity', 1),
                     price=item.get('price', 0),
                     item_total=item_total
@@ -636,9 +642,12 @@ class CartHandler:
             
             for i, item in enumerate(cart_items, 1):
                 item_total = item.get("price", 0) * item.get("quantity", 1)
+                # Translate product name
+                from src.utils.helpers import translate_product_name
+                translated_product_name = translate_product_name(item.get('product_name', 'Unknown Product'), item.get('options', {}), user_id)
                 message += i18n.get_text("CART_ITEM_FORMAT", user_id=user_id).format(
                     index=i,
-                    product_name=item.get('product_name', 'Unknown Product'),
+                    product_name=translated_product_name,
                     quantity=item.get('quantity', 1),
                     price=item.get('price', 0),
                     item_total=item_total
