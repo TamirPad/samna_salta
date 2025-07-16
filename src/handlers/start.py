@@ -60,24 +60,25 @@ class OnboardingHandler:
 
             if existing_customer:
                 # Welcome back existing customer with main page
+                user_id = user.id
                 welcome_message = (
-                    f"🇾🇪 <b>Welcome to Samna Salta!</b> 🇾🇪\n\n"
-                    f"👋 <b>Hello {existing_customer.full_name}!</b>\n\n"
-                    f"Welcome back to the best traditional Yemenite food experience!\n\n"
-                    f"Press the button below to continue"
+                    f"🇾🇪 <b>{i18n.get_text('WELCOME', user_id=user_id)}</b> 🇾🇪\n\n"
+                    f"👋 <b>{i18n.get_text('WELCOME_BACK', user_id=user_id).format(name=existing_customer.full_name)}</b>\n\n"
+                    f"{i18n.get_text('WHAT_TO_ORDER_TODAY', user_id=user_id)}"
                 )
                 await update.message.reply_text(
                     welcome_message,
-                    reply_markup=self._get_main_page_keyboard(),
+                    reply_markup=self._get_main_page_keyboard(user_id),
                     parse_mode="HTML"
                 )
                 return END
 
             # Start onboarding for new customer
+            user_id = user.id
             await update.message.reply_text(
-                i18n.get_text("WELCOME_NEW_USER") + "\n\n" +
-                i18n.get_text("WELCOME_HELP_MESSAGE") + "\n\n" +
-                i18n.get_text("PLEASE_ENTER_NAME"),
+                i18n.get_text("WELCOME_NEW_USER", user_id=user_id) + "\n\n" +
+                i18n.get_text("WELCOME_HELP_MESSAGE", user_id=user_id) + "\n\n" +
+                i18n.get_text("PLEASE_ENTER_NAME", user_id=user_id),
                 parse_mode="HTML"
             )
             return ONBOARDING_NAME
@@ -306,18 +307,25 @@ class OnboardingHandler:
         except Exception as e:
             self.logger.error("Failed to send error message: %s", e)
 
-    def _get_main_page_keyboard(self):
-        """Get main page keyboard with My Info and Menu buttons"""
+    def _get_main_page_keyboard(self, user_id: int = None):
+        """Get main page keyboard with Menu, My Info, and Language buttons"""
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        from src.utils.language_manager import language_manager
+        
+        current_lang = language_manager.get_user_language(user_id)
+        lang_display = "🇺🇸 EN" if current_lang == "en" else "🇮🇱 עברית"
         
         keyboard = [
-            [InlineKeyboardButton("👤 My Info", callback_data="main_my_info")],
-            [InlineKeyboardButton("🍽️ Menu", callback_data="main_menu")],
+            [
+                InlineKeyboardButton(i18n.get_text("BUTTON_MENU", user_id=user_id), callback_data="main_menu"),
+                InlineKeyboardButton(i18n.get_text("BUTTON_MY_INFO", user_id=user_id), callback_data="main_my_info"),
+                InlineKeyboardButton(f"🌐 {lang_display}", callback_data="language_selection"),
+            ],
         ]
         return InlineKeyboardMarkup(keyboard)
 
     async def handle_main_page_callback(self, update: Update, _: ContextTypes.DEFAULT_TYPE):
-        """Handle main page callbacks (My Info, Menu)"""
+        """Handle main page callbacks (My Info, Menu, Language)"""
         query = update.callback_query
         await query.answer()
 
@@ -333,6 +341,8 @@ class OnboardingHandler:
                 await self._show_menu(query)
             elif data == "main_page":
                 await self._show_main_page(query)
+            elif data.startswith("language_"):
+                await self._handle_language_selection(query)
             else:
                 self.logger.warning("⚠️ UNKNOWN MAIN PAGE CALLBACK: %s", data)
 
@@ -348,36 +358,37 @@ class OnboardingHandler:
             
             if customer:
                 info_text = (
-                    f"👤 <b>My Information</b>\n\n"
-                    f"<b>Name:</b> {customer.full_name}\n"
-                    f"<b>Phone:</b> {customer.phone_number}\n"
-                    f"<b>Delivery Address:</b> {customer.delivery_address or 'Not set'}\n\n"
-                    f"To update your information, please contact support."
+                    f"👤 <b>{i18n.get_text('MY_INFO_TITLE', user_id=user_id)}</b>\n\n"
+                    f"<b>{i18n.get_text('NAME_FIELD', user_id=user_id)}</b> {customer.full_name}\n"
+                    f"<b>{i18n.get_text('PHONE_FIELD', user_id=user_id)}</b> {customer.phone_number}\n"
+                    f"<b>{i18n.get_text('ADDRESS_FIELD', user_id=user_id)}</b> {customer.delivery_address or i18n.get_text('NOT_SET', user_id=user_id)}\n\n"
+                    f"{i18n.get_text('CONTACT_SUPPORT_FOR_UPDATES', user_id=user_id)}"
                 )
             else:
-                info_text = "❌ User information not found. Please restart the bot with /start"
+                info_text = i18n.get_text("USER_INFO_NOT_FOUND", user_id=user_id)
 
             await query.edit_message_text(
                 info_text,
-                reply_markup=self._get_back_to_main_keyboard(),
+                reply_markup=self._get_my_info_keyboard(user_id),
                 parse_mode="HTML"
             )
 
         except Exception as e:
             self.logger.error("Error showing my info: %s", e)
             await query.edit_message_text(
-                "❌ Error loading your information. Please try again.",
-                reply_markup=self._get_back_to_main_keyboard()
+                i18n.get_text("UNEXPECTED_ERROR", user_id=user_id),
+                reply_markup=self._get_back_to_main_keyboard(user_id)
             )
 
     async def _show_menu(self, query: CallbackQuery):
         """Show the food menu"""
         try:
             from src.keyboards.menu_keyboards import get_main_menu_keyboard
+            user_id = query.from_user.id
             
             await query.edit_message_text(
-                i18n.get_text("MENU_PROMPT"),
-                reply_markup=get_main_menu_keyboard(),
+                i18n.get_text("MENU_PROMPT", user_id=user_id),
+                reply_markup=get_main_menu_keyboard(user_id),
                 parse_mode="HTML"
             )
 
@@ -396,39 +407,84 @@ class OnboardingHandler:
             
             if customer:
                 welcome_message = (
-                    f"🇾🇪 <b>Welcome to Samna Salta!</b> 🇾🇪\n\n"
-                    f"👋 <b>Hello {customer.full_name}!</b>\n\n"
-                    f"Welcome back to the best traditional Yemenite food experience!\n\n"
-                    f"What would you like to order today?"
+                    f"🇾🇪 <b>{i18n.get_text('WELCOME', user_id=user_id)}</b> 🇾🇪\n\n"
+                    f"👋 <b>{i18n.get_text('WELCOME_BACK', user_id=user_id).format(name=customer.full_name)}</b>\n\n"
+                    f"{i18n.get_text('WHAT_TO_ORDER_TODAY', user_id=user_id)}"
                 )
             else:
                 welcome_message = (
-                    f"🇾🇪 <b>Welcome to Samna Salta!</b> 🇾🇪\n\n"
-                    f"Welcome to the best traditional Yemenite food experience!\n\n"
-                    f"What would you like to order today?"
+                    f"🇾🇪 <b>{i18n.get_text('WELCOME', user_id=user_id)}</b> 🇾🇪\n\n"
+                    f"{i18n.get_text('WHAT_TO_ORDER_TODAY', user_id=user_id)}"
                 )
 
             await query.edit_message_text(
                 welcome_message,
-                reply_markup=self._get_main_page_keyboard(),
+                reply_markup=self._get_main_page_keyboard(user_id),
                 parse_mode="HTML"
             )
 
         except Exception as e:
             self.logger.error("Error showing main page: %s", e)
             await query.edit_message_text(
-                "❌ Error loading main page. Please try again.",
-                reply_markup=self._get_main_page_keyboard()
+                i18n.get_text("UNEXPECTED_ERROR", user_id=user_id),
+                reply_markup=self._get_main_page_keyboard(user_id)
             )
 
-    def _get_back_to_main_keyboard(self):
+    def _get_my_info_keyboard(self, user_id: int):
+        """Get My Info keyboard"""
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
+        keyboard = [
+            [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="main_page")],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
+    def _get_back_to_main_keyboard(self, user_id: int = None):
         """Get keyboard to go back to main page"""
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
         
         keyboard = [
-            [InlineKeyboardButton("🏠 Back to Main", callback_data="main_page")],
+            [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="main_page")],
         ]
         return InlineKeyboardMarkup(keyboard)
+
+    async def _handle_language_selection(self, query: CallbackQuery):
+        """Handle language selection"""
+        try:
+            user_id = query.from_user.id
+            data = query.data
+            
+            if data == "language_selection":
+                # Show language selection keyboard
+                from src.keyboards.language_keyboards import get_language_selection_keyboard
+                
+                await query.edit_message_text(
+                    i18n.get_text("SELECT_LANGUAGE_PROMPT", user_id=user_id),
+                    reply_markup=get_language_selection_keyboard(user_id),
+                    parse_mode="HTML"
+                )
+                
+            elif data.startswith("language_"):
+                # Handle language change
+                from src.utils.language_manager import language_manager
+                
+                language = data.split("_")[1]  # language_en -> en
+                language_manager.set_user_language(user_id, language)
+                
+                # Show success message in new language and return to main page
+                success_text = i18n.get_text("LANGUAGE_CHANGED", user_id=user_id)
+                await query.edit_message_text(
+                    success_text,
+                    reply_markup=self._get_main_page_keyboard(user_id),
+                    parse_mode="HTML"
+                )
+                
+        except Exception as e:
+            self.logger.error("Error handling language selection: %s", e)
+            await query.edit_message_text(
+                i18n.get_text("UNEXPECTED_ERROR", user_id=user_id),
+                reply_markup=self._get_back_to_main_keyboard(user_id)
+            )
 
 
 def register_start_handlers(application: Application):

@@ -106,6 +106,9 @@ class NotificationService:
 
     def _format_order_notification(self, order_data: Dict) -> str:
         """Format order data for notification"""
+        # Get user_id for translations (admin notifications are always in English)
+        user_id = order_data.get('customer_telegram_id')
+        
         items_text = ""
         for i, item in enumerate(order_data.get('items', []), 1):
             item_total = item.get("price", 0) * item.get("quantity", 1)
@@ -113,25 +116,23 @@ class NotificationService:
         
         # Format delivery info
         delivery_method = order_data.get('delivery_method', 'Unknown').title()
-        delivery_info = f"🚚 <b>Delivery:</b> {delivery_method}"
+        delivery_info = i18n.get_text("ADMIN_DELIVERY_INFO", user_id=user_id).format(delivery_method=delivery_method)
         
         # Add delivery address if it's delivery
         if order_data.get('delivery_method') == 'delivery' and order_data.get('delivery_address'):
-            delivery_info += f"\n📍 <b>Address:</b> {order_data.get('delivery_address')}"
+            delivery_info += f"\n{i18n.get_text('ADMIN_DELIVERY_ADDRESS', user_id=user_id).format(address=order_data.get('delivery_address'))}"
         
         return f"""
-🆕 <b>NEW ORDER RECEIVED!</b>
+{i18n.get_text("ADMIN_NEW_ORDER_TITLE", user_id=user_id)}
 
-📋 <b>Order #{order_data.get('order_number', 'Unknown')}</b>
-👤 <b>Customer:</b> {order_data.get('customer_name', 'Unknown')}
-📞 <b>Phone:</b> {order_data.get('customer_phone', 'Unknown')}
+{i18n.get_text("ADMIN_ORDER_NUMBER", user_id=user_id).format(order_number=order_data.get('order_number', 'Unknown'))}
+{i18n.get_text("ADMIN_CUSTOMER_INFO", user_id=user_id).format(customer_name=order_data.get('customer_name', 'Unknown'), customer_phone=order_data.get('customer_phone', 'Unknown'))}
 {delivery_info}
 
-📦 <b>Items:</b>
-{items_text}
-💰 <b>Total:</b> ₪{order_data.get('total', 0):.2f}
+{i18n.get_text("ADMIN_ITEMS_HEADER", user_id=user_id)}
+{items_text}{i18n.get_text("ADMIN_ORDER_TOTAL", user_id=user_id).format(total=order_data.get('total', 0))}
 
-<i>Order placed at {order_data.get('created_at', 'Unknown time')}</i>
+{i18n.get_text("ADMIN_ORDER_TIME", user_id=user_id).format(created_at=order_data.get('created_at', 'Unknown time'))}
         """.strip()
 
 # Global instance

@@ -78,89 +78,99 @@ class MenuHandler:
     async def _show_main_menu(self, query: CallbackQuery):
         """Show the main menu"""
         self.logger.debug("📋 SHOWING: Main menu")
+        user_id = query.from_user.id
         await query.edit_message_text(
-            i18n.get_text("MENU_PROMPT"), reply_markup=get_main_menu_keyboard(), parse_mode="HTML"
+            i18n.get_text("MENU_PROMPT", user_id=user_id), 
+            reply_markup=get_main_menu_keyboard(user_id), 
+            parse_mode="HTML"
         )
 
     async def _show_kubaneh_menu(self, query: CallbackQuery):
         """Show Kubaneh sub-menu"""
         self.logger.debug("📋 SHOWING: Kubaneh menu")
-        text = i18n.get_text("KUBANEH_DESC")
+        user_id = query.from_user.id
+        text = i18n.get_text("KUBANEH_DESC", user_id=user_id)
         await query.edit_message_text(
-            text, reply_markup=get_kubaneh_menu_keyboard(), parse_mode="HTML"
+            text, reply_markup=get_kubaneh_menu_keyboard(user_id), parse_mode="HTML"
         )
 
     async def _show_samneh_menu(self, query: CallbackQuery):
         """Show Samneh sub-menu"""
         self.logger.debug("📋 SHOWING: Samneh menu")
-        text = i18n.get_text("SAMNEH_DESC")
+        user_id = query.from_user.id
+        text = i18n.get_text("SAMNEH_DESC", user_id=user_id)
         await query.edit_message_text(
-            text, reply_markup=get_samneh_menu_keyboard(), parse_mode="HTML"
+            text, reply_markup=get_samneh_menu_keyboard(user_id), parse_mode="HTML"
         )
 
     async def _show_red_bisbas_menu(self, query: CallbackQuery):
         """Show Red Bisbas menu"""
         self.logger.debug("📋 SHOWING: Red Bisbas menu")
-        text = i18n.get_text("RED_BISBAS_DESC")
+        user_id = query.from_user.id
+        text = i18n.get_text("RED_BISBAS_DESC", user_id=user_id)
         await query.edit_message_text(
-            text, reply_markup=get_red_bisbas_menu_keyboard(), parse_mode="HTML"
+            text, reply_markup=get_red_bisbas_menu_keyboard(user_id), parse_mode="HTML"
         )
 
     async def _show_hilbeh_menu(self, query: CallbackQuery):
         """Show Hilbeh menu with availability check"""
         self.logger.debug("📋 SHOWING: Hilbeh menu")
+        user_id = query.from_user.id
         try:
             # Check availability using order service
             availability = self.order_service.check_product_availability("Hilbeh")
 
             if not availability["available"]:
                 await query.edit_message_text(
-                    i18n.get_text("AVAILABILITY_CHECK_ERROR").format(error=availability["reason"]), 
-                    reply_markup=get_main_menu_keyboard(),
+                    i18n.get_text("AVAILABILITY_CHECK_ERROR", user_id=user_id).format(error=availability["reason"]), 
+                    reply_markup=get_main_menu_keyboard(user_id),
                     parse_mode="HTML"
                 )
                 return
 
-            text = i18n.get_text("HILBEH_DESC_AVAILABLE")
+            text = i18n.get_text("HILBEH_DESC_AVAILABLE", user_id=user_id)
             await query.edit_message_text(
-                text, reply_markup=get_hilbeh_menu_keyboard(), parse_mode="HTML"
+                text, reply_markup=get_hilbeh_menu_keyboard(user_id), parse_mode="HTML"
             )
 
         except Exception as e:
             self.logger.error("💥 Error checking Hilbeh availability: %s", e)
             await query.edit_message_text(
-                i18n.get_text("AVAILABILITY_CHECK_ERROR_GENERIC"),
-                reply_markup=get_main_menu_keyboard(),
+                i18n.get_text("AVAILABILITY_CHECK_ERROR_GENERIC", user_id=user_id),
+                reply_markup=get_main_menu_keyboard(user_id),
                 parse_mode="HTML"
             )
 
     async def _show_hawaij_soup_menu(self, query: CallbackQuery):
         """Show Hawaij soup spice menu"""
         self.logger.debug("📋 SHOWING: Hawaij soup menu")
-        text = i18n.get_text("HAWAIJ_SOUP_DESC")
+        user_id = query.from_user.id
+        text = i18n.get_text("HAWAIJ_SOUP_DESC", user_id=user_id)
         await query.edit_message_text(
             text,
-            reply_markup=get_direct_add_keyboard("Hawaij soup spice", include_info=False),
+            reply_markup=get_direct_add_keyboard("Hawaij soup spice", include_info=False, user_id=user_id),
             parse_mode="HTML",
         )
 
     async def _show_hawaij_coffee_menu(self, query: CallbackQuery):
         """Show Hawaij coffee spice menu"""
         self.logger.debug("📋 SHOWING: Hawaij coffee menu")
-        text = i18n.get_text("HAWAIJ_COFFEE_DESC")
+        user_id = query.from_user.id
+        text = i18n.get_text("HAWAIJ_COFFEE_DESC", user_id=user_id)
         await query.edit_message_text(
             text,
-            reply_markup=get_direct_add_keyboard("Hawaij coffee spice", include_info=False),
+            reply_markup=get_direct_add_keyboard("Hawaij coffee spice", include_info=False, user_id=user_id),
             parse_mode="HTML",
         )
 
     async def _show_white_coffee_menu(self, query: CallbackQuery):
         """Show White coffee menu"""
         self.logger.debug("📋 SHOWING: White coffee menu")
-        text = i18n.get_text("WHITE_COFFEE_DESC")
+        user_id = query.from_user.id
+        text = i18n.get_text("WHITE_COFFEE_DESC", user_id=user_id)
         await query.edit_message_text(
             text,
-            reply_markup=get_direct_add_keyboard("White coffee", include_info=False),
+            reply_markup=get_direct_add_keyboard("White coffee", include_info=False, user_id=user_id),
             parse_mode="HTML",
         )
 

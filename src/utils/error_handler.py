@@ -593,7 +593,7 @@ async def handle_error(update: Update, error: Exception, operation: str = "unkno
                     error_message,
                     parse_mode="HTML",
                     reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton("🏠 Back to Menu", callback_data="menu_main")
+                        InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN"), callback_data="menu_main")
                     ]])
                 )
             except Exception as edit_error:

@@ -69,23 +69,23 @@ class CartHandler:
                 )
 
                 # Send success message
-                message = f"✅ <b>{product_info['display_name']}</b> added to cart!\n\n"
-                message += f"🛒 <b>Cart Summary:</b>\n"
-                message += f"• Items: {item_count}\n"
-                message += f"• Total: ₪{cart_total:.2f}\n\n"
-                message += "What would you like to do next?"
+                message = i18n.get_text("CART_SUCCESS_MESSAGE", user_id=user_id).format(
+                    product_name=product_info['display_name'],
+                    item_count=item_count,
+                    cart_total=cart_total
+                )
 
                 await query.edit_message_text(
                     message,
                     parse_mode="HTML",
-                    reply_markup=self._get_cart_success_keyboard(),
+                    reply_markup=self._get_cart_success_keyboard(user_id),
                 )
             else:
                 self.logger.error("❌ ADD FAILED: User %s, Product: %s", user_id, product_info["display_name"])
                 await query.edit_message_text(
-                    "❌ Failed to add item to cart. Please try again.",
+                    i18n.get_text("FAILED_ADD_TO_CART", user_id=user_id),
                     parse_mode="HTML",
-                    reply_markup=self._get_back_to_menu_keyboard(),
+                    reply_markup=self._get_back_to_menu_keyboard(user_id),
                 )
 
         except Exception as e:
@@ -107,9 +107,9 @@ class CartHandler:
 
             if not cart_items:
                 await query.edit_message_text(
-                    "🛒 <b>Your cart is empty</b>\n\nReady to add some delicious items? Browse our menu to get started!",
+                    i18n.get_text("CART_EMPTY_READY", user_id=user_id),
                     parse_mode="HTML",
-                    reply_markup=self._get_empty_cart_keyboard(),
+                    reply_markup=self._get_empty_cart_keyboard(user_id),
                 )
                 return
 
@@ -117,22 +117,25 @@ class CartHandler:
             cart_total = cart_service.calculate_total(cart_items)
 
             # Build cart display
-            message = "🛒 <b>Your Cart</b>\n\n"
+            message = i18n.get_text("CART_VIEW_TITLE", user_id=user_id) + "\n\n"
             
             for i, item in enumerate(cart_items, 1):
                 item_total = item.get("price", 0) * item.get("quantity", 1)
-                message += f"{i}. <b>{item.get('product_name', 'Unknown Product')}</b>\n"
-                message += f"   • Quantity: {item.get('quantity', 1)}\n"
-                message += f"   • Price: ₪{item.get('price', 0):.2f}\n"
-                message += f"   • Total: ₪{item_total:.2f}\n\n"
+                message += i18n.get_text("CART_ITEM_FORMAT", user_id=user_id).format(
+                    index=i,
+                    product_name=item.get('product_name', 'Unknown Product'),
+                    quantity=item.get('quantity', 1),
+                    price=item.get('price', 0),
+                    item_total=item_total
+                ) + "\n\n"
 
-            message += f"💰 <b>Total: ₪{cart_total:.2f}</b>\n\n"
-            message += "What would you like to do next?"
+            message += i18n.get_text("CART_TOTAL", user_id=user_id).format(total=cart_total) + "\n\n"
+            message += i18n.get_text("CART_WHAT_NEXT", user_id=user_id)
 
             await query.edit_message_text(
                 message,
                 parse_mode="HTML",
-                reply_markup=self._get_cart_actions_keyboard(),
+                reply_markup=self._get_cart_actions_keyboard(user_id),
             )
 
         except Exception as e:
@@ -155,16 +158,16 @@ class CartHandler:
             if success:
                 self.logger.info("✅ CART CLEARED: User %s", user_id)
                 await query.edit_message_text(
-                    "🗑️ <b>Cart cleared successfully!</b>\n\nYour cart is now empty.",
+                    i18n.get_text("CART_CLEARED_SUCCESS", user_id=user_id),
                     parse_mode="HTML",
-                    reply_markup=self._get_empty_cart_keyboard(),
+                    reply_markup=self._get_empty_cart_keyboard(user_id),
                 )
             else:
                 self.logger.error("❌ CART CLEAR FAILED: User %s", user_id)
                 await query.edit_message_text(
-                    "❌ Failed to clear cart. Please try again.",
+                    i18n.get_text("FAILED_CLEAR_CART", user_id=user_id),
                     parse_mode="HTML",
-                    reply_markup=self._get_back_to_menu_keyboard(),
+                    reply_markup=self._get_back_to_menu_keyboard(user_id),
                 )
 
         except Exception as e:
@@ -186,9 +189,9 @@ class CartHandler:
 
             if not cart_items:
                 await query.edit_message_text(
-                    "🛒 <b>Your cart is empty</b>\n\nPlease add some items before checkout.",
+                    i18n.get_text("CART_EMPTY_CHECKOUT", user_id=user_id),
                     parse_mode="HTML",
-                    reply_markup=self._get_empty_cart_keyboard(),
+                    reply_markup=self._get_empty_cart_keyboard(user_id),
                 )
                 return
 
@@ -196,22 +199,25 @@ class CartHandler:
             cart_total = cart_service.calculate_total(cart_items)
 
             # Build checkout summary
-            message = "🛒 <b>Checkout Summary</b>\n\n"
+            message = i18n.get_text("CHECKOUT_TITLE", user_id=user_id) + "\n\n"
             
             for i, item in enumerate(cart_items, 1):
                 item_total = item.get("price", 0) * item.get("quantity", 1)
-                message += f"{i}. <b>{item.get('product_name', 'Unknown Product')}</b>\n"
-                message += f"   • Quantity: {item.get('quantity', 1)}\n"
-                message += f"   • Price: ₪{item.get('price', 0):.2f}\n"
-                message += f"   • Total: ₪{item_total:.2f}\n\n"
+                message += i18n.get_text("CART_ITEM_FORMAT", user_id=user_id).format(
+                    index=i,
+                    product_name=item.get('product_name', 'Unknown Product'),
+                    quantity=item.get('quantity', 1),
+                    price=item.get('price', 0),
+                    item_total=item_total
+                ) + "\n\n"
 
-            message += f"💰 <b>Total: ₪{cart_total:.2f}</b>\n\n"
-            message += "Please select your delivery method:"
+            message += i18n.get_text("CART_TOTAL", user_id=user_id).format(total=cart_total) + "\n\n"
+            message += i18n.get_text("SELECT_DELIVERY_METHOD", user_id=user_id)
 
             await query.edit_message_text(
                 message,
                 parse_mode="HTML",
-                reply_markup=self._get_delivery_method_keyboard(),
+                reply_markup=self._get_delivery_method_keyboard(user_id),
             )
 
         except Exception as e:
@@ -236,9 +242,9 @@ class CartHandler:
             
             if not success:
                 await query.edit_message_text(
-                    "❌ Failed to set delivery method. Please try again.",
+                    i18n.get_text("FAILED_SET_DELIVERY", user_id=user_id),
                     parse_mode="HTML",
-                    reply_markup=self._get_back_to_cart_keyboard(),
+                    reply_markup=self._get_back_to_cart_keyboard(user_id),
                 )
                 return
 
@@ -248,21 +254,16 @@ class CartHandler:
                 
                 if customer and customer.delivery_address:
                     # Customer has a saved address - ask if they want to use it
-                    message = (
-                        f"📍 <b>Current delivery address:</b>\n"
-                        f"{customer.delivery_address}\n\n"
-                        f"Would you like to use this address or enter a new one?"
-                    )
+                    message = i18n.get_text("DELIVERY_ADDRESS_CURRENT", user_id=user_id).format(address=customer.delivery_address)
                     await query.edit_message_text(
                         message,
                         parse_mode="HTML",
-                        reply_markup=self._get_delivery_address_choice_keyboard(),
+                        reply_markup=self._get_delivery_address_choice_keyboard(user_id),
                     )
                 else:
                     # No saved address - ask for new address
                     await query.edit_message_text(
-                        "📍 <b>Delivery Address Required</b> 📍\n\n"
-                        "To continue with delivery, please provide your full delivery address:",
+                        i18n.get_text("DELIVERY_ADDRESS_REQUIRED", user_id=user_id),
                         parse_mode="HTML",
                     )
                     # Set context to expect address input
@@ -298,24 +299,23 @@ class CartHandler:
                     await self._show_order_confirmation(query, cart_service, user_id)
                 else:
                     await query.edit_message_text(
-                        "❌ No saved address found. Please enter a new address.",
+                        i18n.get_text("NO_SAVED_ADDRESS", user_id=user_id),
                         parse_mode="HTML",
-                        reply_markup=self._get_back_to_cart_keyboard(),
+                        reply_markup=self._get_back_to_cart_keyboard(user_id),
                     )
             elif choice == "new_address":
                 # Ask for new address
                 await query.edit_message_text(
-                    "📍 <b>Enter Delivery Address</b> 📍\n\n"
-                    "Please provide your full delivery address (street, number, city):",
+                    i18n.get_text("DELIVERY_ADDRESS_PROMPT", user_id=user_id),
                     parse_mode="HTML",
                 )
                 # Set context to expect address input
                 context.user_data["expecting_delivery_address"] = True
             else:
                 await query.edit_message_text(
-                    "❌ Invalid choice. Please try again.",
+                    i18n.get_text("INVALID_CHOICE", user_id=user_id),
                     parse_mode="HTML",
-                    reply_markup=self._get_back_to_cart_keyboard(),
+                    reply_markup=self._get_back_to_cart_keyboard(user_id),
                 )
 
         except Exception as e:
@@ -336,9 +336,9 @@ class CartHandler:
             
             if not address or len(address) < 5:
                 await update.message.reply_text(
-                    "❌ Please enter a valid delivery address (at least 5 characters).",
+                    i18n.get_text("INVALID_ADDRESS", user_id=user_id),
                     parse_mode="HTML",
-                    reply_markup=self._get_back_to_cart_keyboard(),
+                    reply_markup=self._get_back_to_cart_keyboard(user_id),
                 )
                 return
 
@@ -352,9 +352,9 @@ class CartHandler:
             
             if not success:
                 await update.message.reply_text(
-                    "❌ Failed to save delivery address. Please try again.",
+                    i18n.get_text("FAILED_SAVE_ADDRESS", user_id=user_id),
                     parse_mode="HTML",
-                    reply_markup=self._get_back_to_cart_keyboard(),
+                    reply_markup=self._get_back_to_cart_keyboard(user_id),
                 )
                 return
 
@@ -369,9 +369,7 @@ class CartHandler:
 
             # Show order confirmation
             await update.message.reply_text(
-                f"✅ <b>Delivery Address Saved</b> ✅\n\n"
-                f"New address: {address}\n\n"
-                "Proceeding to order confirmation...",
+                i18n.get_text("DELIVERY_ADDRESS_SAVED", user_id=user_id).format(address=address),
                 parse_mode="HTML",
             )
             
@@ -415,21 +413,15 @@ class CartHandler:
                 order_total = order_result.get("total")
                 
                 # Send success message to customer
-                success_message = f"""
-✅ <b>Order Confirmed!</b>
-
-📋 <b>Order #{order_number}</b>
-💰 <b>Total: ₪{order_total:.2f}</b>
-
-Your order has been received and is being prepared. We'll notify you when it's ready!
-
-Thank you for choosing Samna Salta! 🇾🇪
-                """.strip()
+                success_message = i18n.get_text("ORDER_CONFIRMED_SUCCESS", user_id=user_id).format(
+                    order_number=order_number,
+                    order_total=order_total
+                )
                 
                 await query.edit_message_text(
                     success_message,
                     parse_mode="HTML",
-                    reply_markup=self._get_order_success_keyboard()
+                    reply_markup=self._get_order_success_keyboard(user_id)
                 )
                 
                 self.logger.info("✅ ORDER CREATED: #%s for user %s", order_number, user_id)
@@ -438,17 +430,17 @@ Thank you for choosing Samna Salta! 🇾🇪
                 error_msg = order_result.get("error", "Unknown error occurred")
                 self.logger.error("❌ ORDER CREATION FAILED: %s", error_msg)
                 await query.edit_message_text(
-                    f"❌ <b>Order Creation Failed</b>\n\n{error_msg}\n\nPlease try again or contact support.",
+                    i18n.get_text("ORDER_CREATION_FAILED", user_id=user_id).format(error_msg=error_msg),
                     parse_mode="HTML",
-                    reply_markup=self._get_back_to_cart_keyboard()
+                    reply_markup=self._get_back_to_cart_keyboard(user_id)
                 )
                 
         except Exception as e:
             self.logger.error("❌ ORDER CREATION ERROR: %s", e)
             await query.edit_message_text(
-                "❌ <b>Order Creation Error</b>\n\nAn unexpected error occurred. Please try again.",
+                i18n.get_text("ORDER_CREATION_ERROR", user_id=user_id),
                 parse_mode="HTML",
-                reply_markup=self._get_back_to_cart_keyboard()
+                reply_markup=self._get_back_to_cart_keyboard(user_id)
             )
 
     def _parse_product_from_callback(self, callback_data: str) -> Dict[str, Any]:
@@ -510,89 +502,89 @@ Thank you for choosing Samna Salta! 🇾🇪
             self.logger.error("Error parsing product from callback: %s", e)
             return None
 
-    def _get_cart_success_keyboard(self) -> InlineKeyboardMarkup:
+    def _get_cart_success_keyboard(self, user_id: int = None) -> InlineKeyboardMarkup:
         """Get keyboard for successful cart addition"""
         keyboard = [
             [
-                InlineKeyboardButton("🛒 View Cart", callback_data="cart_view"),
-                InlineKeyboardButton("➕ Add More", callback_data="menu_main"),
+                InlineKeyboardButton(i18n.get_text("VIEW_CART", user_id=user_id), callback_data="cart_view"),
+                InlineKeyboardButton(i18n.get_text("ADD_MORE", user_id=user_id), callback_data="menu_main"),
             ],
-            [InlineKeyboardButton("🏠 Main Menu", callback_data="menu_main")],
+            [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main")],
         ]
         return InlineKeyboardMarkup(keyboard)
 
-    def _get_cart_actions_keyboard(self) -> InlineKeyboardMarkup:
+    def _get_cart_actions_keyboard(self, user_id: int = None) -> InlineKeyboardMarkup:
         """Get keyboard for cart actions"""
         keyboard = [
             [
-                InlineKeyboardButton("🗑️ Clear Cart", callback_data="cart_clear_confirm"),
-                InlineKeyboardButton("🛒 Checkout", callback_data="cart_checkout"),
+                InlineKeyboardButton(i18n.get_text("CLEAR_CART", user_id=user_id), callback_data="cart_clear_confirm"),
+                InlineKeyboardButton(i18n.get_text("CHECKOUT", user_id=user_id), callback_data="cart_checkout"),
             ],
-            [InlineKeyboardButton("🏠 Main Menu", callback_data="menu_main")],
+            [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main")],
         ]
         return InlineKeyboardMarkup(keyboard)
 
-    def _get_empty_cart_keyboard(self) -> InlineKeyboardMarkup:
+    def _get_empty_cart_keyboard(self, user_id: int = None) -> InlineKeyboardMarkup:
         """Get keyboard for empty cart"""
         keyboard = [
-            [InlineKeyboardButton("🏠 Main Menu", callback_data="menu_main")],
+            [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main")],
         ]
         return InlineKeyboardMarkup(keyboard)
 
-    def _get_back_to_menu_keyboard(self) -> InlineKeyboardMarkup:
+    def _get_back_to_menu_keyboard(self, user_id: int = None) -> InlineKeyboardMarkup:
         """Get keyboard to go back to main menu"""
         keyboard = [
-            [InlineKeyboardButton("🏠 Main Menu", callback_data="menu_main")],
+            [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main")],
         ]
         return InlineKeyboardMarkup(keyboard)
 
-    def _get_delivery_method_keyboard(self) -> InlineKeyboardMarkup:
+    def _get_delivery_method_keyboard(self, user_id: int = None) -> InlineKeyboardMarkup:
         """Get keyboard for delivery method selection"""
         keyboard = [
             [
-                InlineKeyboardButton("🚚 Pickup", callback_data="delivery_pickup"),
-                InlineKeyboardButton("🚚 Delivery", callback_data="delivery_delivery"),
+                InlineKeyboardButton(i18n.get_text("DELIVERY_PICKUP", user_id=user_id), callback_data="delivery_pickup"),
+                InlineKeyboardButton(i18n.get_text("DELIVERY_DELIVERY", user_id=user_id), callback_data="delivery_delivery"),
             ],
-            [InlineKeyboardButton("🛒 Back to Cart", callback_data="cart_view")],
+            [InlineKeyboardButton(i18n.get_text("BACK_TO_CART", user_id=user_id), callback_data="cart_view")],
         ]
         return InlineKeyboardMarkup(keyboard)
 
-    def _get_delivery_address_choice_keyboard(self) -> InlineKeyboardMarkup:
+    def _get_delivery_address_choice_keyboard(self, user_id: int = None) -> InlineKeyboardMarkup:
         """Get keyboard for delivery address choice (use saved or enter new)"""
         keyboard = [
             [
-                InlineKeyboardButton("📍 Use Saved Address", callback_data="delivery_address_use_saved"),
-                InlineKeyboardButton("📍 Enter New Address", callback_data="delivery_address_new_address"),
+                InlineKeyboardButton(i18n.get_text("USE_SAVED_ADDRESS", user_id=user_id), callback_data="delivery_address_use_saved"),
+                InlineKeyboardButton(i18n.get_text("ENTER_NEW_ADDRESS", user_id=user_id), callback_data="delivery_address_new_address"),
             ],
-            [InlineKeyboardButton("🛒 Back to Cart", callback_data="cart_view")],
+            [InlineKeyboardButton(i18n.get_text("BACK_TO_CART", user_id=user_id), callback_data="cart_view")],
         ]
         return InlineKeyboardMarkup(keyboard)
 
-    def _get_order_confirmation_keyboard(self) -> InlineKeyboardMarkup:
+    def _get_order_confirmation_keyboard(self, user_id: int = None) -> InlineKeyboardMarkup:
         """Get keyboard for order confirmation"""
         keyboard = [
             [
-                InlineKeyboardButton("✅ Confirm Order", callback_data="confirm_order"),
-                InlineKeyboardButton("❌ Cancel", callback_data="cart_view"),
+                InlineKeyboardButton(i18n.get_text("CONFIRM_ORDER", user_id=user_id), callback_data="confirm_order"),
+                InlineKeyboardButton(i18n.get_text("CANCEL", user_id=user_id), callback_data="cart_view"),
             ],
         ]
         return InlineKeyboardMarkup(keyboard)
 
-    def _get_order_success_keyboard(self) -> InlineKeyboardMarkup:
+    def _get_order_success_keyboard(self, user_id: int = None) -> InlineKeyboardMarkup:
         """Get keyboard for successful order"""
         keyboard = [
             [
-                InlineKeyboardButton("🛒 New Order", callback_data="menu_main"),
-                InlineKeyboardButton("🏠 Main Menu", callback_data="menu_main"),
+                InlineKeyboardButton(i18n.get_text("NEW_ORDER", user_id=user_id), callback_data="menu_main"),
+                InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main"),
             ],
         ]
         return InlineKeyboardMarkup(keyboard)
 
-    def _get_back_to_cart_keyboard(self) -> InlineKeyboardMarkup:
+    def _get_back_to_cart_keyboard(self, user_id: int = None) -> InlineKeyboardMarkup:
         """Get keyboard to go back to cart"""
         keyboard = [
-            [InlineKeyboardButton("🛒 Back to Cart", callback_data="cart_view")],
-            [InlineKeyboardButton("🏠 Main Menu", callback_data="menu_main")],
+            [InlineKeyboardButton(i18n.get_text("BACK_TO_CART", user_id=user_id), callback_data="cart_view")],
+            [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main")],
         ]
         return InlineKeyboardMarkup(keyboard)
 
@@ -605,36 +597,43 @@ Thank you for choosing Samna Salta! 🇾🇪
             cart_info = cart_service.get_cart_info(user_id)
 
             # Build order confirmation
-            message = f"📋 <b>Order Confirmation</b>\n\n"
-            message += f"🚚 <b>Delivery Method:</b> {cart_info.get('delivery_method', 'pickup').title()}\n"
+            message = i18n.get_text("ORDER_CONFIRMATION_TITLE", user_id=user_id) + "\n\n"
+            message += i18n.get_text("DELIVERY_METHOD_LABEL", user_id=user_id).format(
+                method=cart_info.get('delivery_method', 'pickup').title()
+            ) + "\n"
             
             if cart_info.get('delivery_method') == 'delivery' and cart_info.get('delivery_address'):
-                message += f"📍 <b>Delivery Address:</b> {cart_info.get('delivery_address')}\n"
+                message += i18n.get_text("DELIVERY_ADDRESS_LABEL", user_id=user_id).format(
+                    address=cart_info.get('delivery_address')
+                ) + "\n"
             
             message += "\n"
             
             for i, item in enumerate(cart_items, 1):
                 item_total = item.get("price", 0) * item.get("quantity", 1)
-                message += f"{i}. <b>{item.get('product_name', 'Unknown Product')}</b>\n"
-                message += f"   • Quantity: {item.get('quantity', 1)}\n"
-                message += f"   • Price: ₪{item.get('price', 0):.2f}\n"
-                message += f"   • Total: ₪{item_total:.2f}\n\n"
+                message += i18n.get_text("CART_ITEM_FORMAT", user_id=user_id).format(
+                    index=i,
+                    product_name=item.get('product_name', 'Unknown Product'),
+                    quantity=item.get('quantity', 1),
+                    price=item.get('price', 0),
+                    item_total=item_total
+                ) + "\n\n"
 
-            message += f"💰 <b>Total: ₪{cart_total:.2f}</b>\n\n"
-            message += "Please confirm your order:"
+            message += i18n.get_text("CART_TOTAL", user_id=user_id).format(total=cart_total) + "\n\n"
+            message += i18n.get_text("CONFIRM_ORDER_PROMPT", user_id=user_id)
 
             await query.edit_message_text(
                 message,
                 parse_mode="HTML",
-                reply_markup=self._get_order_confirmation_keyboard(),
+                reply_markup=self._get_order_confirmation_keyboard(user_id),
             )
 
         except Exception as e:
             self.logger.error("Exception in _show_order_confirmation: %s", e)
             await query.edit_message_text(
-                "❌ Error showing order confirmation. Please try again.",
+                i18n.get_text("ERROR_SHOWING_CONFIRMATION", user_id=user_id),
                 parse_mode="HTML",
-                reply_markup=self._get_back_to_cart_keyboard(),
+                reply_markup=self._get_back_to_cart_keyboard(user_id),
             )
 
     async def _show_order_confirmation_text(self, message, cart_service, user_id):
@@ -646,34 +645,41 @@ Thank you for choosing Samna Salta! 🇾🇪
             cart_info = cart_service.get_cart_info(user_id)
 
             # Build order confirmation
-            confirmation_message = f"📋 <b>Order Confirmation</b>\n\n"
-            confirmation_message += f"🚚 <b>Delivery Method:</b> {cart_info.get('delivery_method', 'pickup').title()}\n"
+            confirmation_message = i18n.get_text("ORDER_CONFIRMATION_TITLE", user_id=user_id) + "\n\n"
+            confirmation_message += i18n.get_text("DELIVERY_METHOD_LABEL", user_id=user_id).format(
+                method=cart_info.get('delivery_method', 'pickup').title()
+            ) + "\n"
             
             if cart_info.get('delivery_method') == 'delivery' and cart_info.get('delivery_address'):
-                confirmation_message += f"📍 <b>Delivery Address:</b> {cart_info.get('delivery_address')}\n"
+                confirmation_message += i18n.get_text("DELIVERY_ADDRESS_LABEL", user_id=user_id).format(
+                    address=cart_info.get('delivery_address')
+                ) + "\n"
             
             confirmation_message += "\n"
             
             for i, item in enumerate(cart_items, 1):
                 item_total = item.get("price", 0) * item.get("quantity", 1)
-                confirmation_message += f"{i}. <b>{item.get('product_name', 'Unknown Product')}</b>\n"
-                confirmation_message += f"   • Quantity: {item.get('quantity', 1)}\n"
-                confirmation_message += f"   • Price: ₪{item.get('price', 0):.2f}\n"
-                confirmation_message += f"   • Total: ₪{item_total:.2f}\n\n"
+                confirmation_message += i18n.get_text("CART_ITEM_FORMAT", user_id=user_id).format(
+                    index=i,
+                    product_name=item.get('product_name', 'Unknown Product'),
+                    quantity=item.get('quantity', 1),
+                    price=item.get('price', 0),
+                    item_total=item_total
+                ) + "\n\n"
 
-            confirmation_message += f"💰 <b>Total: ₪{cart_total:.2f}</b>\n\n"
-            confirmation_message += "Please confirm your order:"
+            confirmation_message += i18n.get_text("CART_TOTAL", user_id=user_id).format(total=cart_total) + "\n\n"
+            confirmation_message += i18n.get_text("CONFIRM_ORDER_PROMPT", user_id=user_id)
 
             await message.reply_text(
                 confirmation_message,
                 parse_mode="HTML",
-                reply_markup=self._get_order_confirmation_keyboard(),
+                reply_markup=self._get_order_confirmation_keyboard(user_id),
             )
 
         except Exception as e:
             self.logger.error("Exception in _show_order_confirmation_text: %s", e)
             await message.reply_text(
-                "❌ Error showing order confirmation. Please try again.",
+                i18n.get_text("ERROR_SHOWING_CONFIRMATION", user_id=user_id),
                 parse_mode="HTML",
-                reply_markup=self._get_back_to_cart_keyboard(),
+                reply_markup=self._get_back_to_cart_keyboard(user_id),
             )

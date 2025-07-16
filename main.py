@@ -59,6 +59,9 @@ def setup_bot():
     onboarding_handler = OnboardingHandler()
     application.add_handler(CallbackQueryHandler(onboarding_handler.handle_main_page_callback, pattern="^main_"))
     
+    # Language selection handlers
+    application.add_handler(CallbackQueryHandler(onboarding_handler.handle_main_page_callback, pattern="^language_"))
+    
     # Menu handlers
     application.add_handler(CallbackQueryHandler(menu_handler, pattern="^menu_"))
     

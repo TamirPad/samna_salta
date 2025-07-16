@@ -9,41 +9,41 @@ from src.utils.i18n import i18n
 from src.keyboards.order_keyboards import get_delivery_method_keyboard
 
 
-def get_main_menu_keyboard(lang: str | None = None):
+def get_main_menu_keyboard(user_id: int = None):
     """Get main menu keyboard (translated)."""
     keyboard = [
         [
-            InlineKeyboardButton(i18n.get_text("BUTTON_KUBANEH", lang), callback_data="menu_kubaneh"),
-            InlineKeyboardButton(i18n.get_text("BUTTON_SAMNEH", lang), callback_data="menu_samneh"),
+            InlineKeyboardButton(i18n.get_text("BUTTON_KUBANEH", user_id=user_id), callback_data="menu_kubaneh"),
+            InlineKeyboardButton(i18n.get_text("BUTTON_SAMNEH", user_id=user_id), callback_data="menu_samneh"),
         ],
         [
-            InlineKeyboardButton(i18n.get_text("BUTTON_RED_BISBAS", lang), callback_data="menu_red_bisbas"),
-            InlineKeyboardButton(i18n.get_text("BUTTON_HAWAIIJ_SOUP", lang), callback_data="menu_hawaij_soup"),
+            InlineKeyboardButton(i18n.get_text("BUTTON_RED_BISBAS", user_id=user_id), callback_data="menu_red_bisbas"),
+            InlineKeyboardButton(i18n.get_text("BUTTON_HAWAIIJ_SOUP", user_id=user_id), callback_data="menu_hawaij_soup"),
         ],
         [
-            InlineKeyboardButton(i18n.get_text("BUTTON_HAWAIIJ_COFFEE", lang), callback_data="menu_hawaij_coffee"),
-            InlineKeyboardButton(i18n.get_text("BUTTON_WHITE_COFFEE", lang), callback_data="menu_white_coffee"),
+            InlineKeyboardButton(i18n.get_text("BUTTON_HAWAIIJ_COFFEE", user_id=user_id), callback_data="menu_hawaij_coffee"),
+            InlineKeyboardButton(i18n.get_text("BUTTON_WHITE_COFFEE", user_id=user_id), callback_data="menu_white_coffee"),
         ],
-        [InlineKeyboardButton(i18n.get_text("BUTTON_HILBEH", lang), callback_data="menu_hilbeh")],
-        [InlineKeyboardButton(i18n.get_text("BUTTON_VIEW_CART", lang), callback_data="cart_view")],
-        [InlineKeyboardButton("🏠 Back to Main", callback_data="main_page")],
+        [InlineKeyboardButton(i18n.get_text("BUTTON_HILBEH", user_id=user_id), callback_data="menu_hilbeh")],
+        [InlineKeyboardButton(i18n.get_text("BUTTON_VIEW_CART", user_id=user_id), callback_data="cart_view")],
+        [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="main_page")],
     ]
 
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_kubaneh_menu_keyboard():
+def get_kubaneh_menu_keyboard(user_id: int = None):
     """Get Kubaneh sub-menu keyboard"""
     keyboard = [
         [
-            InlineKeyboardButton(i18n.get_text("KUBANEH_CLASSIC"), callback_data="kubaneh_classic"),
-            InlineKeyboardButton(i18n.get_text("KUBANEH_SEEDED"), callback_data="kubaneh_seeded"),
+            InlineKeyboardButton(i18n.get_text("KUBANEH_CLASSIC", user_id=user_id), callback_data="kubaneh_classic"),
+            InlineKeyboardButton(i18n.get_text("KUBANEH_SEEDED", user_id=user_id), callback_data="kubaneh_seeded"),
         ],
         [
-            InlineKeyboardButton(i18n.get_text("KUBANEH_HERB"), callback_data="kubaneh_herb"),
-            InlineKeyboardButton(i18n.get_text("KUBANEH_AROMATIC"), callback_data="kubaneh_aromatic"),
+            InlineKeyboardButton(i18n.get_text("KUBANEH_HERB", user_id=user_id), callback_data="kubaneh_herb"),
+            InlineKeyboardButton(i18n.get_text("KUBANEH_AROMATIC", user_id=user_id), callback_data="kubaneh_aromatic"),
         ],
-        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU"), callback_data="menu_main")],
+        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")],
     ]
 
     return InlineKeyboardMarkup(keyboard)
@@ -60,20 +60,20 @@ def get_kubaneh_oil_keyboard(kubaneh_type: str):
                 i18n.get_text("OIL_SAMNEH"), callback_data=f"kubaneh_{kubaneh_type}_samneh"
             ),
         ],
-        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU"), callback_data="menu_kubaneh")],
+        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_kubaneh")],
     ]
 
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_samneh_menu_keyboard():
+def get_samneh_menu_keyboard(user_id: int = None):
     """Get Samneh sub-menu keyboard"""
     keyboard = [
         [
-            InlineKeyboardButton(i18n.get_text("SAMNEH_SMOKED"), callback_data="samneh_smoked"),
-            InlineKeyboardButton(i18n.get_text("SAMNEH_NOT_SMOKED"), callback_data="samneh_not_smoked"),
+            InlineKeyboardButton(i18n.get_text("SAMNEH_SMOKED", user_id=user_id), callback_data="samneh_smoked"),
+            InlineKeyboardButton(i18n.get_text("SAMNEH_NOT_SMOKED", user_id=user_id), callback_data="samneh_not_smoked"),
         ],
-        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU"), callback_data="menu_main")],
+        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")],
     ]
 
     return InlineKeyboardMarkup(keyboard)
@@ -83,32 +83,32 @@ def get_samneh_size_keyboard(smoking_type: str):
     """Get Samneh size selection keyboard"""
     keyboard = [
         [
-            InlineKeyboardButton(i18n.get_text("SIZE_SMALL"), callback_data=f"samneh_{smoking_type}_small"),
-            InlineKeyboardButton(i18n.get_text("SIZE_LARGE"), callback_data=f"samneh_{smoking_type}_large"),
+                    InlineKeyboardButton(i18n.get_text("SIZE_SMALL", user_id=user_id), callback_data=f"samneh_{smoking_type}_small"),
+        InlineKeyboardButton(i18n.get_text("SIZE_LARGE", user_id=user_id), callback_data=f"samneh_{smoking_type}_large"),
         ],
-        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU"), callback_data="menu_samneh")],
+        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_samneh")],
     ]
 
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_red_bisbas_menu_keyboard():
+def get_red_bisbas_menu_keyboard(user_id: int = None):
     """Get Red Bisbas menu keyboard"""
     keyboard = [
         [
-            InlineKeyboardButton(i18n.get_text("SIZE_SMALL"), callback_data="red_bisbas_small"),
-            InlineKeyboardButton(i18n.get_text("SIZE_LARGE"), callback_data="red_bisbas_large"),
+            InlineKeyboardButton(i18n.get_text("SIZE_SMALL", user_id=user_id), callback_data="red_bisbas_small"),
+            InlineKeyboardButton(i18n.get_text("SIZE_LARGE", user_id=user_id), callback_data="red_bisbas_large"),
         ],
-        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU"), callback_data="menu_main")],
+        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")],
     ]
 
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_direct_add_keyboard(product_name: str, include_info: bool = True):
+def get_direct_add_keyboard(product_name: str, include_info: bool = True, user_id: int = None):
     """Get direct add-to-cart keyboard."""
     add_button = InlineKeyboardButton(
-        i18n.get_text("ADD_TO_CART"),
+        i18n.get_text("ADD_TO_CART", user_id=user_id),
         callback_data=f"add_{product_name.lower().replace(' ', '_')}",
     )
 
@@ -116,34 +116,34 @@ def get_direct_add_keyboard(product_name: str, include_info: bool = True):
 
     if include_info:
         info_button = InlineKeyboardButton(
-            i18n.get_text("INFO"),
+            i18n.get_text("INFO", user_id=user_id),
             callback_data=f"info_{product_name.lower().replace(' ', '_')}",
         )
         rows.append([info_button])
 
-    rows.append([InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU"), callback_data="menu_main")])
+    rows.append([InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")])
 
     return InlineKeyboardMarkup(rows)
 
 
-def get_hilbeh_menu_keyboard():
+def get_hilbeh_menu_keyboard(user_id: int = None):
     """Get Hilbeh menu keyboard (with availability check)"""
     if is_hilbeh_available():
         keyboard = [
-            [InlineKeyboardButton(i18n.get_text("ADD_TO_CART"), callback_data="add_hilbeh")],
-            [InlineKeyboardButton(i18n.get_text("INFO"), callback_data="info_hilbeh")],
-            [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU"), callback_data="menu_main")],
+            [InlineKeyboardButton(i18n.get_text("ADD_TO_CART", user_id=user_id), callback_data="add_hilbeh")],
+            [InlineKeyboardButton(i18n.get_text("INFO", user_id=user_id), callback_data="info_hilbeh")],
+            [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")],
         ]
     else:
         keyboard = [
             [
                 InlineKeyboardButton(
-                    i18n.get_text("HILBEH_UNAVAILABLE"),
+                    i18n.get_text("HILBEH_UNAVAILABLE", user_id=user_id),
                     callback_data="hilbeh_unavailable",
                 )
             ],
-            [InlineKeyboardButton(i18n.get_text("INFO"), callback_data="info_hilbeh")],
-            [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU"), callback_data="menu_main")],
+            [InlineKeyboardButton(i18n.get_text("INFO", user_id=user_id), callback_data="info_hilbeh")],
+            [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")],
     ]
 
     return InlineKeyboardMarkup(keyboard)
@@ -152,11 +152,11 @@ def get_hilbeh_menu_keyboard():
 def get_cart_keyboard():
     """Get cart view keyboard"""
     keyboard = [
-        [InlineKeyboardButton(i18n.get_text("CHANGE_DELIVERY"), callback_data="cart_change_delivery")],
-        [InlineKeyboardButton(i18n.get_text("SEND_ORDER"), callback_data="cart_send_order")],
+        [InlineKeyboardButton(i18n.get_text("CHANGE_DELIVERY", user_id=user_id), callback_data="cart_change_delivery")],
+        [InlineKeyboardButton(i18n.get_text("SEND_ORDER", user_id=user_id), callback_data="cart_send_order")],
         [
-            InlineKeyboardButton(i18n.get_text("CLEAR_CART"), callback_data="cart_clear_confirm"),
-            InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU"), callback_data="menu_main"),
+            InlineKeyboardButton(i18n.get_text("CLEAR_CART", user_id=user_id), callback_data="cart_clear_confirm"),
+            InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main"),
         ],
     ]
 
@@ -166,9 +166,9 @@ def get_cart_keyboard():
 def get_cart_delivery_method_keyboard():
     """Get delivery method selection keyboard for cart"""
     keyboard = [
-        [InlineKeyboardButton(i18n.get_text("DELIVERY_PICKUP"), callback_data="cart_delivery_pickup")],
-        [InlineKeyboardButton(i18n.get_text("DELIVERY_DELIVERY"), callback_data="cart_delivery_delivery")],
-        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU"), callback_data="cart_view")],
+        [InlineKeyboardButton(i18n.get_text("DELIVERY_PICKUP", user_id=user_id), callback_data="cart_delivery_pickup")],
+        [InlineKeyboardButton(i18n.get_text("DELIVERY_DELIVERY", user_id=user_id), callback_data="cart_delivery_delivery")],
+        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="cart_view")],
     ]
 
     return InlineKeyboardMarkup(keyboard)
@@ -177,8 +177,8 @@ def get_cart_delivery_method_keyboard():
 def get_clear_cart_confirmation_keyboard():
     """Get clear cart confirmation keyboard"""
     keyboard = [
-        [InlineKeyboardButton(i18n.get_text("CLEAR_CART_YES"), callback_data="cart_clear_yes")],
-        [InlineKeyboardButton(i18n.get_text("CLEAR_CART_NO"), callback_data="cart_view")],
+        [InlineKeyboardButton(i18n.get_text("CLEAR_CART_YES", user_id=user_id), callback_data="cart_clear_yes")],
+        [InlineKeyboardButton(i18n.get_text("CLEAR_CART_NO", user_id=user_id), callback_data="cart_view")],
     ]
 
     return InlineKeyboardMarkup(keyboard)
@@ -187,8 +187,8 @@ def get_clear_cart_confirmation_keyboard():
 def get_back_to_cart_keyboard():
     """Get back to cart keyboard"""
     keyboard = [
-        [InlineKeyboardButton(i18n.get_text("BACK_TO_CART"), callback_data="cart_view")],
-        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU"), callback_data="menu_main")],
+        [InlineKeyboardButton(i18n.get_text("BACK_TO_CART", user_id=user_id), callback_data="cart_view")],
+        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")],
     ]
 
     return InlineKeyboardMarkup(keyboard)
