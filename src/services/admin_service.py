@@ -627,4 +627,41 @@ class AdminService:
             "total_orders": total_orders,
             "total_revenue": total_revenue,
             "status_breakdown": status_counts,
-        } 
+        }
+
+    async def get_all_customers(self) -> List[Dict]:
+        """Get all customers for admin dashboard"""
+        try:
+            from src.db.operations import get_all_customers
+            customers = get_all_customers()
+            
+            # Convert to dict format expected by admin handler
+            result = []
+            for customer in customers:
+                result.append({
+                    "customer_id": customer.id,
+                    "telegram_id": customer.telegram_id,
+                    "full_name": customer.full_name,
+                    "phone_number": customer.phone_number,
+                    "delivery_address": customer.delivery_address,
+                    "language": customer.language,
+                    "created_at": customer.created_at,
+                    "total_orders": 0,  # Will be calculated below
+                    "total_spent": 0.0  # Will be calculated below
+                })
+            
+            # Calculate order statistics for each customer
+            orders = get_all_orders()
+            for customer in result:
+                customer_orders = [order for order in orders if order.customer_id == customer["customer_id"]]
+                customer["total_orders"] = len(customer_orders)
+                customer["total_spent"] = sum(order.total for order in customer_orders)
+            
+            # Sort by total spent (most valuable customers first)
+            result.sort(key=lambda x: x["total_spent"], reverse=True)
+            
+            logger.info("Retrieved %d customers", len(result))
+            return result
+        except Exception as e:
+            logger.error("Error getting all customers: %s", e)
+            return [] 

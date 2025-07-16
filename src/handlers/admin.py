@@ -78,6 +78,8 @@ class AdminHandler:
             await self._show_all_orders(query)
         elif data == "admin_completed_orders":
             await self._show_completed_orders(query)
+        elif data == "admin_customers":
+            await self._show_customers(query)
         elif data == "admin_update_status":
             return await self._start_status_update(query)
         elif data == "admin_analytics":
@@ -87,6 +89,9 @@ class AdminHandler:
         elif data.startswith("admin_order_"):
             order_id = int(data.split("_")[-1])
             await self._show_order_details(query, order_id)
+        elif data.startswith("admin_customer_"):
+            customer_id = int(data.split("_")[-1])
+            await self._show_customer_details(query, customer_id)
         elif data.startswith("admin_status_"):
             # Format: admin_status_{order_id}_{new_status}
             parts = data.split("_")
@@ -147,7 +152,10 @@ class AdminHandler:
                         i18n.get_text("ADMIN_COMPLETED_ORDERS", user_id=user_id), callback_data="admin_completed_orders"
                     ),
                 ],
-                [InlineKeyboardButton(i18n.get_text("ADMIN_ANALYTICS", user_id=user_id), callback_data="admin_analytics")],
+                [
+                    InlineKeyboardButton(i18n.get_text("ADMIN_ANALYTICS", user_id=user_id), callback_data="admin_analytics"),
+                    InlineKeyboardButton(i18n.get_text("ADMIN_CUSTOMERS", user_id=user_id), callback_data="admin_customers")
+                ],
             ]
 
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -792,6 +800,106 @@ class AdminHandler:
         except BusinessLogicError as e:
             self.logger.error("💥 COMPLETED ORDERS ERROR: %s", e)
             await query.message.reply_text(i18n.get_text("ALL_ORDERS_ERROR"))
+
+    async def _show_customers(self, query: CallbackQuery) -> None:
+        """Show all customers"""
+        try:
+            customers = await self.admin_service.get_all_customers()
+
+            if not customers:
+                text = i18n.get_text("ADMIN_CUSTOMERS_TITLE", user_id=query.from_user.id) + "\n\n" + i18n.get_text("ADMIN_NO_CUSTOMERS", user_id=query.from_user.id)
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
+                        )
+                    ]
+                ]
+            else:
+                text = f"{i18n.get_text('ADMIN_CUSTOMERS_TITLE', user_id=query.from_user.id)} ({len(customers)})"
+                keyboard = []
+                for customer in customers[:15]:  # Show max 15
+                    customer_summary = f"👤 {customer['full_name']} (ID: {customer['customer_id']})"
+                    keyboard.append(
+                        [
+                            InlineKeyboardButton(
+                                customer_summary,
+                                callback_data=f"admin_customer_{customer['customer_id']}",
+                            )
+                        ]
+                    )
+                keyboard.append(
+                    [
+                        InlineKeyboardButton(
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
+                        )
+                    ]
+                )
+
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await query.edit_message_text(
+                text, parse_mode="HTML", reply_markup=reply_markup
+            )
+
+        except BusinessLogicError as e:
+            self.logger.error("💥 CUSTOMERS ERROR: %s", e)
+            await query.message.reply_text(i18n.get_text("CUSTOMERS_ERROR"))
+
+    async def _show_customer_details(self, query: CallbackQuery, customer_id: int) -> None:
+        """Show details for a specific customer."""
+        try:
+            self.logger.info("📊 SHOWING CUSTOMER DETAILS FOR #%s", customer_id)
+            user_id = query.from_user.id
+            
+            # Get all customers and find the specific one
+            customers = await self.admin_service.get_all_customers()
+            customer = next((c for c in customers if c['customer_id'] == customer_id), None)
+            
+            if not customer:
+                await query.edit_message_text(i18n.get_text("ADMIN_CUSTOMER_NOT_FOUND", user_id=user_id))
+                return
+
+            # Format customer details
+            details = [
+                i18n.get_text("ADMIN_CUSTOMER_DETAILS_TITLE", user_id=user_id).format(name=customer['full_name'], id=customer['customer_id']),
+                i18n.get_text("ADMIN_CUSTOMER_TELEGRAM_ID", user_id=user_id).format(telegram_id=customer['telegram_id']),
+                i18n.get_text("ADMIN_CUSTOMER_PHONE", user_id=user_id).format(phone=customer['phone_number']),
+                i18n.get_text("ADMIN_CUSTOMER_LANGUAGE", user_id=user_id).format(language=customer['language'].upper() if customer['language'] else 'EN'),
+                i18n.get_text("ADMIN_CUSTOMER_JOINED", user_id=user_id).format(
+                    date=customer['created_at'].strftime('%Y-%m-%d %H:%M') if customer['created_at'] else "Unknown"
+                ),
+            ]
+            
+            if customer.get('delivery_address'):
+                details.append(i18n.get_text("ADMIN_CUSTOMER_ADDRESS", user_id=user_id).format(address=customer['delivery_address']))
+            
+            details.extend([
+                "",
+                i18n.get_text("ADMIN_CUSTOMER_STATS", user_id=user_id),
+                i18n.get_text("ADMIN_CUSTOMER_TOTAL_ORDERS", user_id=user_id).format(orders=customer['total_orders']),
+                i18n.get_text("ADMIN_CUSTOMER_TOTAL_SPENT", user_id=user_id).format(amount=customer['total_spent']),
+            ])
+            
+            if customer['total_orders'] > 0:
+                avg_order = customer['total_spent'] / customer['total_orders']
+                details.append(i18n.get_text("ADMIN_CUSTOMER_AVG_ORDER", user_id=user_id).format(avg=avg_order))
+            
+            customer_text = "\n".join(details)
+            
+            # Create keyboard with back button
+            keyboard = [
+                [InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_CUSTOMERS", user_id=user_id), callback_data="admin_customers")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await query.edit_message_text(
+                customer_text, parse_mode="HTML", reply_markup=reply_markup
+            )
+
+        except BusinessLogicError as e:
+            self.logger.error("💥 CUSTOMER DETAILS ERROR: %s", e)
+            await query.message.reply_text(i18n.get_text("CUSTOMER_DETAILS_ERROR"))
 
     async def _show_order_details(self, query: CallbackQuery, order_id: int) -> None:
         """Show details for a specific order."""
