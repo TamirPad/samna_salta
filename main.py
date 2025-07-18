@@ -101,22 +101,6 @@ def setup_bot():
     # Register admin handlers
     register_admin_handlers(application)
     
-    # Text message handler for delivery address input (temporarily disabled)
-    # application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, cart_handler.handle_delivery_address_input))
-    
-    # Simple text handler to debug conversation issues
-    async def debug_text_handler(update, context):
-        try:
-            print(f"🔍 DEBUG: Received text message: '{update.message.text}' from user {update.effective_user.id}")
-            print(f"🔍 DEBUG: Context user_data: {context.user_data}")
-            print(f"🔍 DEBUG: Conversation state: {context.user_data.get('conversation_state', 'None')}")
-        except Exception as e:
-            logger.error(f"Error in debug handler: {e}")
-        return
-    
-    # Add debug handler with lower priority (after conversation handlers)
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, debug_text_handler))
-    
     return application
 
 async def ping_handler(update, context):
@@ -199,53 +183,44 @@ def run_webhook():
         nonlocal application
         if application:
             try:
-                logger.info("Shutting down bot...")
                 await application.stop()
                 await application.shutdown()
+                logger.info("Bot shutdown completed")
             except Exception as e:
                 logger.error(f"Error during shutdown: {e}")
-                # Continue with shutdown even if there are errors
 
     @app.get("/health")
     async def health_check(background_tasks: BackgroundTasks):
-        """Health check endpoint for Render"""
+        """Health check endpoint"""
         try:
-            from src.db.operations import get_database_status
+            # Add health check to background tasks
+            background_tasks.add_task(log_health_check)
             
-            db_status = get_database_status()
-            
-            if db_status["connected"]:
+            if application and application.bot:
                 return {
-                    "status": "ok", 
-                    "message": "Bot is running",
-                    "database": "connected",
-                    "database_type": db_status["database_type"]
+                    "status": "healthy",
+                    "bot": "running",
+                    "timestamp": asyncio.get_event_loop().time()
                 }
             else:
                 return {
-                    "status": "degraded", 
-                    "message": "Bot is running but database is unavailable",
-                    "database": "disconnected",
-                    "database_error": db_status["error"]
+                    "status": "unhealthy",
+                    "bot": "not_initialized",
+                    "timestamp": asyncio.get_event_loop().time()
                 }
         except Exception as e:
-            logger.error(f"Error in health check: {e}")
-            return {
-                "status": "error",
-                "message": "Health check failed",
-                "error": str(e)
-            }
+            logger.error(f"Health check failed: {e}")
+            raise HTTPException(status_code=500, detail="Health check failed")
+
+    async def log_health_check():
+        """Log health check for monitoring"""
+        logger.info("Health check performed")
 
     @app.post("/webhook")
     async def webhook_handler(request: Request):
-        """Handle incoming webhook updates from Telegram"""
-        nonlocal application
-        
-        if not application:
-            raise HTTPException(status_code=503, detail="Bot not initialized")
-        
+        """Handle incoming webhook updates"""
         try:
-            # Get the update data
+            # Get the update from the request
             update_data = await request.json()
             update = Update.de_json(update_data, application.bot)
             
@@ -253,47 +228,30 @@ def run_webhook():
             await application.process_update(update)
             
             return JSONResponse(content={"status": "ok"})
-            
-        except ValueError as e:
-            logger.error(f"Invalid JSON in webhook: {e}")
-            raise HTTPException(status_code=400, detail="Invalid JSON")
         except Exception as e:
-            logger.error(f"Error processing webhook: {e}")
-            raise HTTPException(status_code=500, detail="Internal server error")
+            logger.error(f"Webhook handler error: {e}")
+            raise HTTPException(status_code=500, detail="Webhook processing failed")
 
     @app.get("/")
     async def root():
         """Root endpoint"""
-        try:
-            return {"message": "Samna Salta Bot is running", "status": "active"}
-        except Exception as e:
-            logger.error(f"Error in root endpoint: {e}")
-            return {"message": "Bot is running", "status": "error"}
+        return {
+            "message": "Samna Salta Bot API",
+            "status": "running",
+            "version": "1.0.0"
+        }
 
     # Run the FastAPI app
-    try:
-        port = int(os.getenv("PORT", 8000))
-        uvicorn.run(app, host="0.0.0.0", port=port)
-    except Exception as e:
-        logger.error(f"Failed to start webhook server: {e}")
-        raise
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
 
 def main():
-    """Main entry point - determines mode based on environment"""
-    try:
-        # Check if we should run in webhook mode
-        webhook_url = os.getenv("WEBHOOK_URL")
-        port = os.getenv("PORT")
-        
-        # If WEBHOOK_URL or PORT is set, run in webhook mode (production)
-        if webhook_url or port:
-            run_webhook()
-        else:
-            # Otherwise run in polling mode (local development)
-            run_polling()
-    except Exception as e:
-        logging.getLogger(__name__).error(f"Fatal error in main: {e}")
-        raise
+    """Main entry point"""
+    # Check if we should run in webhook mode
+    if os.getenv("WEBHOOK_MODE", "false").lower() == "true":
+        run_webhook()
+    else:
+        run_polling()
 
 if __name__ == "__main__":
     main() 

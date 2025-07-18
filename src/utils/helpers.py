@@ -11,7 +11,7 @@ from threading import Lock
 from typing import Any, Dict, Generic, Optional, TypeVar, Union
 
 from src.config import get_config
-from src.utils.constants import CacheSettings, SecurityPatterns
+from src.utils.constants import CacheSettings
 
 logger = logging.getLogger(__name__)
 
@@ -151,12 +151,13 @@ def validate_phone_number(phone: str) -> bool:
     sanitized = sanitize_phone_number(phone)
 
     # Check basic Israeli format
-    if not sanitized.startswith(SecurityPatterns.ISRAELI_PHONE_PREFIX) or len(sanitized) != SecurityPatterns.ISRAELI_PHONE_LENGTH:
+    if not sanitized.startswith("+972") or len(sanitized) != 13:
         return False
 
     # Check for valid Israeli mobile prefixes
     mobile_part = sanitized[4:6]
-    return mobile_part in SecurityPatterns.ISRAELI_MOBILE_PREFIXES
+    israeli_mobile_prefixes = ["50", "52", "53", "54", "55", "57", "58"]
+    return mobile_part in israeli_mobile_prefixes
 
 @cached(ttl=3600)  # Cache for 1 hour
 def translate_product_name(product_name: str, options: Optional[dict] = None, user_id: Optional[int] = None) -> str:
@@ -217,18 +218,46 @@ def translate_product_name(product_name: str, options: Optional[dict] = None, us
                 return f"Hilbeh ({hilbeh_type.title()})"
         return i18n.get_text("PRODUCT_HILBEH", user_id=user_id)
     
-    # Handle Hawaij products
-    elif "hawaij" in product_name_lower:
-        if "soup" in product_name_lower:
-            return i18n.get_text("PRODUCT_HAWAIJ_SOUP", user_id=user_id)
-        elif "coffee" in product_name_lower:
-            return i18n.get_text("PRODUCT_HAWAIJ_COFFEE", user_id=user_id)
-        else:
-            return i18n.get_text("PRODUCT_HAWAIJ_SOUP", user_id=user_id)  # Default to soup
-    
-    # Handle White Coffee
-    elif "white coffee" in product_name_lower:
-        return i18n.get_text("PRODUCT_WHITE_COFFEE", user_id=user_id)
-    
-    # Fallback to original product name
-    return product_name
+    # Handle other products
+    else:
+        # Try to find a direct product translation
+        product_key = f"PRODUCT_{product_name.upper().replace(' ', '_')}"
+        try:
+            return i18n.get_text(product_key, user_id=user_id)
+        except:
+            # Fallback to original name
+            return product_name
+
+def format_order_number(order_id: int) -> str:
+    """Format order number for display"""
+    return f"ORD-{order_id:06d}"
+
+def format_datetime(dt: datetime) -> str:
+    """Format datetime for display"""
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+def format_date(dt: datetime) -> str:
+    """Format date for display"""
+    return dt.strftime("%Y-%m-%d")
+
+def format_time(dt: datetime) -> str:
+    """Format time for display"""
+    return dt.strftime("%H:%M")
+
+def calculate_total(items: list[dict]) -> float:
+    """Calculate total price from items list"""
+    return sum(item.get("total_price", 0) for item in items)
+
+def calculate_subtotal(items: list[dict]) -> float:
+    """Calculate subtotal from items list"""
+    return sum(item.get("unit_price", 0) * item.get("quantity", 1) for item in items)
+
+def calculate_delivery_charge(subtotal: float, delivery_method: str) -> float:
+    """Calculate delivery charge based on subtotal and method"""
+    if delivery_method.lower() == "delivery":
+        return 5.0  # Fixed delivery charge
+    return 0.0
+
+def calculate_final_total(subtotal: float, delivery_charge: float) -> float:
+    """Calculate final total including delivery charge"""
+    return subtotal + delivery_charge
