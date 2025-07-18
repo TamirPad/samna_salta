@@ -161,15 +161,23 @@ def run_webhook():
             
             # Set webhook (webhook mode only)
             webhook_url = os.getenv("WEBHOOK_URL")
+            if not webhook_url:
+                # Try to construct webhook URL from Render environment
+                render_url = os.getenv("RENDER_EXTERNAL_URL")
+                if render_url:
+                    webhook_url = render_url
+                    logger.info(f"Using RENDER_EXTERNAL_URL for webhook: {webhook_url}")
+                else:
+                    logger.warning("WEBHOOK_URL not set! Bot will not receive updates.")
+            
             if webhook_url:
                 try:
-                    await application.bot.set_webhook(url=f"{webhook_url}/webhook")
-                    logger.info(f"Webhook set to: {webhook_url}/webhook")
+                    webhook_endpoint = f"{webhook_url}/webhook"
+                    await application.bot.set_webhook(url=webhook_endpoint)
+                    logger.info(f"Webhook set to: {webhook_endpoint}")
                 except Exception as webhook_error:
                     logger.error(f"Failed to set webhook: {webhook_error}")
                     # Continue without webhook - bot will still work
-            else:
-                logger.warning("WEBHOOK_URL not set! Bot will not receive updates.")
             
             logger.info("Bot started successfully!")
             
@@ -243,10 +251,20 @@ def run_webhook():
 
     # Run the FastAPI app
     port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    logger.info(f"Starting FastAPI server on port {port}")
+    try:
+        uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+    except Exception as e:
+        logger.error(f"Failed to start FastAPI server: {e}")
+        raise
 
 def main():
     """Main entry point"""
+    print("🚀 Starting Samna Salta Bot...")
+    print(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
+    print(f"Webhook Mode: {os.getenv('WEBHOOK_MODE', 'false')}")
+    print(f"Port: {os.getenv('PORT', '8000')}")
+    
     # Check if we should run in webhook mode
     if os.getenv("WEBHOOK_MODE", "false").lower() == "true":
         run_webhook()

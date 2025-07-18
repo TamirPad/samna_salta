@@ -5,6 +5,7 @@ services:
     plan: free
     buildCommand: ./render-build.sh
     startCommand: .venv/bin/python main.py
+    healthCheckPath: /health
     preDeployCommand: mkdir -p data
     envVars:
       - key: PYTHON_VERSION
@@ -30,4 +31,6 @@ services:
       - key: HILBEH_AVAILABLE_HOURS
         value: 09:00-18:00
       - key: WEBHOOK_URL
-        sync: false 
+        sync: false
+      - key: WEBHOOK_MODE
+        value: "true" 
