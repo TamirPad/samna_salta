@@ -272,7 +272,7 @@ python test_menu_management.py
 ## Future Enhancements
 
 ### Planned Features
-- **Bulk Operations**: Add/update multiple products at once
+
 - **Image Support**: Add product images to the menu
 - **Pricing History**: Track price changes over time
 - **Inventory Management**: Add stock tracking

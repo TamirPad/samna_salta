@@ -641,11 +641,26 @@ def get_all_products() -> list[Product]:
 
 
 @retry_on_database_error()
-def get_all_products_admin() -> list[Product]:
+def get_all_products_admin() -> list[dict]:
     """Get all products (including inactive) for admin management"""
     session = get_db_session()
     try:
-        return session.query(Product).order_by(Product.category, Product.name).all()
+        products = session.query(Product, MenuCategory.name.label('category_name')).join(MenuCategory).order_by(MenuCategory.name, Product.name).all()
+        
+        result = []
+        for product, category_name in products:
+            result.append({
+                "id": product.id,
+                "name": product.name,
+                "description": product.description,
+                "category": category_name,
+                "price": product.price,
+                "is_active": product.is_active,
+                "created_at": product.created_at,
+                "updated_at": product.updated_at
+            })
+        
+        return result
     finally:
         session.close()
 

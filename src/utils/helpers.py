@@ -261,3 +261,25 @@ def calculate_delivery_charge(subtotal: float, delivery_method: str) -> float:
 def calculate_final_total(subtotal: float, delivery_charge: float) -> float:
     """Calculate final total including delivery charge"""
     return subtotal + delivery_charge
+
+def translate_category_name(category_name: str, user_id: Optional[int] = None) -> str:
+    """Translate category name from database format to localized display name"""
+    from src.utils.i18n import i18n
+    
+    # Map database category names to translation keys
+    category_mapping = {
+        "bread": "CATEGORY_BREAD",
+        "spice": "CATEGORY_SPICE", 
+        "spread": "CATEGORY_SPREAD",
+        "beverage": "CATEGORY_BEVERAGE",
+        "other": "CATEGORY_OTHER"
+    }
+    
+    # Get translation key for category
+    translation_key = category_mapping.get(category_name.lower(), "CATEGORY_OTHER")
+    
+    try:
+        return i18n.get_text(translation_key, user_id=user_id)
+    except:
+        # Fallback to capitalized category name if translation not found
+        return category_name.title()

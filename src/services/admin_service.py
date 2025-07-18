@@ -683,17 +683,18 @@ class AdminService:
         try:
             products = get_all_products_admin()
             
+            # The database function now returns dictionaries directly
             result = []
             for product in products:
                 result.append({
-                    "id": product.id,
-                    "name": product.name,
-                    "description": product.description or "",
-                    "category": product.category or "Uncategorized",
-                    "price": product.price,
-                    "is_active": product.is_active,
-                    "created_at": product.created_at,
-                    "updated_at": product.updated_at
+                    "id": product["id"],
+                    "name": product["name"],
+                    "description": product["description"] or "",
+                    "category": product["category"] or "Uncategorized",
+                    "price": product["price"],
+                    "is_active": product["is_active"],
+                    "created_at": product["created_at"],
+                    "updated_at": product["updated_at"]
                 })
             
             logger.info("Retrieved %d products for admin", len(result))
@@ -875,54 +876,7 @@ class AdminService:
             logger.error("Error getting products by category: %s", e)
             return []
 
-    # Bulk Operations Methods
-    async def bulk_activate_all_products(self) -> Dict:
-        """Activate all inactive products"""
-        try:
-            from src.db.operations import bulk_activate_products
-            result = bulk_activate_products()
-            
-            if result["success"]:
-                logger.info("Bulk activated %d products", result["count"])
-            else:
-                logger.error("Bulk activate failed: %s", result["error"])
-                
-            return result
-        except Exception as e:
-            logger.error("Error in bulk activate: %s", e)
-            return {"success": False, "error": str(e)}
 
-    async def bulk_deactivate_all_products(self) -> Dict:
-        """Deactivate all active products"""
-        try:
-            from src.db.operations import bulk_deactivate_products
-            result = bulk_deactivate_products()
-            
-            if result["success"]:
-                logger.info("Bulk deactivated %d products", result["count"])
-            else:
-                logger.error("Bulk deactivate failed: %s", result["error"])
-                
-            return result
-        except Exception as e:
-            logger.error("Error in bulk deactivate: %s", e)
-            return {"success": False, "error": str(e)}
-
-    async def bulk_delete_inactive_products(self) -> Dict:
-        """Delete all inactive products"""
-        try:
-            from src.db.operations import bulk_delete_inactive_products
-            result = bulk_delete_inactive_products()
-            
-            if result["success"]:
-                logger.info("Bulk deleted %d inactive products", result["count"])
-            else:
-                logger.error("Bulk delete failed: %s", result["error"])
-                
-            return result
-        except Exception as e:
-            logger.error("Error in bulk delete: %s", e)
-            return {"success": False, "error": str(e)}
 
     async def toggle_product_status(self, product_id: int) -> Dict:
         """Toggle product active/inactive status"""

@@ -114,24 +114,25 @@ class AdminHandler:
             await self._update_order_status(query, order_id, new_status, user_id)
         elif data == "admin_menu_management":
             await self._show_menu_management_dashboard(query)
+        elif data == "admin_products_management":
+            await self._show_products_management(query)
         elif data == "admin_view_products":
-            await self._show_product_categories(query)
+            await self._show_all_products(query)
         elif data == "admin_add_product":
             return await self._start_add_product(query)
         elif data == "admin_search_products":
             return await self._start_search_products(query)
         elif data == "admin_remove_products":
             await self._show_remove_products_list(query)
-        elif data == "admin_bulk_operations":
-            await self._show_bulk_operations(query)
-        elif data.startswith("admin_bulk_"):
-            await self._handle_bulk_operation(query, data)
+        
         elif data.startswith("admin_quick_"):
             await self._handle_quick_action(query, data)
         elif data.startswith("admin_product_"):
             await self._handle_product_callback(query, data)
         elif data == "admin_category_management":
             await self._show_category_management(query)
+        elif data == "admin_view_categories":
+            await self._show_all_categories(query)
         elif data == "admin_add_category":
             return await self._start_add_category(query)
         elif data.startswith("admin_edit_category_"):
@@ -1146,32 +1147,21 @@ class AdminHandler:
             categories = await self.admin_service.get_product_categories_list()
             
             text = (
-                i18n.get_text("ADMIN_PRODUCT_MANAGEMENT_SUMMARY", user_id=user_id).format(
+                i18n.get_text("ADMIN_MENU_MANAGEMENT_TITLE", user_id=user_id) + "\n\n" +
+                i18n.get_text("ADMIN_MENU_MANAGEMENT_SUMMARY", user_id=user_id).format(
                     total=total_products,
                     active=active_products,
                     inactive=inactive_products,
                     categories=len(categories)
                 ) + "\n\n" +
-                i18n.get_text("ADMIN_PRODUCT_MANAGEMENT_ACTIONS", user_id=user_id)
+                i18n.get_text("ADMIN_MENU_MANAGEMENT_ACTIONS", user_id=user_id)
             )
             
             keyboard = [
                 [
                     InlineKeyboardButton(
-                        i18n.get_text("ADMIN_PRODUCT_MANAGEMENT_VIEW", user_id=user_id),
-                        callback_data="admin_view_products"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_PRODUCT_MANAGEMENT_ADD", user_id=user_id),
-                        callback_data="admin_add_product"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_PRODUCT_MANAGEMENT_REMOVE", user_id=user_id),
-                        callback_data="admin_remove_products"
+                        i18n.get_text("ADMIN_PRODUCTS_MANAGEMENT", user_id=user_id),
+                        callback_data="admin_products_management"
                     )
                 ],
                 [
@@ -1182,13 +1172,7 @@ class AdminHandler:
                 ],
                 [
                     InlineKeyboardButton(
-                        i18n.get_text("ADMIN_BULK_OPERATIONS", user_id=user_id),
-                        callback_data="admin_bulk_operations"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_PRODUCT_MANAGEMENT_BACK", user_id=user_id),
+                        i18n.get_text("ADMIN_MENU_MANAGEMENT_BACK", user_id=user_id),
                         callback_data="admin_back"
                     )
                 ]
@@ -1199,6 +1183,50 @@ class AdminHandler:
             
         except Exception as e:
             self.logger.error("Error showing menu management dashboard: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
+
+    async def _show_products_management(self, query: CallbackQuery) -> None:
+        """Show products management dashboard"""
+        try:
+            user_id = query.from_user.id
+            products = await self.admin_service.get_all_products_for_admin()
+            
+            text = (
+                i18n.get_text("ADMIN_PRODUCTS_MANAGEMENT_TITLE", user_id=user_id) + "\n\n" +
+                i18n.get_text("ADMIN_PRODUCTS_MANAGEMENT_SUMMARY", user_id=user_id).format(
+                    total=len(products),
+                    active=len([p for p in products if p["is_active"]]),
+                    inactive=len([p for p in products if not p["is_active"]])
+                ) + "\n\n" +
+                i18n.get_text("ADMIN_PRODUCTS_MANAGEMENT_ACTIONS", user_id=user_id)
+            )
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCTS_MANAGEMENT_VIEW", user_id=user_id),
+                        callback_data="admin_view_products"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCTS_MANAGEMENT_ADD", user_id=user_id),
+                        callback_data="admin_add_product"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCTS_MANAGEMENT_BACK", user_id=user_id),
+                        callback_data="admin_menu_management"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+        except Exception as e:
+            self.logger.error("Error showing products management: %s", e)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
 
     async def _show_all_products(self, query: CallbackQuery) -> None:
@@ -1213,7 +1241,7 @@ class AdminHandler:
                     [
                         InlineKeyboardButton(
                             i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
-                            callback_data="admin_menu_management"
+                            callback_data="admin_products_management"
                         )
                     ]
                 ]
@@ -1242,8 +1270,8 @@ class AdminHandler:
                 
                 keyboard.append([
                     InlineKeyboardButton(
-                        i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
-                        callback_data="admin_menu_management"
+                        i18n.get_text("ADMIN_PRODUCT_BACK_TO_PRODUCTS", user_id=user_id),
+                        callback_data="admin_products_management"
                     )
                 ])
             
@@ -1286,9 +1314,13 @@ class AdminHandler:
                 
                 # Add category list
                 for category in categories:
+                    # Translate category name based on user's language
+                    from src.utils.i18n import translate_category_name
+                    translated_category = translate_category_name(category, user_id=user_id)
+                    
                     keyboard.append([
                         InlineKeyboardButton(
-                            f"📂 {category}",
+                            f"📂 {translated_category}",
                             callback_data=f"admin_category_{category}"
                         )
                     ])
@@ -1333,7 +1365,11 @@ class AdminHandler:
                 ]
             else:
                 # Build text with category name and product count
-                text = f"📂 <b>{category}</b>\n\n{i18n.get_text('ADMIN_PRODUCTS_IN_CATEGORY_TITLE', user_id=user_id).format(category=category, count=len(products))}"
+                # Translate category name based on user's language
+                from src.utils.i18n import translate_category_name
+                translated_category = translate_category_name(category, user_id=user_id)
+                
+                text = f"📂 <b>{translated_category}</b>\n\n{i18n.get_text('ADMIN_PRODUCTS_IN_CATEGORY_TITLE', user_id=user_id).format(category=translated_category, count=len(products))}"
                 
                 keyboard = []
                 
@@ -1377,49 +1413,117 @@ class AdminHandler:
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
 
     async def _show_category_management(self, query: CallbackQuery) -> None:
-        """Show category management interface"""
+        """Show category management dashboard"""
         try:
             user_id = query.from_user.id
             categories = await self.admin_service.get_product_categories_list()
             
-            text = i18n.get_text("ADMIN_CATEGORY_MANAGEMENT_TITLE", user_id=user_id) + f"\n\n{i18n.get_text('ADMIN_CATEGORY_TOTAL_COUNT', user_id=user_id).format(count=len(categories))}"
+            # Get total products count for summary
+            products = await self.admin_service.get_all_products_for_admin()
+            total_products = len(products)
             
-            keyboard = []
+            text = (
+                i18n.get_text("ADMIN_CATEGORY_MANAGEMENT_TITLE", user_id=user_id) + "\n\n" +
+                i18n.get_text("ADMIN_CATEGORY_MANAGEMENT_SUMMARY", user_id=user_id).format(
+                    total=len(categories),
+                    products=total_products
+                ) + "\n\n" +
+                i18n.get_text("ADMIN_CATEGORY_MANAGEMENT_ACTIONS", user_id=user_id)
+            )
             
-            # Add category list with edit/delete options
-            for category in categories:
-                # Get all products in category (including inactive ones) for accurate count
-                from src.db.operations import get_all_products_by_category
-                products = get_all_products_by_category(category)
-                product_count = len(products)
-                
-                keyboard.append([
+            keyboard = [
+                [
                     InlineKeyboardButton(
-                        f"📂 {category} ({product_count})",
-                        callback_data=f"admin_edit_category_{category}"
+                        i18n.get_text("ADMIN_CATEGORY_MANAGEMENT_VIEW", user_id=user_id),
+                        callback_data="admin_view_categories"
                     )
-                ])
-            
-            # Add action buttons
-            keyboard.append([
-                InlineKeyboardButton(
-                    i18n.get_text("ADMIN_CATEGORY_ADD_NEW", user_id=user_id),
-                    callback_data="admin_add_category"
-                )
-            ])
-            
-            keyboard.append([
-                InlineKeyboardButton(
-                    i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
-                    callback_data="admin_menu_management"
-                )
-            ])
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_CATEGORY_MANAGEMENT_ADD", user_id=user_id),
+                        callback_data="admin_add_category"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_CATEGORY_MANAGEMENT_BACK", user_id=user_id),
+                        callback_data="admin_menu_management"
+                    )
+                ]
+            ]
             
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
             
         except Exception as e:
             self.logger.error("Error showing category management: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
+
+    async def _show_all_categories(self, query: CallbackQuery) -> None:
+        """Show all categories for admin management"""
+        try:
+            user_id = query.from_user.id
+            categories = await self.admin_service.get_product_categories_list()
+            
+            if not categories:
+                text = i18n.get_text("ADMIN_NO_CATEGORIES", user_id=user_id)
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            i18n.get_text("ADMIN_CATEGORY_BACK_TO_MANAGEMENT", user_id=user_id),
+                            callback_data="admin_category_management"
+                        )
+                    ]
+                ]
+            else:
+                # Build text with category count
+                text = i18n.get_text("ADMIN_CATEGORIES_TITLE", user_id=user_id) + f"\n\n{i18n.get_text('ADMIN_CATEGORY_TOTAL_COUNT', user_id=user_id).format(count=len(categories))}"
+                
+                keyboard = []
+                
+                # Add category list with product counts
+                for category in categories:
+                    # Get all products in category (including inactive ones) for accurate count
+                    from src.db.operations import get_all_products_by_category
+                    products = get_all_products_by_category(category)
+                    product_count = len(products)
+                    
+                    # Translate category name based on user's language
+                    from src.utils.i18n import translate_category_name
+                    translated_category = translate_category_name(category, user_id=user_id)
+                    
+                    category_text = i18n.get_text("ADMIN_CATEGORY_BUTTON_FORMAT", user_id=user_id).format(
+                        name=translated_category,
+                        count=product_count
+                    )
+                    
+                    keyboard.append([
+                        InlineKeyboardButton(
+                            category_text,
+                            callback_data=f"admin_edit_category_{category}"
+                        )
+                    ])
+                
+                keyboard.append([
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_CATEGORY_BACK_TO_MANAGEMENT", user_id=user_id),
+                        callback_data="admin_category_management"
+                    )
+                ])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            try:
+                await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            except Exception as edit_error:
+                if "Message is not modified" in str(edit_error):
+                    # Message content is identical, just answer the callback
+                    await query.answer()
+                else:
+                    # Re-raise other errors
+                    raise edit_error
+            
+        except Exception as e:
+            self.logger.error("Error showing all categories: %s", e)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
 
     async def _show_edit_category(self, query: CallbackQuery, category: str) -> None:
@@ -1431,7 +1535,11 @@ class AdminHandler:
             products = get_all_products_by_category(category)
             product_count = len(products)
             
-            text = i18n.get_text("ADMIN_CATEGORY_EDIT_TITLE", user_id=user_id).format(category=category, count=product_count)
+            # Translate category name based on user's language
+            from src.utils.i18n import translate_category_name
+            translated_category = translate_category_name(category, user_id=user_id)
+            
+            text = i18n.get_text("ADMIN_CATEGORY_EDIT_TITLE", user_id=user_id).format(category=translated_category, count=product_count)
             
             keyboard = [
                 [
@@ -1448,8 +1556,8 @@ class AdminHandler:
                 ],
                 [
                     InlineKeyboardButton(
-                        i18n.get_text("ADMIN_CATEGORY_BACK", user_id=user_id),
-                        callback_data="admin_category_management"
+                        i18n.get_text("ADMIN_CATEGORY_BACK_TO_LIST", user_id=user_id),
+                        callback_data="admin_view_categories"
                     )
                 ]
             ]
@@ -1517,8 +1625,8 @@ class AdminHandler:
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_CATEGORY_BACK", user_id=user_id),
-                            callback_data="admin_category_management"
+                            i18n.get_text("ADMIN_CATEGORY_BACK_TO_LIST", user_id=user_id),
+                            callback_data="admin_view_categories"
                         )
                     ]
                 ]
@@ -1598,8 +1706,8 @@ class AdminHandler:
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_CATEGORY_BACK", user_id=user_id),
-                            callback_data="admin_category_management"
+                            i18n.get_text("ADMIN_CATEGORY_BACK_TO_LIST", user_id=user_id),
+                            callback_data="admin_view_categories"
                         )
                     ]
                 ]
@@ -1631,12 +1739,16 @@ class AdminHandler:
             
             self.logger.info(f"Found {product_count} products in category '{category}'")
             
+            # Translate category name based on user's language
+            from src.utils.i18n import translate_category_name
+            translated_category = translate_category_name(category, user_id=user_id)
+            
             if product_count > 0:
                 text = i18n.get_text("ADMIN_CATEGORY_DELETE_WITH_PRODUCTS", user_id=user_id).format(
-                    category=category, count=product_count
+                    category=translated_category, count=product_count
                 )
             else:
-                text = i18n.get_text("ADMIN_CATEGORY_DELETE_CONFIRM", user_id=user_id).format(category=category)
+                text = i18n.get_text("ADMIN_CATEGORY_DELETE_CONFIRM", user_id=user_id).format(category=translated_category)
             
             keyboard = [
                 [
@@ -1673,8 +1785,8 @@ class AdminHandler:
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_CATEGORY_BACK", user_id=user_id),
-                            callback_data="admin_category_management"
+                            i18n.get_text("ADMIN_CATEGORY_BACK_TO_LIST", user_id=user_id),
+                            callback_data="admin_view_categories"
                         )
                     ]
                 ]
@@ -2156,7 +2268,7 @@ class AdminHandler:
             elif data == "admin_product_back_to_list":
                 await self._show_all_products(query)
             elif data == "admin_product_back_to_management":
-                await self._show_menu_management_dashboard(query)
+                await self._show_products_management(query)
             elif data == "admin_product_yes_delete":
                 # Handle delete confirmation
                 context = query.data.split("_")[-1] if "_" in query.data else None
@@ -2194,11 +2306,15 @@ class AdminHandler:
             
             status_text = i18n.get_text("ADMIN_PRODUCT_ACTIVE", user_id=user_id) if product["is_active"] else i18n.get_text("ADMIN_PRODUCT_INACTIVE", user_id=user_id)
             
+            # Translate category name based on user's language
+            from src.utils.i18n import translate_category_name
+            translated_category = translate_category_name(product["category"], user_id=user_id)
+            
             text = (
                 i18n.get_text("ADMIN_PRODUCT_DETAILS", user_id=user_id) + "\n\n" +
                 i18n.get_text("ADMIN_PRODUCT_NAME", user_id=user_id).format(name=product["name"]) + "\n" +
                 i18n.get_text("ADMIN_PRODUCT_DESCRIPTION", user_id=user_id).format(description=product["description"]) + "\n" +
-                i18n.get_text("ADMIN_PRODUCT_CATEGORY", user_id=user_id).format(category=product["category"]) + "\n" +
+                i18n.get_text("ADMIN_PRODUCT_CATEGORY", user_id=user_id).format(category=translated_category) + "\n" +
                 i18n.get_text("ADMIN_PRODUCT_PRICE", user_id=user_id).format(price=product["price"]) + "\n" +
                 i18n.get_text("ADMIN_PRODUCT_STATUS", user_id=user_id).format(status=status_text) + "\n" +
                 i18n.get_text("ADMIN_PRODUCT_CREATED", user_id=user_id).format(created_at=product["created_at"].strftime("%Y-%m-%d %H:%M"))
@@ -2476,89 +2592,7 @@ class AdminHandler:
             self.logger.error("Error showing remove products list: %s", e)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
 
-    async def _show_bulk_operations(self, query: CallbackQuery) -> None:
-        """Show bulk operations menu"""
-        try:
-            user_id = query.from_user.id
-            text = i18n.get_text("ADMIN_BULK_OPERATIONS_TITLE", user_id=user_id)
-            
-            keyboard = [
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_BULK_ACTIVATE_ALL", user_id=user_id),
-                        callback_data="admin_bulk_activate_all"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_BULK_DEACTIVATE_ALL", user_id=user_id),
-                        callback_data="admin_bulk_deactivate_all"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_BULK_DELETE_INACTIVE", user_id=user_id),
-                        callback_data="admin_bulk_delete_inactive"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
-                        callback_data="admin_menu_management"
-                    )
-                ]
-            ]
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
-            
-        except Exception as e:
-            self.logger.error("Error showing bulk operations: %s", e)
-            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
 
-    async def _handle_bulk_operation(self, query: CallbackQuery, data: str) -> None:
-        """Handle bulk operations"""
-        try:
-            user_id = query.from_user.id
-            
-            if data == "admin_bulk_activate_all":
-                result = await self.admin_service.bulk_activate_all_products()
-                if result["success"]:
-                    text = i18n.get_text("ADMIN_BULK_ACTIVATE_SUCCESS", user_id=user_id).format(count=result["count"])
-                else:
-                    text = i18n.get_text("ADMIN_BULK_ACTIVATE_ERROR", user_id=user_id).format(error=result["error"])
-                    
-            elif data == "admin_bulk_deactivate_all":
-                result = await self.admin_service.bulk_deactivate_all_products()
-                if result["success"]:
-                    text = i18n.get_text("ADMIN_BULK_DEACTIVATE_SUCCESS", user_id=user_id).format(count=result["count"])
-                else:
-                    text = i18n.get_text("ADMIN_BULK_DEACTIVATE_ERROR", user_id=user_id).format(error=result["error"])
-                    
-            elif data == "admin_bulk_delete_inactive":
-                result = await self.admin_service.bulk_delete_inactive_products()
-                if result["success"]:
-                    text = i18n.get_text("ADMIN_BULK_DELETE_SUCCESS", user_id=user_id).format(count=result["count"])
-                else:
-                    text = i18n.get_text("ADMIN_BULK_DELETE_ERROR", user_id=user_id).format(error=result["error"])
-            else:
-                text = i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id)
-            
-            keyboard = [
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
-                        callback_data="admin_menu_management"
-                    )
-                ]
-            ]
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
-            
-        except Exception as e:
-            self.logger.error("Error handling bulk operation: %s", e)
-            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
 
     async def _handle_quick_action(self, query: CallbackQuery, data: str) -> None:
         """Handle quick actions for products"""

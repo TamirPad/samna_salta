@@ -6,6 +6,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from src.utils.helpers import is_hilbeh_available
 from src.utils.i18n import i18n
+from src.utils.helpers import translate_category_name
 from src.keyboards.order_keyboards import get_delivery_method_keyboard
 from src.db.operations import get_all_products, get_products_by_category
 
@@ -41,8 +42,9 @@ def get_dynamic_main_menu_keyboard(user_id: int = None):
             # Add category buttons (max 2 per row)
             row = []
             for category, category_products in categories.items():
-                # Create category button with product count
-                button_text = f"📂 {category.title()} ({len(category_products)})"
+                # Create category button with product count using translated category name
+                translated_category = translate_category_name(category, user_id)
+                button_text = f"📂 {translated_category} ({len(category_products)})"
                 callback_data = f"category_{category}"
                 
                 row.append(InlineKeyboardButton(button_text, callback_data=callback_data))

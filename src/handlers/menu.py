@@ -21,6 +21,7 @@ from src.keyboards.menu_keyboards import (
     get_search_results_keyboard,
 )
 from src.utils.i18n import i18n
+from src.utils.helpers import translate_category_name
 from src.utils.constants import CallbackPatterns, ErrorMessages
 
 logger = logging.getLogger(__name__)
@@ -193,7 +194,7 @@ class MenuHandler:
             products = get_products_by_category(category)
             
             if not products:
-                text = i18n.get_text("CATEGORY_EMPTY", user_id=user_id).format(category=category)
+                text = i18n.get_text("CATEGORY_EMPTY", user_id=user_id).format(category=translate_category_name(category, user_id))
                 keyboard = [
                     [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")]
                 ]
@@ -202,7 +203,7 @@ class MenuHandler:
                 return
             
             text = i18n.get_text("CATEGORY_TITLE", user_id=user_id).format(
-                category=category, count=len(products)
+                category=translate_category_name(category, user_id), count=len(products)
             )
             reply_markup = get_category_menu_keyboard(category, user_id)
             await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
@@ -232,7 +233,7 @@ class MenuHandler:
             text = i18n.get_text("PRODUCT_DETAILS_TITLE", user_id=user_id).format(name=product.name)
             text += f"\n\n📄 <b>{i18n.get_text('PRODUCT_DESCRIPTION', user_id=user_id)}:</b>\n{product.description or i18n.get_text('NO_DESCRIPTION', user_id=user_id)}"
             text += f"\n\n💰 <b>{i18n.get_text('PRODUCT_PRICE', user_id=user_id)}:</b> ₪{product.price:.2f}"
-            text += f"\n📂 <b>{i18n.get_text('PRODUCT_CATEGORY', user_id=user_id)}:</b> {product.category or i18n.get_text('UNCATEGORIZED', user_id=user_id)}"
+            text += f"\n📂 <b>{i18n.get_text('PRODUCT_CATEGORY', user_id=user_id)}:</b> {translate_category_name(product.category, user_id) if product.category else i18n.get_text('UNCATEGORIZED', user_id=user_id)}"
             
             # Create keyboard with add to cart and back options
             keyboard = [
@@ -248,7 +249,7 @@ class MenuHandler:
             if product.category:
                 keyboard.append([
                     InlineKeyboardButton(
-                        i18n.get_text("BACK_TO_CATEGORY", user_id=user_id).format(category=product.category.title()),
+                        i18n.get_text("BACK_TO_CATEGORY", user_id=user_id).format(category=translate_category_name(product.category, user_id)),
                         callback_data=f"category_{product.category}"
                     )
                 ])
