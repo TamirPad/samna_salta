@@ -7,6 +7,99 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from src.utils.helpers import is_hilbeh_available
 from src.utils.i18n import i18n
 from src.keyboards.order_keyboards import get_delivery_method_keyboard
+from src.db.operations import get_all_products, get_products_by_category
+
+
+def get_dynamic_main_menu_keyboard(user_id: int = None):
+    """Get dynamic main menu keyboard that shows categories first."""
+    try:
+        # Get all active products from database
+        products = get_all_products()
+        
+        if not products:
+            # Fallback to static menu if no products found
+            return get_main_menu_keyboard(user_id)
+        
+        # Group products by category
+        categories = {}
+        for product in products:
+            category = product.category or "other"
+            if category not in categories:
+                categories[category] = []
+            categories[category].append(product)
+        
+        # Build keyboard with only category buttons
+        keyboard = []
+        
+        # Add category buttons (max 2 per row)
+        row = []
+        for category, category_products in categories.items():
+            # Create category button with product count
+            button_text = f"📂 {category.title()} ({len(category_products)})"
+            callback_data = f"category_{category}"
+            
+            row.append(InlineKeyboardButton(button_text, callback_data=callback_data))
+            
+            # Add row when we have 2 categories or it's the last category
+            if len(row) == 2 or category == list(categories.keys())[-1]:
+                keyboard.append(row)
+                row = []
+        
+        # Add standard action buttons
+        keyboard.append([InlineKeyboardButton(i18n.get_text("BUTTON_VIEW_CART", user_id=user_id), callback_data="cart_view")])
+        keyboard.append([InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="main_page")])
+        
+        return InlineKeyboardMarkup(keyboard)
+        
+    except Exception as e:
+        # Fallback to static menu if there's an error
+        print(f"Error creating dynamic menu: {e}")
+        return get_main_menu_keyboard(user_id)
+
+
+def get_category_menu_keyboard(category: str, user_id: int = None):
+    """Get menu keyboard for a specific category."""
+    try:
+        products = get_products_by_category(category)
+        
+        if not products:
+            # Return to main menu if no products in category
+            keyboard = [
+                [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")]
+            ]
+            return InlineKeyboardMarkup(keyboard)
+        
+        keyboard = []
+        
+        # Add category header (text only, not clickable)
+        # Note: We can't add plain text to keyboard, so we'll skip the header
+        # The category name will be shown in the message text instead
+        
+        # Add product buttons (max 2 per row)
+        row = []
+        for product in products:
+            # Cleaner product button format
+            button_text = f"{product.name}\n₪{product.price:.2f}"
+            callback_data = f"product_{product.id}"
+            
+            row.append(InlineKeyboardButton(button_text, callback_data=callback_data))
+            
+            if len(row) == 2 or product == products[-1]:
+                keyboard.append(row)
+                row = []
+        
+        # Add action buttons
+        keyboard.append([InlineKeyboardButton(i18n.get_text("BUTTON_VIEW_CART", user_id=user_id), callback_data="cart_view")])
+        keyboard.append([InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")])
+        
+        return InlineKeyboardMarkup(keyboard)
+        
+    except Exception as e:
+        print(f"Error creating category menu: {e}")
+        keyboard = [
+            [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")]
+        ]
+        return InlineKeyboardMarkup(keyboard)
 
 
 def get_main_menu_keyboard(user_id: int = None):

@@ -17,7 +17,7 @@ from src.config import get_config
 from src.db.operations import init_db, init_default_products
 from src.container import get_container
 from src.handlers.start import start_handler, OnboardingHandler, register_start_handlers
-from src.handlers.menu import menu_handler
+from src.handlers.menu import MenuHandler
 from src.handlers.cart import CartHandler
 from src.handlers.admin import register_admin_handlers
 from src.utils.logger import ProductionLogger
@@ -73,11 +73,17 @@ def setup_bot():
     application.add_handler(CallbackQueryHandler(onboarding_handler.handle_main_page_callback, pattern="^customer_order_"))
     
     # Menu handlers
-    application.add_handler(CallbackQueryHandler(menu_handler, pattern="^menu_"))
+    menu_handler_instance = MenuHandler()
+    application.add_handler(CallbackQueryHandler(menu_handler_instance.handle_menu_callback, pattern="^menu_"))
+    
+    # Dynamic menu handlers (for new product system)
+    application.add_handler(CallbackQueryHandler(menu_handler_instance.handle_menu_callback, pattern="^category_"))
+    application.add_handler(CallbackQueryHandler(menu_handler_instance.handle_menu_callback, pattern="^product_"))
     
     # Cart handlers
     cart_handler = CartHandler()
     application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^add_"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^add_product_"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^(kubaneh_|samneh_|red_bisbas_|hawaij_coffee_spice|white_coffee)"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_view_cart, pattern="^cart_view"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart_confirmation, pattern="^cart_clear_confirm"))
@@ -87,11 +93,21 @@ def setup_bot():
     application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_method, pattern="^delivery_"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_confirm_order, pattern="^confirm_order"))
     
-    # Text message handler for delivery address input
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, cart_handler.handle_delivery_address_input))
-    
     # Register admin handlers
     register_admin_handlers(application)
+    
+    # Text message handler for delivery address input (temporarily disabled)
+    # application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, cart_handler.handle_delivery_address_input))
+    
+    # Simple text handler to debug conversation issues
+    async def debug_text_handler(update, context):
+        print(f"🔍 DEBUG: Received text message: '{update.message.text}' from user {update.effective_user.id}")
+        print(f"🔍 DEBUG: Context user_data: {context.user_data}")
+        print(f"🔍 DEBUG: Conversation state: {context.user_data.get('conversation_state', 'None')}")
+        return
+    
+    # Add debug handler with lower priority (after conversation handlers)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, debug_text_handler))
     
     return application
 

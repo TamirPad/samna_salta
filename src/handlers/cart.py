@@ -6,13 +6,17 @@ import logging
 from typing import Dict, Any
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, filters
 
 from src.container import get_container
 from src.utils.i18n import i18n
 from src.utils.error_handler import handle_error
 
 logger = logging.getLogger(__name__)
+
+
+def expecting_delivery_address_filter(update, context):
+    return bool(context.user_data.get('expecting_delivery_address'))
 
 
 class CartHandler:
@@ -351,7 +355,7 @@ class CartHandler:
             await handle_error(update, e, "delivery address choice")
 
     async def handle_delivery_address_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle delivery address text input"""
+        self.logger.info(f"[DEBUG] handle_delivery_address_input called for user {update.effective_user.id} with text: {getattr(update.message, 'text', None)}")
         try:
             user_id = update.effective_user.id
             
@@ -474,6 +478,19 @@ class CartHandler:
     def _parse_product_from_callback(self, callback_data: str) -> Dict[str, Any]:
         """Parse product information from callback data"""
         try:
+            # Handle new dynamic product pattern
+            if callback_data.startswith("add_product_"):
+                product_id = int(callback_data.replace("add_product_", ""))
+                # Get product from database
+                from src.db.operations import get_product_by_id
+                product = get_product_by_id(product_id)
+                if product:
+                    return {
+                        "product_id": product.id,
+                        "display_name": product.name,
+                        "options": {}
+                    }
+            
             # Handle different callback patterns
             if callback_data.startswith("add_"):
                 # Extract product info from callback data

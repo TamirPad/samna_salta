@@ -8,7 +8,18 @@ from datetime import datetime, date, timedelta
 from collections import defaultdict, Counter
 from dataclasses import dataclass
 
-from src.db.operations import get_all_orders, update_order_status
+from src.db.operations import (
+    get_all_orders, 
+    update_order_status, 
+    get_all_products_admin,
+    create_product,
+    update_product,
+    delete_product,
+    get_product_categories,
+    get_products_by_category,
+    search_products,
+    get_product_by_id
+)
 from src.db.models import Order
 
 logger = logging.getLogger(__name__)
@@ -664,4 +675,314 @@ class AdminService:
             return result
         except Exception as e:
             logger.error("Error getting all customers: %s", e)
-            return [] 
+            return []
+
+    # Menu Management Methods
+    async def get_all_products_for_admin(self) -> List[Dict]:
+        """Get all products (including inactive) for admin management"""
+        try:
+            products = get_all_products_admin()
+            
+            result = []
+            for product in products:
+                result.append({
+                    "id": product.id,
+                    "name": product.name,
+                    "description": product.description or "",
+                    "category": product.category or "Uncategorized",
+                    "price": product.price,
+                    "is_active": product.is_active,
+                    "created_at": product.created_at,
+                    "updated_at": product.updated_at
+                })
+            
+            logger.info("Retrieved %d products for admin", len(result))
+            return result
+        except Exception as e:
+            logger.error("Error getting products for admin: %s", e)
+            return []
+
+    async def create_new_product(self, name: str, description: str, category: str, price: float) -> Dict:
+        """Create a new product"""
+        try:
+            # Validate inputs
+            if not name or len(name.strip()) < 2:
+                return {"success": False, "error": "Product name must be at least 2 characters long"}
+            
+            if price <= 0:
+                return {"success": False, "error": "Price must be greater than 0"}
+            
+            if not category or len(category.strip()) < 2:
+                return {"success": False, "error": "Category must be at least 2 characters long"}
+            
+            # Create product
+            product = create_product(
+                name=name.strip(),
+                description=description.strip(),
+                category=category.strip(),
+                price=price
+            )
+            
+            if product:
+                logger.info("Successfully created product: %s", name)
+                return {
+                    "success": True,
+                    "product": {
+                        "id": product.id,
+                        "name": product.name,
+                        "description": product.description,
+                        "category": product.category,
+                        "price": product.price,
+                        "is_active": product.is_active
+                    }
+                }
+            else:
+                return {"success": False, "error": "Product with this name already exists"}
+                
+        except Exception as e:
+            logger.error("Error creating product: %s", e)
+            return {"success": False, "error": f"Failed to create product: {str(e)}"}
+
+    async def update_existing_product(self, product_id: int, **kwargs) -> Dict:
+        """Update an existing product"""
+        try:
+            # Validate product exists
+            product = get_product_by_id(product_id)
+            if not product:
+                return {"success": False, "error": "Product not found"}
+            
+            # Validate inputs
+            if "name" in kwargs and (not kwargs["name"] or len(kwargs["name"].strip()) < 2):
+                return {"success": False, "error": "Product name must be at least 2 characters long"}
+            
+            if "price" in kwargs and kwargs["price"] <= 0:
+                return {"success": False, "error": "Price must be greater than 0"}
+            
+            if "category" in kwargs and (not kwargs["category"] or len(kwargs["category"].strip()) < 2):
+                return {"success": False, "error": "Category must be at least 2 characters long"}
+            
+            # Clean up string inputs
+            if "name" in kwargs:
+                kwargs["name"] = kwargs["name"].strip()
+            if "description" in kwargs:
+                kwargs["description"] = kwargs["description"].strip()
+            if "category" in kwargs:
+                kwargs["category"] = kwargs["category"].strip()
+            
+            # Update product
+            success = update_product(product_id, **kwargs)
+            
+            if success:
+                # Get updated product
+                updated_product = get_product_by_id(product_id)
+                logger.info("Successfully updated product ID %d", product_id)
+                return {
+                    "success": True,
+                    "product": {
+                        "id": updated_product.id,
+                        "name": updated_product.name,
+                        "description": updated_product.description,
+                        "category": updated_product.category,
+                        "price": updated_product.price,
+                        "is_active": updated_product.is_active
+                    }
+                }
+            else:
+                return {"success": False, "error": "Failed to update product"}
+                
+        except Exception as e:
+            logger.error("Error updating product ID %d: %s", product_id, e)
+            return {"success": False, "error": f"Failed to update product: {str(e)}"}
+
+    async def delete_existing_product(self, product_id: int) -> Dict:
+        """Soft delete a product (set is_active to False)"""
+        try:
+            # Validate product exists
+            product = get_product_by_id(product_id)
+            if not product:
+                return {"success": False, "error": "Product not found"}
+            
+            # Soft delete product
+            success = delete_product(product_id)
+            
+            if success:
+                logger.info("Successfully deleted product ID %d: %s", product_id, product.name)
+                return {
+                    "success": True,
+                    "message": f"Product '{product.name}' has been deactivated"
+                }
+            else:
+                return {"success": False, "error": "Failed to delete product"}
+                
+        except Exception as e:
+            logger.error("Error deleting product ID %d: %s", product_id, e)
+            return {"success": False, "error": f"Failed to delete product: {str(e)}"}
+
+    async def get_product_categories_list(self) -> List[str]:
+        """Get all unique product categories"""
+        try:
+            categories = get_product_categories()
+            logger.info("Retrieved %d product categories", len(categories))
+            return categories
+        except Exception as e:
+            logger.error("Error getting product categories: %s", e)
+            return []
+
+    async def search_products_admin(self, search_term: str) -> List[Dict]:
+        """Search products by name or description"""
+        try:
+            if not search_term or len(search_term.strip()) < 2:
+                return []
+            
+            products = search_products(search_term.strip())
+            
+            result = []
+            for product in products:
+                result.append({
+                    "id": product.id,
+                    "name": product.name,
+                    "description": product.description or "",
+                    "category": product.category or "Uncategorized",
+                    "price": product.price,
+                    "is_active": product.is_active
+                })
+            
+            logger.info("Found %d products matching '%s'", len(result), search_term)
+            return result
+        except Exception as e:
+            logger.error("Error searching products: %s", e)
+            return []
+
+    async def get_products_by_category_admin(self, category: str) -> List[Dict]:
+        """Get all products in a specific category"""
+        try:
+            products = get_products_by_category(category)
+            
+            result = []
+            for product in products:
+                result.append({
+                    "id": product.id,
+                    "name": product.name,
+                    "description": product.description or "",
+                    "category": product.category or "Uncategorized",
+                    "price": product.price,
+                    "is_active": product.is_active
+                })
+            
+            logger.info("Retrieved %d products in category '%s'", len(result), category)
+            return result
+        except Exception as e:
+            logger.error("Error getting products by category: %s", e)
+            return []
+
+    # Category Management Methods
+    async def create_category(self, category_name: str) -> Dict:
+        """Create a new category"""
+        try:
+            # Validate input
+            if not category_name or len(category_name.strip()) < 2:
+                return {"success": False, "error": "Category name must be at least 2 characters long"}
+            
+            # Check if category already exists
+            existing_categories = get_product_categories()
+            if category_name.lower() in [cat.lower() for cat in existing_categories]:
+                return {"success": False, "error": f"Category '{category_name}' already exists"}
+            
+            # For now, we'll create a dummy product with this category to establish it
+            # In a real implementation, you might want a separate categories table
+            dummy_product = create_product(
+                name=f"Category: {category_name}",
+                description=f"Category placeholder for {category_name}",
+                category=category_name.strip(),
+                price=0.01
+            )
+            
+            if dummy_product:
+                # Immediately deactivate the dummy product
+                update_product(dummy_product.id, is_active=False)
+                logger.info("Successfully created category: %s", category_name)
+                return {
+                    "success": True,
+                    "category": category_name.strip(),
+                    "message": f"Category '{category_name}' created successfully"
+                }
+            else:
+                return {"success": False, "error": "Failed to create category"}
+                
+        except Exception as e:
+            logger.error("Error creating category: %s", e)
+            return {"success": False, "error": f"Failed to create category: {str(e)}"}
+
+    async def update_category(self, old_category: str, new_category: str) -> Dict:
+        """Update a category name"""
+        try:
+            # Validate inputs
+            if not new_category or len(new_category.strip()) < 2:
+                return {"success": False, "error": "Category name must be at least 2 characters long"}
+            
+            # Check if new category name already exists
+            existing_categories = get_product_categories()
+            if new_category.lower() in [cat.lower() for cat in existing_categories if cat != old_category]:
+                return {"success": False, "error": f"Category '{new_category}' already exists"}
+            
+            # Get all products in the old category
+            products = get_products_by_category(old_category)
+            
+            if not products:
+                return {"success": False, "error": f"No products found in category '{old_category}'"}
+            
+            # Update all products in the category
+            updated_count = 0
+            for product in products:
+                success = update_product(product.id, category=new_category.strip())
+                if success:
+                    updated_count += 1
+            
+            if updated_count > 0:
+                logger.info("Successfully updated category from '%s' to '%s' (%d products)", 
+                          old_category, new_category, updated_count)
+                return {
+                    "success": True,
+                    "old_category": old_category,
+                    "new_category": new_category.strip(),
+                    "updated_products": updated_count,
+                    "message": f"Category updated from '{old_category}' to '{new_category}' ({updated_count} products)"
+                }
+            else:
+                return {"success": False, "error": "Failed to update any products"}
+                
+        except Exception as e:
+            logger.error("Error updating category from '%s' to '%s': %s", old_category, new_category, e)
+            return {"success": False, "error": f"Failed to update category: {str(e)}"}
+
+    async def delete_category(self, category: str) -> Dict:
+        """Delete a category (deactivate all products in it)"""
+        try:
+            # Get all products in the category
+            products = get_products_by_category(category)
+            
+            if not products:
+                return {"success": False, "error": f"No products found in category '{category}'"}
+            
+            # Deactivate all products in the category
+            deactivated_count = 0
+            for product in products:
+                success = update_product(product.id, is_active=False)
+                if success:
+                    deactivated_count += 1
+            
+            if deactivated_count > 0:
+                logger.info("Successfully deleted category '%s' (%d products deactivated)", 
+                          category, deactivated_count)
+                return {
+                    "success": True,
+                    "category": category,
+                    "deactivated_products": deactivated_count,
+                    "message": f"Category '{category}' deleted ({deactivated_count} products deactivated)"
+                }
+            else:
+                return {"success": False, "error": "Failed to deactivate any products"}
+                
+        except Exception as e:
+            logger.error("Error deleting category '%s': %s", category, e)
+            return {"success": False, "error": f"Failed to delete category: {str(e)}"}

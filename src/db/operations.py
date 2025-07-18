@@ -581,7 +581,17 @@ def get_all_products() -> list[Product]:
 
 
 @retry_on_database_error()
-def get_product_by_name(name: str) -> Product | None:
+def get_all_products_admin() -> list[Product]:
+    """Get all products (including inactive) for admin management"""
+    session = get_db_session()
+    try:
+        return session.query(Product).order_by(Product.category, Product.name).all()
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def get_product_by_name(name: str) -> Optional[Product]:
     """Get product by name"""
     session = get_db_session()
     try:
@@ -591,11 +601,134 @@ def get_product_by_name(name: str) -> Product | None:
 
 
 @retry_on_database_error()
-def get_product_by_id(product_id: int) -> Product | None:
+def get_product_by_id(product_id: int) -> Optional[Product]:
     """Get product by ID"""
     session = get_db_session()
     try:
         return session.query(Product).filter(Product.id == product_id).first()
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def create_product(name: str, description: str, category: str, price: float) -> Optional[Product]:
+    """Create a new product"""
+    session = get_db_session()
+    try:
+        # Check if product with same name already exists
+        existing_product = session.query(Product).filter(Product.name == name).first()
+        if existing_product:
+            logger.warning("Product with name '%s' already exists", name)
+            return None
+        
+        product = Product(
+            name=name,
+            description=description,
+            category=category,
+            price=price,
+            is_active=True
+        )
+        session.add(product)
+        session.commit()
+        session.refresh(product)
+        logger.info("Created new product: %s (ID: %d)", name, product.id)
+        return product
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error("Failed to create product '%s': %s", name, e)
+        return None
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def update_product(product_id: int, **kwargs) -> bool:
+    """Update product by ID with provided fields"""
+    session = get_db_session()
+    try:
+        product = session.query(Product).filter(Product.id == product_id).first()
+        if not product:
+            logger.warning("Product with ID %d not found", product_id)
+            return False
+        
+        # Update allowed fields
+        allowed_fields = ['name', 'description', 'category', 'price', 'is_active']
+        for field, value in kwargs.items():
+            if field in allowed_fields:
+                setattr(product, field, value)
+        
+        product.updated_at = datetime.utcnow()
+        session.commit()
+        logger.info("Updated product ID %d: %s", product_id, kwargs)
+        return True
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error("Failed to update product ID %d: %s", product_id, e)
+        return False
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def delete_product(product_id: int) -> bool:
+    """Soft delete product by setting is_active to False"""
+    session = get_db_session()
+    try:
+        product = session.query(Product).filter(Product.id == product_id).first()
+        if not product:
+            logger.warning("Product with ID %d not found", product_id)
+            return False
+        
+        product.is_active = False
+        product.updated_at = datetime.utcnow()
+        session.commit()
+        logger.info("Soft deleted product ID %d: %s", product_id, product.name)
+        return True
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error("Failed to delete product ID %d: %s", product_id, e)
+        return False
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def get_product_categories() -> list[str]:
+    """Get all unique product categories"""
+    session = get_db_session()
+    try:
+        categories = session.query(Product.category).distinct().filter(
+            Product.category.isnot(None),
+            Product.category != ""
+        ).all()
+        return [cat[0] for cat in categories if cat[0]]
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def get_products_by_category(category: str) -> list[Product]:
+    """Get all products in a specific category"""
+    session = get_db_session()
+    try:
+        return session.query(Product).filter(
+            Product.category == category,
+            Product.is_active == True
+        ).all()
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def search_products(search_term: str) -> list[Product]:
+    """Search products by name or description"""
+    session = get_db_session()
+    try:
+        search_pattern = f"%{search_term}%"
+        return session.query(Product).filter(
+            Product.is_active == True,
+            (Product.name.ilike(search_pattern) | Product.description.ilike(search_pattern))
+        ).all()
     finally:
         session.close()
 
@@ -851,8 +984,8 @@ def create_order(
     customer_id: int,
     total_amount: float,
     delivery_method: str = "pickup",
-    delivery_address: str | None = None,
-) -> Order | None:
+    delivery_address: Optional[str] = None,
+) -> Optional[Order]:
     """Create a new order"""
     try:
         with get_db_manager().get_session_context() as session:
@@ -880,8 +1013,8 @@ def create_order_with_items(
     total_amount: float,
     items: list[dict],
     delivery_method: str = "pickup",
-    delivery_address: str | None = None,
-) -> Order | None:
+    delivery_address: Optional[str] = None,
+) -> Optional[Order]:
     """Create a new order with order items from cart items"""
     try:
         with get_db_manager().get_session_context() as session:

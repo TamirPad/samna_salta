@@ -436,12 +436,12 @@ class OnboardingHandler:
     async def _show_menu(self, query: CallbackQuery):
         """Show the food menu"""
         try:
-            from src.keyboards.menu_keyboards import get_main_menu_keyboard
+            from src.keyboards.menu_keyboards import get_dynamic_main_menu_keyboard
             user_id = query.from_user.id
             
             await query.edit_message_text(
                 i18n.get_text("MENU_PROMPT", user_id=user_id),
-                reply_markup=get_main_menu_keyboard(user_id),
+                reply_markup=get_dynamic_main_menu_keyboard(user_id),
                 parse_mode="HTML"
             )
 

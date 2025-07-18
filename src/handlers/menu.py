@@ -4,7 +4,7 @@ Menu Handler for the Telegram bot.
 
 import logging
 
-from telegram import CallbackQuery, Update
+from telegram import CallbackQuery, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes
 
 from src.container import get_container
@@ -16,6 +16,8 @@ from src.keyboards.menu_keyboards import (
     get_main_menu_keyboard,
     get_red_bisbas_menu_keyboard,
     get_samneh_menu_keyboard,
+    get_dynamic_main_menu_keyboard,
+    get_category_menu_keyboard,
 )
 from src.utils.i18n import i18n
 from src.utils.constants import CallbackPatterns, ErrorMessages
@@ -47,6 +49,14 @@ class MenuHandler:
         try:
             if data == "menu_main":
                 await self._show_main_menu(query)
+            elif data.startswith("category_"):
+                # Handle category menu
+                category = data.replace("category_", "")
+                await self._show_category_menu(query, category)
+            elif data.startswith("product_"):
+                # Handle product selection
+                product_id = int(data.replace("product_", ""))
+                await self._show_product_details(query, product_id)
             elif data == "menu_kubaneh":
                 await self._show_kubaneh_menu(query)
             elif data == "menu_samneh":
@@ -81,7 +91,7 @@ class MenuHandler:
         user_id = query.from_user.id
         await query.edit_message_text(
             i18n.get_text("MENU_PROMPT", user_id=user_id), 
-            reply_markup=get_main_menu_keyboard(user_id), 
+            reply_markup=get_dynamic_main_menu_keyboard(user_id), 
             parse_mode="HTML"
         )
 
@@ -173,6 +183,67 @@ class MenuHandler:
             reply_markup=get_direct_add_keyboard("White coffee", include_info=False, user_id=user_id),
             parse_mode="HTML",
         )
+
+    async def _show_category_menu(self, query: CallbackQuery, category: str):
+        """Show menu for a specific category"""
+        self.logger.debug("📋 SHOWING: Category menu for %s", category)
+        user_id = query.from_user.id
+        text = f"📂 <b>{category.title()}</b>\n\n{i18n.get_text('MENU_PROMPT', user_id=user_id)}"
+        await query.edit_message_text(
+            text,
+            reply_markup=get_category_menu_keyboard(category, user_id),
+            parse_mode="HTML"
+        )
+
+    async def _show_product_details(self, query: CallbackQuery, product_id: int):
+        """Show product details and add to cart option"""
+        self.logger.debug("📋 SHOWING: Product details for ID %d", product_id)
+        user_id = query.from_user.id
+        
+        try:
+            # Get product from database
+            from src.db.operations import get_product_by_id
+            product = get_product_by_id(product_id)
+            
+            if not product:
+                await query.edit_message_text(
+                    "❌ Product not found",
+                    reply_markup=get_dynamic_main_menu_keyboard(user_id)
+                )
+                return
+            
+            # Create product details text
+            text = f"<b>{product.name}</b>\n\n"
+            if product.description:
+                text += f"{product.description}\n\n"
+            text += f"💰 Price: ₪{product.price:.2f}\n"
+            if product.category:
+                text += f"📂 Category: {product.category.title()}\n"
+            
+            # Create keyboard with add to cart button
+            keyboard = [
+                [InlineKeyboardButton(
+                    f"🛒 Add to Cart - ₪{product.price:.2f}",
+                    callback_data=f"add_product_{product_id}"
+                )],
+                [InlineKeyboardButton(
+                    i18n.get_text("BACK_MAIN_MENU", user_id=user_id),
+                    callback_data="menu_main"
+                )]
+            ]
+            
+            await query.edit_message_text(
+                text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="HTML"
+            )
+            
+        except Exception as e:
+            self.logger.error("Error showing product details: %s", e)
+            await query.edit_message_text(
+                "❌ Error loading product details",
+                reply_markup=get_dynamic_main_menu_keyboard(user_id)
+            )
 
 
 def register_menu_handlers(application: Application):

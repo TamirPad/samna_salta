@@ -4,7 +4,7 @@ Admin Handler for the Telegram bot.
 
 import logging
 from datetime import datetime
-from typing import Dict
+from typing import Dict, Optional
 
 from telegram import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
@@ -22,7 +22,21 @@ from src.utils.error_handler import BusinessLogicError, error_handler
 from src.utils.i18n import i18n
 
 # Conversation states
-AWAITING_ORDER_ID, AWAITING_STATUS_UPDATE = range(2)
+AWAITING_ORDER_ID, AWAITING_STATUS_UPDATE, AWAITING_PRODUCT_DETAILS, AWAITING_PRODUCT_UPDATE, AWAITING_PRODUCT_DELETE_CONFIRM, AWAITING_SEARCH_TERM = range(6)
+
+# Import the new states from states.py
+from src.states import (
+    AWAITING_PRODUCT_NAME,
+    AWAITING_PRODUCT_DESCRIPTION,
+    AWAITING_PRODUCT_CATEGORY,
+    AWAITING_PRODUCT_PRICE,
+    AWAITING_PRODUCT_CONFIRMATION,
+    END
+)
+
+# Category management states
+AWAITING_CATEGORY_NAME = 10
+AWAITING_CATEGORY_NAME_EDIT = 11
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +112,37 @@ class AdminHandler:
             order_id = int(parts[2])
             new_status = parts[3]
             await self._update_order_status(query, order_id, new_status, user_id)
+        elif data == "admin_menu_management":
+            await self._show_menu_management_dashboard(query)
+        elif data == "admin_view_products":
+            await self._show_product_categories(query)
+        elif data == "admin_add_product":
+            return await self._start_add_product(query)
+        elif data == "admin_search_products":
+            return await self._start_search_products(query)
+        elif data == "admin_remove_products":
+            await self._show_remove_products_list(query)
+        elif data.startswith("admin_product_"):
+            await self._handle_product_callback(query, data)
+        elif data == "admin_category_management":
+            await self._show_category_management(query)
+        elif data == "admin_add_category":
+            return await self._start_add_category(query)
+        elif data.startswith("admin_edit_category_"):
+            category = data.replace("admin_edit_category_", "")
+            await self._show_edit_category(query, category)
+        elif data.startswith("admin_edit_category_name_"):
+            category = data.replace("admin_edit_category_name_", "")
+            return await self._start_edit_category_name(query, category)
+        elif data.startswith("admin_delete_category_"):
+            category = data.replace("admin_delete_category_", "")
+            await self._show_delete_category_confirmation(query, category)
+        elif data.startswith("admin_delete_category_confirm_"):
+            category = data.replace("admin_delete_category_confirm_", "")
+            await self._delete_category_confirmed(query, category)
+        elif data.startswith("admin_category_"):
+            category = data.replace("admin_category_", "")
+            await self._show_products_in_category(query, category)
         elif data == "admin_back":
             await self._show_admin_dashboard(update, None)
 
@@ -155,6 +200,9 @@ class AdminHandler:
                 [
                     InlineKeyboardButton(i18n.get_text("ADMIN_ANALYTICS", user_id=user_id), callback_data="admin_analytics"),
                     InlineKeyboardButton(i18n.get_text("ADMIN_CUSTOMERS", user_id=user_id), callback_data="admin_customers")
+                ],
+                [
+                    InlineKeyboardButton(i18n.get_text("ADMIN_MENU_MANAGEMENT", user_id=user_id), callback_data="admin_menu_management")
                 ],
             ]
 
@@ -1076,6 +1124,1368 @@ class AdminHandler:
         # This is a simple fallback - in production you'd want a proper admin system
         return str(telegram_id) in ['598829473']  # Add your admin user IDs here
 
+    # Menu Management Methods
+    async def _show_menu_management_dashboard(self, query: CallbackQuery) -> None:
+        """Show menu management dashboard"""
+        try:
+            user_id = query.from_user.id
+            
+            # Get product statistics
+            products = await self.admin_service.get_all_products_for_admin()
+            total_products = len(products)
+            active_products = len([p for p in products if p["is_active"]])
+            inactive_products = total_products - active_products
+            categories = await self.admin_service.get_product_categories_list()
+            
+            text = (
+                i18n.get_text("ADMIN_PRODUCT_MANAGEMENT_SUMMARY", user_id=user_id).format(
+                    total=total_products,
+                    active=active_products,
+                    inactive=inactive_products,
+                    categories=len(categories)
+                ) + "\n\n" +
+                i18n.get_text("ADMIN_PRODUCT_MANAGEMENT_ACTIONS", user_id=user_id)
+            )
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_MANAGEMENT_VIEW", user_id=user_id),
+                        callback_data="admin_view_products"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_MANAGEMENT_ADD", user_id=user_id),
+                        callback_data="admin_add_product"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_MANAGEMENT_REMOVE", user_id=user_id),
+                        callback_data="admin_remove_products"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_CATEGORY_MANAGEMENT", user_id=user_id),
+                        callback_data="admin_category_management"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_MANAGEMENT_BACK", user_id=user_id),
+                        callback_data="admin_back"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+        except Exception as e:
+            self.logger.error("Error showing menu management dashboard: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
+
+    async def _show_all_products(self, query: CallbackQuery) -> None:
+        """Show all products for admin management"""
+        try:
+            user_id = query.from_user.id
+            products = await self.admin_service.get_all_products_for_admin()
+            
+            if not products:
+                text = i18n.get_text("ADMIN_NO_PRODUCTS", user_id=user_id)
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
+                            callback_data="admin_menu_management"
+                        )
+                    ]
+                ]
+            else:
+                # Build text with product count
+                text = i18n.get_text("ADMIN_PRODUCTS_TITLE", user_id=user_id) + f"\n\n{i18n.get_text('ADMIN_PRODUCT_TOTAL_COUNT', user_id=user_id).format(count=len(products))}"
+                
+                keyboard = []
+                
+                # Add product list
+                for product in products:
+                    status_text = i18n.get_text("ADMIN_PRODUCT_ACTIVE", user_id=user_id) if product["is_active"] else i18n.get_text("ADMIN_PRODUCT_INACTIVE", user_id=user_id)
+                    product_text = i18n.get_text("ADMIN_PRODUCT_BUTTON_FORMAT", user_id=user_id).format(
+                        name=product["name"],
+                        category=product["category"],
+                        price=product["price"],
+                        status=status_text
+                    )
+                    
+                    keyboard.append([
+                        InlineKeyboardButton(
+                            product_text,
+                            callback_data=f"admin_product_details_{product['id']}"
+                        )
+                    ])
+                
+                keyboard.append([
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
+                        callback_data="admin_menu_management"
+                    )
+                ])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            try:
+                await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            except Exception as edit_error:
+                if "Message is not modified" in str(edit_error):
+                    # Message content is identical, just answer the callback
+                    await query.answer()
+                else:
+                    # Re-raise other errors
+                    raise edit_error
+            
+        except Exception as e:
+            self.logger.error("Error showing all products: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
+
+    async def _show_product_categories(self, query: CallbackQuery) -> None:
+        """Show product categories for admin management"""
+        try:
+            user_id = query.from_user.id
+            categories = await self.admin_service.get_product_categories_list()
+            
+            if not categories:
+                text = i18n.get_text("ADMIN_NO_CATEGORIES", user_id=user_id)
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
+                            callback_data="admin_menu_management"
+                        )
+                    ]
+                ]
+            else:
+                # Build text with category count
+                text = i18n.get_text("ADMIN_CATEGORIES_TITLE", user_id=user_id) + f"\n\n{i18n.get_text('ADMIN_CATEGORY_TOTAL_COUNT', user_id=user_id).format(count=len(categories))}"
+                
+                keyboard = []
+                
+                # Add category list
+                for category in categories:
+                    keyboard.append([
+                        InlineKeyboardButton(
+                            f"📂 {category}",
+                            callback_data=f"admin_category_{category}"
+                        )
+                    ])
+                
+                keyboard.append([
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
+                        callback_data="admin_menu_management"
+                    )
+                ])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            try:
+                await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            except Exception as edit_error:
+                if "Message is not modified" in str(edit_error):
+                    # Message content is identical, just answer the callback
+                    await query.answer()
+                else:
+                    # Re-raise other errors
+                    raise edit_error
+            
+        except Exception as e:
+            self.logger.error("Error showing product categories: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
+
+    async def _show_products_in_category(self, query: CallbackQuery, category: str) -> None:
+        """Show products within a specific category for admin management"""
+        try:
+            user_id = query.from_user.id
+            products = await self.admin_service.get_products_by_category_admin(category)
+            
+            if not products:
+                text = i18n.get_text("ADMIN_NO_PRODUCTS_IN_CATEGORY", user_id=user_id).format(category=category)
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            i18n.get_text("ADMIN_PRODUCT_BACK_TO_CATEGORIES", user_id=user_id),
+                            callback_data="admin_view_products"
+                        )
+                    ]
+                ]
+            else:
+                # Build text with category name and product count
+                text = f"📂 <b>{category}</b>\n\n{i18n.get_text('ADMIN_PRODUCTS_IN_CATEGORY_TITLE', user_id=user_id).format(category=category, count=len(products))}"
+                
+                keyboard = []
+                
+                # Add product list
+                for product in products:
+                    status_text = i18n.get_text("ADMIN_PRODUCT_ACTIVE", user_id=user_id) if product["is_active"] else i18n.get_text("ADMIN_PRODUCT_INACTIVE", user_id=user_id)
+                    product_text = i18n.get_text("ADMIN_PRODUCT_BUTTON_FORMAT", user_id=user_id).format(
+                        name=product["name"],
+                        category=product["category"],
+                        price=product["price"],
+                        status=status_text
+                    )
+                    
+                    keyboard.append([
+                        InlineKeyboardButton(
+                            product_text,
+                            callback_data=f"admin_product_details_{product['id']}"
+                        )
+                    ])
+                
+                keyboard.append([
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_BACK_TO_CATEGORIES", user_id=user_id),
+                        callback_data="admin_view_products"
+                    )
+                ])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            try:
+                await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            except Exception as edit_error:
+                if "Message is not modified" in str(edit_error):
+                    # Message content is identical, just answer the callback
+                    await query.answer()
+                else:
+                    # Re-raise other errors
+                    raise edit_error
+            
+        except Exception as e:
+            self.logger.error("Error showing products in category: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
+
+    async def _show_category_management(self, query: CallbackQuery) -> None:
+        """Show category management interface"""
+        try:
+            user_id = query.from_user.id
+            categories = await self.admin_service.get_product_categories_list()
+            
+            text = i18n.get_text("ADMIN_CATEGORY_MANAGEMENT_TITLE", user_id=user_id) + f"\n\n{i18n.get_text('ADMIN_CATEGORY_TOTAL_COUNT', user_id=user_id).format(count=len(categories))}"
+            
+            keyboard = []
+            
+            # Add category list with edit/delete options
+            for category in categories:
+                # Get product count for this category
+                products = await self.admin_service.get_products_by_category_admin(category)
+                product_count = len(products)
+                
+                keyboard.append([
+                    InlineKeyboardButton(
+                        f"📂 {category} ({product_count})",
+                        callback_data=f"admin_edit_category_{category}"
+                    )
+                ])
+            
+            # Add action buttons
+            keyboard.append([
+                InlineKeyboardButton(
+                    i18n.get_text("ADMIN_CATEGORY_ADD_NEW", user_id=user_id),
+                    callback_data="admin_add_category"
+                )
+            ])
+            
+            keyboard.append([
+                InlineKeyboardButton(
+                    i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
+                    callback_data="admin_menu_management"
+                )
+            ])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+        except Exception as e:
+            self.logger.error("Error showing category management: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
+
+    async def _show_edit_category(self, query: CallbackQuery, category: str) -> None:
+        """Show category edit options"""
+        try:
+            user_id = query.from_user.id
+            products = await self.admin_service.get_products_by_category_admin(category)
+            product_count = len(products)
+            
+            text = i18n.get_text("ADMIN_CATEGORY_EDIT_TITLE", user_id=user_id).format(category=category, count=product_count)
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_CATEGORY_EDIT_NAME", user_id=user_id),
+                        callback_data=f"admin_edit_category_name_{category}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_CATEGORY_DELETE", user_id=user_id),
+                        callback_data=f"admin_delete_category_{category}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_CATEGORY_BACK", user_id=user_id),
+                        callback_data="admin_category_management"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+        except Exception as e:
+            self.logger.error("Error showing edit category: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
+
+    async def _start_add_category(self, query: CallbackQuery) -> int:
+        """Start the add category conversation"""
+        try:
+            user_id = query.from_user.id
+            text = i18n.get_text("ADMIN_CATEGORY_ADD_PROMPT", user_id=user_id)
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("CANCEL", user_id=user_id),
+                        callback_data="admin_category_management"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+            return AWAITING_CATEGORY_NAME
+            
+        except Exception as e:
+            self.logger.error("Error starting add category: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _handle_category_name_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle category name input"""
+        try:
+            user_id = update.effective_user.id
+            category_name = update.message.text.strip()
+            
+            if len(category_name) < 2:
+                await update.message.reply_text(
+                    i18n.get_text("ADMIN_CATEGORY_NAME_TOO_SHORT", user_id=user_id)
+                )
+                return AWAITING_CATEGORY_NAME
+            
+            # Check if category already exists
+            existing_categories = await self.admin_service.get_product_categories_list()
+            if category_name.lower() in [cat.lower() for cat in existing_categories]:
+                await update.message.reply_text(
+                    i18n.get_text("ADMIN_CATEGORY_ALREADY_EXISTS", user_id=user_id).format(category=category_name)
+                )
+                return AWAITING_CATEGORY_NAME
+            
+            # Create the category (this would need to be implemented in the service)
+            result = await self.admin_service.create_category(category_name)
+            
+            if result["success"]:
+                success_text = i18n.get_text("ADMIN_CATEGORY_ADD_SUCCESS", user_id=user_id).format(category=category_name)
+                
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            i18n.get_text("ADMIN_CATEGORY_BACK", user_id=user_id),
+                            callback_data="admin_category_management"
+                        )
+                    ]
+                ]
+                
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await update.message.reply_text(success_text, parse_mode="HTML", reply_markup=reply_markup)
+            else:
+                await update.message.reply_text(
+                    i18n.get_text("ADMIN_CATEGORY_ADD_ERROR", user_id=user_id).format(error=result["error"])
+                )
+            
+            return ConversationHandler.END
+            
+        except Exception as e:
+            self.logger.error("Error handling category name input: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _start_edit_category_name(self, query: CallbackQuery, category: str) -> int:
+        """Start the edit category name conversation"""
+        try:
+            user_id = query.from_user.id
+            text = i18n.get_text("ADMIN_CATEGORY_EDIT_NAME_PROMPT", user_id=user_id).format(category=category)
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("CANCEL", user_id=user_id),
+                        callback_data=f"admin_edit_category_{category}"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+            # Store the old category name in context
+            context = query.from_user.id
+            context.user_data["old_category_name"] = category
+            
+            return AWAITING_CATEGORY_NAME_EDIT
+            
+        except Exception as e:
+            self.logger.error("Error starting edit category name: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _handle_category_name_edit_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle category name edit input"""
+        try:
+            user_id = update.effective_user.id
+            new_category_name = update.message.text.strip()
+            old_category_name = context.user_data.get("old_category_name")
+            
+            if len(new_category_name) < 2:
+                await update.message.reply_text(
+                    i18n.get_text("ADMIN_CATEGORY_NAME_TOO_SHORT", user_id=user_id)
+                )
+                return AWAITING_CATEGORY_NAME_EDIT
+            
+            # Check if new category name already exists
+            existing_categories = await self.admin_service.get_product_categories_list()
+            if new_category_name.lower() in [cat.lower() for cat in existing_categories if cat != old_category_name]:
+                await update.message.reply_text(
+                    i18n.get_text("ADMIN_CATEGORY_ALREADY_EXISTS", user_id=user_id).format(category=new_category_name)
+                )
+                return AWAITING_CATEGORY_NAME_EDIT
+            
+            # Update the category (this would need to be implemented in the service)
+            result = await self.admin_service.update_category(old_category_name, new_category_name)
+            
+            if result["success"]:
+                success_text = i18n.get_text("ADMIN_CATEGORY_UPDATE_SUCCESS", user_id=user_id).format(
+                    old_category=old_category_name, new_category=new_category_name
+                )
+                
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            i18n.get_text("ADMIN_CATEGORY_BACK", user_id=user_id),
+                            callback_data="admin_category_management"
+                        )
+                    ]
+                ]
+                
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await update.message.reply_text(success_text, parse_mode="HTML", reply_markup=reply_markup)
+            else:
+                await update.message.reply_text(
+                    i18n.get_text("ADMIN_CATEGORY_UPDATE_ERROR", user_id=user_id).format(error=result["error"])
+                )
+            
+            return ConversationHandler.END
+            
+        except Exception as e:
+            self.logger.error("Error handling category name edit input: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _show_delete_category_confirmation(self, query: CallbackQuery, category: str) -> None:
+        """Show category deletion confirmation"""
+        try:
+            user_id = query.from_user.id
+            products = await self.admin_service.get_products_by_category_admin(category)
+            product_count = len(products)
+            
+            if product_count > 0:
+                text = i18n.get_text("ADMIN_CATEGORY_DELETE_WITH_PRODUCTS", user_id=user_id).format(
+                    category=category, count=product_count
+                )
+            else:
+                text = i18n.get_text("ADMIN_CATEGORY_DELETE_CONFIRM", user_id=user_id).format(category=category)
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_CATEGORY_DELETE_YES", user_id=user_id),
+                        callback_data=f"admin_delete_category_confirm_{category}"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_CATEGORY_DELETE_NO", user_id=user_id),
+                        callback_data=f"admin_edit_category_{category}"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+        except Exception as e:
+            self.logger.error("Error showing delete category confirmation: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
+
+    async def _delete_category_confirmed(self, query: CallbackQuery, category: str) -> None:
+        """Handle confirmed category deletion"""
+        try:
+            user_id = query.from_user.id
+            
+            # Delete the category (this would need to be implemented in the service)
+            result = await self.admin_service.delete_category(category)
+            
+            if result["success"]:
+                success_text = i18n.get_text("ADMIN_CATEGORY_DELETE_SUCCESS", user_id=user_id).format(category=category)
+                
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            i18n.get_text("ADMIN_CATEGORY_BACK", user_id=user_id),
+                            callback_data="admin_category_management"
+                        )
+                    ]
+                ]
+                
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await query.edit_message_text(success_text, parse_mode="HTML", reply_markup=reply_markup)
+            else:
+                await query.edit_message_text(
+                    i18n.get_text("ADMIN_CATEGORY_DELETE_ERROR", user_id=user_id).format(error=result["error"])
+                )
+            
+        except Exception as e:
+            self.logger.error("Error deleting category: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
+
+    async def _start_add_product(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Start the step-by-step add product conversation"""
+        try:
+            query = update.callback_query
+            user_id = query.from_user.id
+            self.logger.info(f"🚀 Starting step-by-step product creation for user {user_id}")
+            self.logger.info(f"🚀 Setting conversation state to AWAITING_PRODUCT_NAME ({AWAITING_PRODUCT_NAME})")
+            text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_NAME", user_id=user_id)
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("CANCEL", user_id=user_id),
+                        callback_data="admin_menu_management"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+            return AWAITING_PRODUCT_NAME
+            
+        except Exception as e:
+            self.logger.error("Error starting add product: %s", e)
+            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=update.callback_query.from_user.id))
+            return ConversationHandler.END
+
+    async def _handle_add_product_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle product details input for adding new product"""
+        try:
+            user_id = update.effective_user.id
+            text = update.message.text
+            
+            # Parse product details from text
+            product_data = self._parse_product_input(text)
+            if not product_data:
+                await update.message.reply_text(
+                    i18n.get_text("ADMIN_PRODUCT_INVALID_INPUT", user_id=user_id)
+                )
+                return AWAITING_PRODUCT_DETAILS
+            
+            # Create product
+            result = await self.admin_service.create_new_product(
+                name=product_data["name"],
+                description=product_data["description"],
+                category=product_data["category"],
+                price=product_data["price"]
+            )
+            
+            if result["success"]:
+                product = result["product"]
+                success_text = i18n.get_text("ADMIN_ADD_PRODUCT_SUCCESS", user_id=user_id).format(
+                    name=product["name"],
+                    description=product["description"],
+                    category=product["category"],
+                    price=product["price"]
+                )
+                
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
+                            callback_data="admin_menu_management"
+                        )
+                    ]
+                ]
+                
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await update.message.reply_text(success_text, parse_mode="HTML", reply_markup=reply_markup)
+            else:
+                await update.message.reply_text(
+                    i18n.get_text("ADMIN_ADD_PRODUCT_ERROR", user_id=user_id).format(error=result["error"])
+                )
+            
+            return ConversationHandler.END
+            
+        except Exception as e:
+            self.logger.error("Error handling add product input: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    # Step-by-step product creation handlers
+    async def _handle_product_name_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle product name input"""
+        try:
+            user_id = update.effective_user.id
+            name = update.message.text.strip()
+            
+            self.logger.info(f"🔍 Handling product name input: '{name}' for user {user_id}")
+            self.logger.info(f"🔍 Current conversation state: {context.user_data.get('conversation_state', 'None')}")
+            
+            if len(name) < 2:
+                await update.message.reply_text(
+                    i18n.get_text("ADMIN_ADD_PRODUCT_NAME_TOO_SHORT", user_id=user_id)
+                )
+                return AWAITING_PRODUCT_NAME
+            
+            # Store name in context
+            context.user_data["product_name"] = name
+            
+            # Ask for description
+            text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_DESCRIPTION", user_id=user_id).format(name=name)
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("CANCEL", user_id=user_id),
+                        callback_data="admin_menu_management"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+            return AWAITING_PRODUCT_DESCRIPTION
+            
+        except Exception as e:
+            self.logger.error("Error handling product name input: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _handle_product_description_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle product description input"""
+        try:
+            user_id = update.effective_user.id
+            description = update.message.text.strip()
+            
+            if len(description) < 5:
+                await update.message.reply_text(
+                    i18n.get_text("ADMIN_ADD_PRODUCT_DESCRIPTION_TOO_SHORT", user_id=user_id)
+                )
+                return AWAITING_PRODUCT_DESCRIPTION
+            
+            # Store description in context
+            context.user_data["product_description"] = description
+            name = context.user_data["product_name"]
+            
+            # Ask for category
+            text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_CATEGORY", user_id=user_id).format(
+                name=name, description=description
+            )
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_ADD_PRODUCT_CATEGORY_BREAD", user_id=user_id),
+                        callback_data="admin_add_product_category_bread"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_ADD_PRODUCT_CATEGORY_SPICE", user_id=user_id),
+                        callback_data="admin_add_product_category_spice"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_ADD_PRODUCT_CATEGORY_SPREAD", user_id=user_id),
+                        callback_data="admin_add_product_category_spread"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_ADD_PRODUCT_CATEGORY_BEVERAGE", user_id=user_id),
+                        callback_data="admin_add_product_category_beverage"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_ADD_PRODUCT_CATEGORY_OTHER", user_id=user_id),
+                        callback_data="admin_add_product_category_other"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("CANCEL", user_id=user_id),
+                        callback_data="admin_menu_management"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+            return AWAITING_PRODUCT_CATEGORY
+            
+        except Exception as e:
+            self.logger.error("Error handling product description input: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _handle_product_category_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle product category selection"""
+        try:
+            query = update.callback_query
+            user_id = query.from_user.id
+            data = query.data
+            
+            # Extract category from callback data
+            category_map = {
+                "admin_add_product_category_bread": "bread",
+                "admin_add_product_category_spice": "spice", 
+                "admin_add_product_category_spread": "spread",
+                "admin_add_product_category_beverage": "beverage",
+                "admin_add_product_category_other": "other"
+            }
+            
+            category = category_map.get(data)
+            if not category:
+                await query.answer("Invalid category selection")
+                return AWAITING_PRODUCT_CATEGORY
+            
+            # Store category in context
+            context.user_data["product_category"] = category
+            name = context.user_data["product_name"]
+            description = context.user_data["product_description"]
+            
+            # Ask for price
+            text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_PRICE", user_id=user_id).format(
+                name=name, description=description, category=category
+            )
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("CANCEL", user_id=user_id),
+                        callback_data="admin_menu_management"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+            return AWAITING_PRODUCT_PRICE
+            
+        except Exception as e:
+            self.logger.error("Error handling product category selection: %s", e)
+            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=update.callback_query.from_user.id))
+            return ConversationHandler.END
+
+    async def _handle_product_price_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle product price input"""
+        try:
+            user_id = update.effective_user.id
+            price_text = update.message.text.strip()
+            
+            # Validate price
+            try:
+                price = float(price_text)
+                if price <= 0:
+                    await update.message.reply_text(
+                        i18n.get_text("ADMIN_ADD_PRODUCT_PRICE_TOO_LOW", user_id=user_id)
+                    )
+                    return AWAITING_PRODUCT_PRICE
+            except ValueError:
+                await update.message.reply_text(
+                    i18n.get_text("ADMIN_ADD_PRODUCT_PRICE_INVALID", user_id=user_id)
+                )
+                return AWAITING_PRODUCT_PRICE
+            
+            # Store price in context
+            context.user_data["product_price"] = price
+            name = context.user_data["product_name"]
+            description = context.user_data["product_description"]
+            category = context.user_data["product_category"]
+            
+            # Show confirmation
+            text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_CONFIRM", user_id=user_id).format(
+                name=name, description=description, category=category, price=f"{price:.2f}"
+            )
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_ADD_PRODUCT_CONFIRM_YES", user_id=user_id),
+                        callback_data="admin_add_product_confirm_yes"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_ADD_PRODUCT_CONFIRM_NO", user_id=user_id),
+                        callback_data="admin_add_product_confirm_no"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+            return AWAITING_PRODUCT_CONFIRMATION
+            
+        except Exception as e:
+            self.logger.error("Error handling product price input: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _handle_product_confirmation(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle product creation confirmation"""
+        try:
+            query = update.callback_query
+            user_id = query.from_user.id
+            data = query.data
+            
+            if data == "admin_add_product_confirm_yes":
+                # Create the product
+                name = context.user_data["product_name"]
+                description = context.user_data["product_description"]
+                category = context.user_data["product_category"]
+                price = context.user_data["product_price"]
+                
+                result = await self.admin_service.create_new_product(
+                    name=name,
+                    description=description,
+                    category=category,
+                    price=price
+                )
+                
+                if result["success"]:
+                    product = result["product"]
+                    success_text = i18n.get_text("ADMIN_ADD_PRODUCT_SUCCESS", user_id=user_id).format(
+                        name=product["name"],
+                        description=product["description"],
+                        category=product["category"],
+                        price=product["price"]
+                    )
+                    
+                    keyboard = [
+                        [
+                            InlineKeyboardButton(
+                                i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
+                                callback_data="admin_menu_management"
+                            )
+                        ]
+                    ]
+                    
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    await query.edit_message_text(success_text, parse_mode="HTML", reply_markup=reply_markup)
+                else:
+                    await query.edit_message_text(
+                        i18n.get_text("ADMIN_ADD_PRODUCT_ERROR", user_id=user_id).format(error=result["error"])
+                    )
+                
+                # Clear context data
+                context.user_data.clear()
+                return ConversationHandler.END
+                
+            elif data == "admin_add_product_confirm_no":
+                # Start over
+                context.user_data.clear()
+                return await self._start_add_product(update, context)
+            
+        except Exception as e:
+            self.logger.error("Error handling product confirmation: %s", e)
+            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=update.callback_query.from_user.id))
+            return ConversationHandler.END
+
+    async def _start_search_products(self, query: CallbackQuery):
+        """Start the search products conversation"""
+        try:
+            user_id = query.from_user.id
+            text = (
+                i18n.get_text("ADMIN_SEARCH_PRODUCTS_TITLE", user_id=user_id) + "\n\n" +
+                i18n.get_text("ADMIN_SEARCH_PRODUCTS_INSTRUCTIONS", user_id=user_id)
+            )
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("CANCEL", user_id=user_id),
+                        callback_data="admin_menu_management"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+            return AWAITING_SEARCH_TERM
+            
+        except Exception as e:
+            self.logger.error("Error starting search products: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
+            return ConversationHandler.END
+
+    async def _handle_search_products_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle search term input"""
+        try:
+            user_id = update.effective_user.id
+            search_term = update.message.text.strip()
+            
+            if len(search_term) < 2:
+                await update.message.reply_text(
+                    i18n.get_text("ADMIN_PRODUCT_SEARCH_MIN_LENGTH", user_id=user_id)
+                )
+                return AWAITING_SEARCH_TERM
+            
+            # Search products
+            products = await self.admin_service.search_products_admin(search_term)
+            
+            if not products:
+                text = i18n.get_text("ADMIN_SEARCH_PRODUCTS_NO_RESULTS", user_id=user_id).format(search_term=search_term)
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
+                            callback_data="admin_menu_management"
+                        )
+                    ]
+                ]
+            else:
+                text = i18n.get_text("ADMIN_SEARCH_PRODUCTS_RESULTS", user_id=user_id).format(search_term=search_term)
+                
+                keyboard = []
+                for product in products:
+                    status_text = i18n.get_text("ADMIN_PRODUCT_ACTIVE", user_id=user_id) if product["is_active"] else i18n.get_text("ADMIN_PRODUCT_INACTIVE", user_id=user_id)
+                    product_text = i18n.get_text("ADMIN_PRODUCT_FORMAT", user_id=user_id).format(
+                        name=product["name"],
+                        category=product["category"],
+                        price=product["price"],
+                        status=status_text
+                    )
+                    
+                    keyboard.append([
+                        InlineKeyboardButton(
+                            product_text,
+                            callback_data=f"admin_product_details_{product['id']}"
+                        )
+                    ])
+                
+                keyboard.append([
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
+                        callback_data="admin_menu_management"
+                    )
+                ])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+            return ConversationHandler.END
+            
+        except Exception as e:
+            self.logger.error("Error handling search products input: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _handle_product_callback(self, query: CallbackQuery, data: str) -> None:
+        """Handle product-related callbacks"""
+        try:
+            user_id = query.from_user.id
+            
+            if data.startswith("admin_product_details_"):
+                product_id = int(data.split("_")[-1])
+                await self._show_product_details(query, product_id)
+            elif data.startswith("admin_product_edit_"):
+                product_id = int(data.split("_")[-1])
+                return await self._start_edit_product(query, product_id)
+            elif data.startswith("admin_product_delete_"):
+                product_id = int(data.split("_")[-1])
+                await self._show_delete_product_confirmation(query, product_id)
+            elif data.startswith("admin_product_toggle_"):
+                product_id = int(data.split("_")[-1])
+                await self._toggle_product_status(query, product_id)
+            elif data.startswith("admin_remove_product_"):
+                product_id = int(data.split("_")[-1])
+                await self._show_remove_product_confirmation(query, product_id)
+            elif data == "admin_product_back_to_list":
+                await self._show_all_products(query)
+            elif data == "admin_product_back_to_management":
+                await self._show_menu_management_dashboard(query)
+            elif data == "admin_product_yes_delete":
+                # Handle delete confirmation
+                context = query.data.split("_")[-1] if "_" in query.data else None
+                if context and context.isdigit():
+                    product_id = int(context)
+                    await self._delete_product(query, product_id)
+            elif data == "admin_product_no_delete":
+                await self._show_all_products(query)
+            elif data.startswith("admin_remove_yes_"):
+                product_id = int(data.split("_")[-1])
+                await self._remove_product_confirmed(query, product_id)
+            elif data == "admin_remove_no":
+                await self._show_remove_products_list(query)
+            elif data.startswith("admin_add_product_category_"):
+                # Handle category selection in step-by-step product creation
+                return await self._handle_product_category_selection(query, None)
+            elif data.startswith("admin_add_product_confirm_"):
+                # Handle product confirmation in step-by-step product creation
+                return await self._handle_product_confirmation(query, None)
+                
+        except Exception as e:
+            self.logger.error("Error handling product callback: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
+    async def _show_product_details(self, query: CallbackQuery, product_id: int) -> None:
+        """Show detailed product information"""
+        try:
+            user_id = query.from_user.id
+            products = await self.admin_service.get_all_products_for_admin()
+            product = next((p for p in products if p["id"] == product_id), None)
+            
+            if not product:
+                await query.message.reply_text(i18n.get_text("ADMIN_PRODUCT_NOT_FOUND", user_id=user_id))
+                return
+            
+            status_text = i18n.get_text("ADMIN_PRODUCT_ACTIVE", user_id=user_id) if product["is_active"] else i18n.get_text("ADMIN_PRODUCT_INACTIVE", user_id=user_id)
+            
+            text = (
+                i18n.get_text("ADMIN_PRODUCT_DETAILS", user_id=user_id) + "\n\n" +
+                i18n.get_text("ADMIN_PRODUCT_NAME", user_id=user_id).format(name=product["name"]) + "\n" +
+                i18n.get_text("ADMIN_PRODUCT_DESCRIPTION", user_id=user_id).format(description=product["description"]) + "\n" +
+                i18n.get_text("ADMIN_PRODUCT_CATEGORY", user_id=user_id).format(category=product["category"]) + "\n" +
+                i18n.get_text("ADMIN_PRODUCT_PRICE", user_id=user_id).format(price=product["price"]) + "\n" +
+                i18n.get_text("ADMIN_PRODUCT_STATUS", user_id=user_id).format(status=status_text) + "\n" +
+                i18n.get_text("ADMIN_PRODUCT_CREATED", user_id=user_id).format(created_at=product["created_at"].strftime("%Y-%m-%d %H:%M"))
+            )
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_EDIT", user_id=user_id),
+                        callback_data=f"admin_product_edit_{product_id}"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_DELETE", user_id=user_id),
+                        callback_data=f"admin_product_delete_{product_id}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_TOGGLE_STATUS", user_id=user_id),
+                        callback_data=f"admin_product_toggle_{product_id}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_BACK_TO_LIST", user_id=user_id),
+                        callback_data="admin_product_back_to_list"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+        except Exception as e:
+            self.logger.error("Error showing product details: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
+    async def _start_edit_product(self, query: CallbackQuery, product_id: int):
+        """Start the edit product conversation"""
+        try:
+            user_id = query.from_user.id
+            products = await self.admin_service.get_all_products_for_admin()
+            product = next((p for p in products if p["id"] == product_id), None)
+            
+            if not product:
+                await query.message.reply_text(i18n.get_text("ADMIN_PRODUCT_NOT_FOUND", user_id=user_id))
+                return ConversationHandler.END
+            
+            text = (
+                i18n.get_text("ADMIN_EDIT_PRODUCT_TITLE", user_id=user_id) + "\n\n" +
+                i18n.get_text("ADMIN_EDIT_PRODUCT_INSTRUCTIONS", user_id=user_id) + "\n\n" +
+                f"<b>Current Product:</b>\n" +
+                f"Name: {product['name']}\n" +
+                f"Description: {product['description']}\n" +
+                f"Category: {product['category']}\n" +
+                f"Price: ₪{product['price']:.2f}\n" +
+                f"Status: {'active' if product['is_active'] else 'inactive'}"
+            )
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("CANCEL", user_id=user_id),
+                        callback_data=f"admin_product_details_{product_id}"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+            # Store product_id in context for the conversation
+            context = query.data.split("_")[-1] if "_" in query.data else str(product_id)
+            
+            return AWAITING_PRODUCT_UPDATE
+            
+        except Exception as e:
+            self.logger.error("Error starting edit product: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _show_remove_product_confirmation(self, query: CallbackQuery, product_id: int) -> None:
+        """Show remove product confirmation"""
+        try:
+            user_id = query.from_user.id
+            products = await self.admin_service.get_all_products_for_admin()
+            product = next((p for p in products if p["id"] == product_id), None)
+            
+            if not product:
+                await query.message.reply_text(i18n.get_text("ADMIN_PRODUCT_NOT_FOUND", user_id=user_id))
+                return
+            
+            text = i18n.get_text("ADMIN_REMOVE_PRODUCT_CONFIRM", user_id=user_id).format(
+                name=product["name"],
+                category=product["category"],
+                price=product["price"]
+            )
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_YES_DELETE", user_id=user_id),
+                        callback_data=f"admin_remove_yes_{product_id}"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_NO_DELETE", user_id=user_id),
+                        callback_data="admin_remove_no"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+        except Exception as e:
+            self.logger.error("Error showing remove confirmation: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
+    async def _show_delete_product_confirmation(self, query: CallbackQuery, product_id: int) -> None:
+        """Show delete product confirmation"""
+        try:
+            user_id = query.from_user.id
+            products = await self.admin_service.get_all_products_for_admin()
+            product = next((p for p in products if p["id"] == product_id), None)
+            
+            if not product:
+                await query.message.reply_text(i18n.get_text("ADMIN_PRODUCT_NOT_FOUND", user_id=user_id))
+                return
+            
+            text = i18n.get_text("ADMIN_DELETE_PRODUCT_CONFIRM", user_id=user_id).format(
+                name=product["name"],
+                category=product["category"],
+                price=product["price"]
+            )
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_YES_DELETE", user_id=user_id),
+                        callback_data=f"admin_product_yes_delete_{product_id}"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_NO_DELETE", user_id=user_id),
+                        callback_data="admin_product_no_delete"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+        except Exception as e:
+            self.logger.error("Error showing delete confirmation: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
+    async def _toggle_product_status(self, query: CallbackQuery, product_id: int) -> None:
+        """Toggle product active/inactive status"""
+        try:
+            user_id = query.from_user.id
+            products = await self.admin_service.get_all_products_for_admin()
+            product = next((p for p in products if p["id"] == product_id), None)
+            
+            if not product:
+                await query.message.reply_text(i18n.get_text("ADMIN_PRODUCT_NOT_FOUND", user_id=user_id))
+                return
+            
+            # Toggle status
+            new_status = not product["is_active"]
+            result = await self.admin_service.update_existing_product(product_id, is_active=new_status)
+            
+            if result["success"]:
+                status_text = "activated" if new_status else "deactivated"
+                await query.answer(f"Product {status_text} successfully!")
+                await self._show_product_details(query, product_id)
+            else:
+                await query.message.reply_text(
+                    i18n.get_text("ADMIN_PRODUCT_STATUS_TOGGLE_ERROR", user_id=user_id).format(error=result["error"])
+                )
+                
+        except Exception as e:
+            self.logger.error("Error toggling product status: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
+    async def _remove_product_confirmed(self, query: CallbackQuery, product_id: int) -> None:
+        """Handle confirmed product removal"""
+        try:
+            user_id = query.from_user.id
+            result = await self.admin_service.delete_existing_product(product_id)
+            
+            if result["success"]:
+                await query.answer(result["message"])
+                await self._show_remove_products_list(query)
+            else:
+                await query.message.reply_text(
+                    i18n.get_text("ADMIN_REMOVE_PRODUCT_ERROR", user_id=user_id).format(error=result["error"])
+                )
+                
+        except Exception as e:
+            self.logger.error("Error removing product: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
+    async def _delete_product(self, query: CallbackQuery, product_id: int) -> None:
+        """Delete (deactivate) a product"""
+        try:
+            user_id = query.from_user.id
+            result = await self.admin_service.delete_existing_product(product_id)
+            
+            if result["success"]:
+                await query.answer(result["message"])
+                await self._show_all_products(query)
+            else:
+                await query.message.reply_text(
+                    i18n.get_text("ADMIN_DELETE_PRODUCT_ERROR", user_id=user_id).format(error=result["error"])
+                )
+                
+        except Exception as e:
+            self.logger.error("Error deleting product: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
+    async def _show_remove_products_list(self, query: CallbackQuery) -> None:
+        """Show list of products for removal"""
+        try:
+            user_id = query.from_user.id
+            products = await self.admin_service.get_all_products_for_admin()
+            
+            if not products:
+                text = i18n.get_text("ADMIN_NO_PRODUCTS", user_id=user_id)
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
+                            callback_data="admin_menu_management"
+                        )
+                    ]
+                ]
+            else:
+                text = i18n.get_text("ADMIN_REMOVE_PRODUCTS_TITLE", user_id=user_id) + f"\n\n{i18n.get_text('ADMIN_PRODUCT_TOTAL_COUNT', user_id=user_id).format(count=len(products))}"
+                
+                keyboard = []
+                for product in products:
+                    status_text = i18n.get_text("ADMIN_PRODUCT_ACTIVE", user_id=user_id) if product["is_active"] else i18n.get_text("ADMIN_PRODUCT_INACTIVE", user_id=user_id)
+                    product_text = i18n.get_text("ADMIN_PRODUCT_BUTTON_FORMAT", user_id=user_id).format(
+                        name=product["name"],
+                        category=product["category"],
+                        price=product["price"],
+                        status=status_text
+                    )
+                    
+                    keyboard.append([
+                        InlineKeyboardButton(
+                            product_text,
+                            callback_data=f"admin_remove_product_{product['id']}"
+                        )
+                    ])
+                
+                keyboard.append([
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
+                        callback_data="admin_menu_management"
+                    )
+                ])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            try:
+                await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            except Exception as edit_error:
+                if "Message is not modified" in str(edit_error):
+                    # Message content is identical, just answer the callback
+                    await query.answer()
+                else:
+                    # Re-raise other errors
+                    raise edit_error
+            
+        except Exception as e:
+            self.logger.error("Error showing remove products list: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
+
+
+    def _parse_product_input(self, text: str) -> Optional[Dict]:
+        """Parse product details from text input"""
+        try:
+            lines = text.strip().split('\n')
+            product_data = {}
+            
+            for line in lines:
+                line = line.strip()
+                if ':' in line:
+                    key, value = line.split(':', 1)
+                    key = key.strip().lower()
+                    value = value.strip()
+                    
+                    if key == 'name':
+                        product_data['name'] = value
+                    elif key == 'description':
+                        product_data['description'] = value
+                    elif key == 'category':
+                        product_data['category'] = value
+                    elif key == 'price':
+                        try:
+                            product_data['price'] = float(value)
+                        except ValueError:
+                            return None
+            
+            # Validate required fields
+            if not all(key in product_data for key in ['name', 'description', 'category', 'price']):
+                return None
+            
+            return product_data
+            
+        except Exception:
+            return None
+
 
 def register_admin_handlers(application: Application):
     """Register admin handlers"""
@@ -1084,9 +2494,9 @@ def register_admin_handlers(application: Application):
     # Admin command handler
     application.add_handler(CommandHandler("admin", handler.handle_admin_command))
 
-    # Admin callback handlers
+    # Admin callback handlers (excluding conversation patterns)
     application.add_handler(
-        CallbackQueryHandler(handler.handle_admin_callback, pattern="^admin_")
+        CallbackQueryHandler(handler.handle_admin_callback, pattern="^admin_(?!add_product_category_|add_product_confirm_|add_product$)")
     )
 
     # Admin conversation handler for status updates
@@ -1105,6 +2515,99 @@ def register_admin_handlers(application: Application):
     )
 
     application.add_handler(conv_handler)
+
+    # Admin conversation handler for adding products (step-by-step)
+    add_product_handler = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(handler._start_add_product, pattern="^admin_add_product$")
+        ],
+        states={
+            AWAITING_PRODUCT_NAME: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_product_name_input)
+            ],
+            AWAITING_PRODUCT_DESCRIPTION: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_product_description_input)
+            ],
+            AWAITING_PRODUCT_CATEGORY: [
+                CallbackQueryHandler(handler._handle_product_category_selection, pattern="^admin_add_product_category_")
+            ],
+            AWAITING_PRODUCT_PRICE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_product_price_input)
+            ],
+            AWAITING_PRODUCT_CONFIRMATION: [
+                CallbackQueryHandler(handler._handle_product_confirmation, pattern="^admin_add_product_confirm_")
+            ],
+        },
+        fallbacks=[
+            CommandHandler("cancel", lambda u, c: ConversationHandler.END),
+            CallbackQueryHandler(lambda u, c: ConversationHandler.END, pattern="^admin_menu_management$")
+        ],
+        name="add_product_conversation",
+        persistent=False,
+    )
+    
+    # Add debug logging to the conversation handler
+    handler.logger.info("🔧 Registering add_product_conversation handler")
+    application.add_handler(add_product_handler)
+    handler.logger.info("✅ add_product_conversation handler registered successfully")
+
+    # Admin conversation handler for searching products
+    search_products_handler = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(handler._start_search_products, pattern="^admin_search_products$")
+        ],
+        states={
+            AWAITING_SEARCH_TERM: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_search_products_input)
+            ],
+        },
+        fallbacks=[
+            CommandHandler("cancel", lambda u, c: ConversationHandler.END),
+            CallbackQueryHandler(lambda u, c: ConversationHandler.END, pattern="^admin_menu_management$")
+        ],
+    )
+
+    application.add_handler(search_products_handler)
+
+    # Admin conversation handler for adding categories
+    add_category_handler = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(handler._start_add_category, pattern="^admin_add_category$")
+        ],
+        states={
+            AWAITING_CATEGORY_NAME: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_category_name_input)
+            ],
+        },
+        fallbacks=[
+            CommandHandler("cancel", lambda u, c: ConversationHandler.END),
+            CallbackQueryHandler(lambda u, c: ConversationHandler.END, pattern="^admin_category_management$")
+        ],
+        name="add_category_conversation",
+        persistent=False,
+    )
+
+    application.add_handler(add_category_handler)
+
+    # Admin conversation handler for editing category names
+    edit_category_handler = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(handler._start_edit_category_name, pattern="^admin_edit_category_name_")
+        ],
+        states={
+            AWAITING_CATEGORY_NAME_EDIT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_category_name_edit_input)
+            ],
+        },
+        fallbacks=[
+            CommandHandler("cancel", lambda u, c: ConversationHandler.END),
+            CallbackQueryHandler(lambda u, c: ConversationHandler.END, pattern="^admin_category_management$")
+        ],
+        name="edit_category_conversation",
+        persistent=False,
+    )
+
+    application.add_handler(edit_category_handler)
 
     # Analytics callback handlers
     application.add_handler(
