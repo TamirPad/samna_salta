@@ -82,4 +82,23 @@ def _(key: str, language: Optional[str] = None, user_id: Optional[int] = None) -
 
 def tr(key: str, language: Optional[str] = None, user_id: Optional[int] = None) -> str:
     """Translation function alias for backward compatibility"""
-    return i18n.get_text(key, language, user_id) 
+    return i18n.get_text(key, language, user_id)
+
+def translate_category_name(category_name: str, user_id: Optional[int] = None, language: Optional[str] = None) -> str:
+    """Translate category name based on user's language preference"""
+    # Map English category names to translation keys
+    category_mapping = {
+        "bread": "CATEGORY_BREAD",
+        "spice": "CATEGORY_SPICE", 
+        "beverage": "CATEGORY_BEVERAGE",
+        "other": "CATEGORY_OTHER",
+        "spread": "CATEGORY_SPREAD"
+    }
+    
+    # Get the translation key for this category
+    translation_key = category_mapping.get(category_name.lower())
+    if translation_key:
+        return i18n.get_text(translation_key, language=language, user_id=user_id)
+    
+    # If no mapping found, return the original name
+    return category_name 

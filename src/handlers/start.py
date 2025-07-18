@@ -60,21 +60,32 @@ class OnboardingHandler:
             existing_customer = self.cart_service.get_customer(user.id)
 
             if existing_customer:
-                # Welcome back existing customer with main page
-                user_id = user.id
-                welcome_message = (
-                    f"🇾🇪 <b>{i18n.get_text('WELCOME', user_id=user_id)}</b> 🇾🇪\n\n"
-                    f"👋 <b>{i18n.get_text('WELCOME_BACK', user_id=user_id).format(name=existing_customer.full_name)}</b>\n\n"
-                    f"{i18n.get_text('WHAT_TO_ORDER_TODAY', user_id=user_id)}"
-                )
-                await update.message.reply_text(
-                    welcome_message,
-                    reply_markup=self._get_main_page_keyboard(user_id),
-                    parse_mode="HTML"
-                )
-                return END
+                # Check if customer has complete profile data
+                if self._is_customer_profile_complete(existing_customer):
+                    # Welcome back existing customer with main page
+                    user_id = user.id
+                    welcome_message = (
+                        f"🇾🇪 <b>{i18n.get_text('WELCOME', user_id=user_id)}</b> 🇾🇪\n\n"
+                        f"👋 <b>{i18n.get_text('WELCOME_BACK', user_id=user_id).format(name=existing_customer.name)}</b>\n\n"
+                        f"{i18n.get_text('WHAT_TO_ORDER_TODAY', user_id=user_id)}"
+                    )
+                    await update.message.reply_text(
+                        welcome_message,
+                        reply_markup=self._get_main_page_keyboard(user_id),
+                        parse_mode="HTML"
+                    )
+                    return END
+                else:
+                    # Customer exists but profile is incomplete - restart onboarding
+                    self.logger.info("Customer %s has incomplete profile, restarting onboarding", user.id)
+                    await update.message.reply_text(
+                        i18n.get_text("PROFILE_INCOMPLETE", user_id=user.id) + "\n\n" +
+                        i18n.get_text("PLEASE_COMPLETE_PROFILE", user_id=user.id),
+                        parse_mode="HTML"
+                    )
+                    # Continue to language selection
 
-            # Start onboarding for new customer with language selection
+            # Start onboarding for new customer or incomplete profile with language selection
             user_id = user.id
             await update.message.reply_text(
                 i18n.get_text("WELCOME_NEW_USER", user_id=user_id) + "\n\n" +
@@ -93,6 +104,14 @@ class OnboardingHandler:
             )
             return END
 
+    def _is_customer_profile_complete(self, customer) -> bool:
+        """Check if customer has complete profile data"""
+        return (
+            customer and
+            customer.name and len(customer.name.strip()) >= 2 and
+            customer.phone and len(customer.phone.strip()) >= 8
+        )
+
     async def handle_language_selection(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> int:
@@ -105,20 +124,28 @@ class OnboardingHandler:
             data = query.data
             
             if data == "language_en":
+                # Store language preference in context for later use
+                context.user_data["selected_language"] = "en"
+                # Also update the language manager cache for immediate use
                 from src.utils.language_manager import language_manager
-                language_manager.set_user_language(user_id, "en")
+                language_manager._user_languages[user_id] = "en"
+                
                 await query.edit_message_text(
-                    i18n.get_text("LANGUAGE_CHANGED", user_id=user_id) + "\n\n" +
-                    i18n.get_text("PLEASE_ENTER_NAME", user_id=user_id),
+                    i18n.get_text("LANGUAGE_CHANGED", language="en") + "\n\n" +
+                    i18n.get_text("PLEASE_ENTER_NAME", language="en"),
                     parse_mode="HTML"
                 )
                 return ONBOARDING_NAME
             elif data == "language_he":
+                # Store language preference in context for later use
+                context.user_data["selected_language"] = "he"
+                # Also update the language manager cache for immediate use
                 from src.utils.language_manager import language_manager
-                language_manager.set_user_language(user_id, "he")
+                language_manager._user_languages[user_id] = "he"
+                
                 await query.edit_message_text(
-                    i18n.get_text("LANGUAGE_CHANGED", user_id=user_id) + "\n\n" +
-                    i18n.get_text("PLEASE_ENTER_NAME", user_id=user_id),
+                    i18n.get_text("LANGUAGE_CHANGED", language="he") + "\n\n" +
+                    i18n.get_text("PLEASE_ENTER_NAME", language="he"),
                     parse_mode="HTML"
                 )
                 return ONBOARDING_NAME
@@ -146,10 +173,14 @@ class OnboardingHandler:
 
             user_id = update.effective_user.id
             
+            # Get user's language preference from context or language manager
+            from src.utils.language_manager import language_manager
+            user_language = context.user_data.get("selected_language") or language_manager.get_user_language(user_id)
+            
             # Basic validation
             if len(name) < 2:
                 await update.message.reply_text(
-                    i18n.get_text("NAME_TOO_SHORT", user_id=user_id),
+                    i18n.get_text("NAME_TOO_SHORT", language=user_language),
                     parse_mode="HTML"
                 )
                 return ONBOARDING_NAME
@@ -158,15 +189,15 @@ class OnboardingHandler:
             context.user_data["full_name"] = name
 
             await update.message.reply_text(
-                i18n.get_text("NICE_TO_MEET", user_id=user_id).format(name=name) + "\n\n" +
-                i18n.get_text("PLEASE_SHARE_PHONE", user_id=user_id),
+                i18n.get_text("NICE_TO_MEET", language=user_language).format(name=name) + "\n\n" +
+                i18n.get_text("PLEASE_SHARE_PHONE", language=user_language),
                 parse_mode="HTML"
             )
             return ONBOARDING_PHONE
 
         except Exception as e:
             self.logger.error("Error in handle_name: %s", e, exc_info=True)
-            await self._send_error_message(update, i18n.get_text("ERROR_TRY_START_AGAIN", user_id=user_id))
+            await self._send_error_message(update, i18n.get_text("ERROR_TRY_START_AGAIN", language=user_language))
             return END
 
     async def handle_phone(
@@ -185,26 +216,26 @@ class OnboardingHandler:
                 )
                 return END
 
+            # Get user's language preference from context or language manager
+            from src.utils.language_manager import language_manager
+            user_language = context.user_data.get("selected_language") or language_manager.get_user_language(user_id)
+
             # Validate customer data
             validation = self.cart_service.validate_customer_data(full_name, phone)
             if not validation["valid"]:
                 error_msg = ", ".join(validation["errors"])
                 await update.message.reply_text(
-                    i18n.get_text("VALIDATION_ERROR", user_id=user_id).format(error=error_msg) + "\n\n" + i18n.get_text("PLEASE_TRY_AGAIN", user_id=user_id),
+                    i18n.get_text("VALIDATION_ERROR", language=user_language).format(error=error_msg) + "\n\n" + i18n.get_text("PLEASE_TRY_AGAIN", language=user_language),
                     parse_mode="HTML"
                 )
                 return ONBOARDING_PHONE
-
-            # Get user's language preference
-            from src.utils.language_manager import language_manager
-            user_language = language_manager.get_user_language(user_id)
             
             # Register customer
             result = self.cart_service.register_customer(user_id, full_name, phone, user_language)
             
             if not result["success"]:
                 await update.message.reply_text(
-                    i18n.get_text("VALIDATION_ERROR", user_id=user_id).format(error=result["error"]) + "\n\n" + i18n.get_text("PLEASE_TRY_AGAIN", user_id=user_id),
+                    i18n.get_text("VALIDATION_ERROR", language=user_language).format(error=result["error"]) + "\n\n" + i18n.get_text("PLEASE_TRY_AGAIN", language=user_language),
                     parse_mode="HTML"
                 )
                 return ONBOARDING_PHONE
@@ -215,19 +246,19 @@ class OnboardingHandler:
 
             if result["is_returning"]:
                 await update.message.reply_text(
-                    i18n.get_text("WELCOME_BACK_UPDATED", user_id=user_id).format(name=result["customer"].full_name) + "\n\n" +
-                    i18n.get_text("INFO_UPDATED", user_id=user_id) + "\n\n" +
-                    i18n.get_text("WELCOME", user_id=user_id) + "\n\n" +
-                    i18n.get_text("WHAT_TO_ORDER_TODAY", user_id=user_id),
+                    i18n.get_text("WELCOME_BACK_UPDATED", language=user_language).format(name=result["customer"].name) + "\n\n" +
+                    i18n.get_text("INFO_UPDATED", language=user_language) + "\n\n" +
+                    i18n.get_text("WELCOME", language=user_language) + "\n\n" +
+                    i18n.get_text("WHAT_TO_ORDER_TODAY", language=user_language),
                     reply_markup=self._get_main_page_keyboard(user_id),
                     parse_mode="HTML"
                 )
                 next_state = END
             else:
                 await update.message.reply_text(
-                    i18n.get_text("THANK_YOU_PHONE", user_id=user_id).format(name=result["customer"].full_name) + "\n\n" +
-                    i18n.get_text("PLEASE_ENTER_DELIVERY_ADDRESS_ONBOARDING", user_id=user_id) + "\n\n" +
-                    i18n.get_text("DELIVERY_ADDRESS_ONBOARDING_HELP", user_id=user_id),
+                    i18n.get_text("THANK_YOU_PHONE", language=user_language).format(name=result["customer"].name) + "\n\n" +
+                    i18n.get_text("PLEASE_ENTER_DELIVERY_ADDRESS_ONBOARDING", language=user_language) + "\n\n" +
+                    i18n.get_text("DELIVERY_ADDRESS_ONBOARDING_HELP", language=user_language),
                     parse_mode="HTML"
                 )
                 next_state = ONBOARDING_DELIVERY_ADDRESS
@@ -235,7 +266,7 @@ class OnboardingHandler:
         except Exception as e:
             self.logger.error("Error in handle_phone: %s", e, exc_info=True)
             await update.message.reply_text(
-                i18n.get_text("VALIDATION_ERROR", user_id=user_id).format(error=str(e)) + "\n\n" + i18n.get_text("ENTER_VALID_PHONE", user_id=user_id)
+                i18n.get_text("VALIDATION_ERROR", language=user_language).format(error=str(e)) + "\n\n" + i18n.get_text("ENTER_VALID_PHONE", language=user_language)
             )
             next_state = ONBOARDING_PHONE
 
@@ -412,8 +443,8 @@ class OnboardingHandler:
             if customer:
                 info_text = (
                     f"👤 <b>{i18n.get_text('MY_INFO_TITLE', user_id=user_id)}</b>\n\n"
-                    f"<b>{i18n.get_text('NAME_FIELD', user_id=user_id)}</b> {customer.full_name}\n"
-                    f"<b>{i18n.get_text('PHONE_FIELD', user_id=user_id)}</b> {customer.phone_number}\n"
+                    f"<b>{i18n.get_text('NAME_FIELD', user_id=user_id)}</b> {customer.name or '🤷'}\n"
+                    f"<b>{i18n.get_text('PHONE_FIELD', user_id=user_id)}</b> {customer.phone or '📞'}\n"
                     f"<b>{i18n.get_text('ADDRESS_FIELD', user_id=user_id)}</b> {customer.delivery_address or i18n.get_text('NOT_SET', user_id=user_id)}\n\n"
                     f"{i18n.get_text('CONTACT_SUPPORT_FOR_UPDATES', user_id=user_id)}"
                 )
@@ -436,12 +467,12 @@ class OnboardingHandler:
     async def _show_menu(self, query: CallbackQuery):
         """Show the food menu"""
         try:
-            from src.keyboards.menu_keyboards import get_main_menu_keyboard
+            from src.keyboards.menu_keyboards import get_dynamic_main_menu_keyboard
             user_id = query.from_user.id
             
             await query.edit_message_text(
                 i18n.get_text("MENU_PROMPT", user_id=user_id),
-                reply_markup=get_main_menu_keyboard(user_id),
+                reply_markup=get_dynamic_main_menu_keyboard(user_id),
                 parse_mode="HTML"
             )
 
@@ -461,7 +492,7 @@ class OnboardingHandler:
             if customer:
                 welcome_message = (
                     f"🇾🇪 <b>{i18n.get_text('WELCOME', user_id=user_id)}</b> 🇾🇪\n\n"
-                    f"👋 <b>{i18n.get_text('WELCOME_BACK', user_id=user_id).format(name=customer.full_name)}</b>\n\n"
+                    f"👋 <b>{i18n.get_text('WELCOME_BACK', user_id=user_id).format(name=customer.name)}</b>\n\n"
                     f"{i18n.get_text('WHAT_TO_ORDER_TODAY', user_id=user_id)}"
                 )
             else:
@@ -488,10 +519,9 @@ class OnboardingHandler:
         from src.utils.language_manager import language_manager
         
         current_lang = language_manager.get_user_language(user_id)
-        lang_display = "🇺🇸 English" if current_lang == "en" else "🇮🇱 עברית"
         
         keyboard = [
-            [InlineKeyboardButton(f"🌐 {lang_display}", callback_data="language_selection")],
+            [InlineKeyboardButton(i18n.get_text("LANGUAGE_BUTTON", user_id=user_id), callback_data="language_selection")],
             [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="main_page")],
         ]
         return InlineKeyboardMarkup(keyboard)
@@ -573,7 +603,7 @@ class OnboardingHandler:
             language_manager.set_user_language(user_id, language)
             
             # Show success message in new language and return to My Info
-            success_text = i18n.get_text("LANGUAGE_CHANGED", user_id=user_id)
+            success_text = i18n.get_text("LANGUAGE_CHANGED", language=language)
             await query.edit_message_text(
                 success_text,
                 reply_markup=self._get_my_info_keyboard(user_id),

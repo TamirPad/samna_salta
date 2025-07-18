@@ -6,7 +6,151 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from src.utils.helpers import is_hilbeh_available
 from src.utils.i18n import i18n
+from src.utils.helpers import translate_category_name
 from src.keyboards.order_keyboards import get_delivery_method_keyboard
+from src.db.operations import get_all_products, get_products_by_category
+
+
+def get_dynamic_main_menu_keyboard(user_id: int = None):
+    """Get dynamic main menu keyboard that shows categories first."""
+    try:
+        from src.db.operations import get_db_manager
+        
+        # Use session context to ensure relationships are loaded properly
+        with get_db_manager().get_session_context() as session:
+            from src.db.models import Product
+            
+            # Get all active products with their categories loaded
+            products = session.query(Product).filter(Product.is_active).all()
+            
+            if not products:
+                # Fallback to static menu if no products found
+                return get_main_menu_keyboard(user_id)
+            
+            # Group products by category
+            categories = {}
+            for product in products:
+                # Access category name safely
+                category_name = product.category or "other"
+                if category_name not in categories:
+                    categories[category_name] = []
+                categories[category_name].append(product)
+            
+            # Build keyboard with only category buttons
+            keyboard = []
+            
+            # Add category buttons (max 2 per row)
+            row = []
+            for category, category_products in categories.items():
+                # Create category button with product count using translated category name
+                translated_category = translate_category_name(category, user_id)
+                button_text = f"📂 {translated_category} ({len(category_products)})"
+                callback_data = f"category_{category}"
+                
+                row.append(InlineKeyboardButton(button_text, callback_data=callback_data))
+                
+                # Add row when we have 2 categories or it's the last category
+                if len(row) == 2 or category == list(categories.keys())[-1]:
+                    keyboard.append(row)
+                    row = []
+            
+            # Add search button
+            keyboard.append([InlineKeyboardButton(i18n.get_text("SEARCH_PRODUCTS", user_id=user_id), callback_data="menu_search")])
+            
+            # Add standard action buttons
+            keyboard.append([InlineKeyboardButton(i18n.get_text("BUTTON_VIEW_CART", user_id=user_id), callback_data="cart_view")])
+            keyboard.append([InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="main_page")])
+            
+            return InlineKeyboardMarkup(keyboard)
+        
+    except Exception as e:
+        print(f"Error creating dynamic menu: {e}")
+        return get_main_menu_keyboard(user_id)
+
+
+def get_category_menu_keyboard(category: str, user_id: int = None):
+    """Get menu keyboard for a specific category."""
+    try:
+        products = get_products_by_category(category)
+        
+        if not products:
+            # Return to main menu if no products in category
+            keyboard = [
+                [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")]
+            ]
+            return InlineKeyboardMarkup(keyboard)
+        
+        keyboard = []
+        
+        # Add product buttons (max 2 per row) - clicking these shows product details
+        row = []
+        for product in products:
+            # Product button - clicking this shows product details
+            button_text = f"{product.name}\n₪{product.price:.2f}"
+            callback_data = f"product_{product.id}"
+            
+            row.append(InlineKeyboardButton(button_text, callback_data=callback_data))
+            
+            if len(row) == 2 or product == products[-1]:
+                keyboard.append(row)
+                row = []
+        
+        # Add action buttons
+        keyboard.append([InlineKeyboardButton(i18n.get_text("BUTTON_VIEW_CART", user_id=user_id), callback_data="cart_view")])
+        keyboard.append([InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")])
+        
+        return InlineKeyboardMarkup(keyboard)
+        
+    except Exception as e:
+        print(f"Error creating category menu: {e}")
+        # Fallback to simple back button
+        keyboard = [
+            [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")]
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
+
+def get_search_results_keyboard(results, user_id: int = None):
+    """Get keyboard for search results."""
+    try:
+        keyboard = []
+        
+        # Add product buttons (max 2 per row)
+        row = []
+        for product in results:
+            button_text = f"{product.name}\n₪{product.price:.2f}"
+            callback_data = f"product_{product.id}"
+            
+            row.append(InlineKeyboardButton(button_text, callback_data=callback_data))
+            
+            if len(row) == 2 or product == results[-1]:
+                keyboard.append(row)
+                row = []
+        
+        # Add quick add buttons (max 2 per row)
+        row = []
+        for product in results:
+            quick_add_text = f"➕ {product.name}"
+            callback_data = f"quick_add_{product.id}"
+            
+            row.append(InlineKeyboardButton(quick_add_text, callback_data=callback_data))
+            
+            if len(row) == 2 or product == results[-1]:
+                keyboard.append(row)
+                row = []
+        
+        # Add action buttons
+        keyboard.append([InlineKeyboardButton(i18n.get_text("BUTTON_VIEW_CART", user_id=user_id), callback_data="cart_view")])
+        keyboard.append([InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")])
+        
+        return InlineKeyboardMarkup(keyboard)
+        
+    except Exception as e:
+        print(f"Error creating search results keyboard: {e}")
+        keyboard = [
+            [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")]
+        ]
+        return InlineKeyboardMarkup(keyboard)
 
 
 def get_main_menu_keyboard(user_id: int = None):
@@ -25,6 +169,7 @@ def get_main_menu_keyboard(user_id: int = None):
             InlineKeyboardButton(i18n.get_text("BUTTON_WHITE_COFFEE", user_id=user_id), callback_data="menu_white_coffee"),
         ],
         [InlineKeyboardButton(i18n.get_text("BUTTON_HILBEH", user_id=user_id), callback_data="menu_hilbeh")],
+        [InlineKeyboardButton(i18n.get_text("SEARCH_PRODUCTS", user_id=user_id), callback_data="menu_search")],
         [InlineKeyboardButton(i18n.get_text("BUTTON_VIEW_CART", user_id=user_id), callback_data="cart_view")],
         [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="main_page")],
     ]
@@ -33,7 +178,7 @@ def get_main_menu_keyboard(user_id: int = None):
 
 
 def get_kubaneh_menu_keyboard(user_id: int = None):
-    """Get Kubaneh sub-menu keyboard"""
+    """Get Kubaneh menu keyboard."""
     keyboard = [
         [
             InlineKeyboardButton(i18n.get_text("KUBANEH_CLASSIC", user_id=user_id), callback_data="kubaneh_classic"),
@@ -43,109 +188,75 @@ def get_kubaneh_menu_keyboard(user_id: int = None):
             InlineKeyboardButton(i18n.get_text("KUBANEH_HERB", user_id=user_id), callback_data="kubaneh_herb"),
             InlineKeyboardButton(i18n.get_text("KUBANEH_AROMATIC", user_id=user_id), callback_data="kubaneh_aromatic"),
         ],
+        [InlineKeyboardButton(i18n.get_text("BUTTON_VIEW_CART", user_id=user_id), callback_data="cart_view")],
         [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")],
     ]
-
-    return InlineKeyboardMarkup(keyboard)
-
-
-def get_kubaneh_oil_keyboard(kubaneh_type: str, user_id: int = None):
-    """Get Kubaneh oil selection keyboard"""
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                i18n.get_text("OIL_OLIVE", user_id=user_id), callback_data=f"kubaneh_{kubaneh_type}_olive_oil"
-            ),
-            InlineKeyboardButton(
-                i18n.get_text("OIL_SAMNEH", user_id=user_id), callback_data=f"kubaneh_{kubaneh_type}_samneh"
-            ),
-        ],
-        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_kubaneh")],
-    ]
-
     return InlineKeyboardMarkup(keyboard)
 
 
 def get_samneh_menu_keyboard(user_id: int = None):
-    """Get Samneh sub-menu keyboard"""
+    """Get Samneh menu keyboard."""
     keyboard = [
         [
-            InlineKeyboardButton(i18n.get_text("SAMNEH_SMOKED", user_id=user_id), callback_data="samneh_smoked"),
-            InlineKeyboardButton(i18n.get_text("SAMNEH_NOT_SMOKED", user_id=user_id), callback_data="samneh_not_smoked"),
+            InlineKeyboardButton(i18n.get_text("SAMNEH_CLASSIC", user_id=user_id), callback_data="samneh_classic"),
+            InlineKeyboardButton(i18n.get_text("SAMNEH_SPICY", user_id=user_id), callback_data="samneh_spicy"),
         ],
+        [
+            InlineKeyboardButton(i18n.get_text("SAMNEH_HERB", user_id=user_id), callback_data="samneh_herb"),
+            InlineKeyboardButton(i18n.get_text("SAMNEH_HONEY", user_id=user_id), callback_data="samneh_honey"),
+        ],
+        [InlineKeyboardButton(i18n.get_text("BUTTON_VIEW_CART", user_id=user_id), callback_data="cart_view")],
         [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")],
     ]
-
-    return InlineKeyboardMarkup(keyboard)
-
-
-def get_samneh_size_keyboard(smoking_type: str, user_id: int = None):
-    """Get Samneh size selection keyboard"""
-    keyboard = [
-        [
-            InlineKeyboardButton(i18n.get_text("SIZE_SMALL", user_id=user_id), callback_data=f"samneh_{smoking_type}_small"),
-            InlineKeyboardButton(i18n.get_text("SIZE_LARGE", user_id=user_id), callback_data=f"samneh_{smoking_type}_large"),
-        ],
-        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_samneh")],
-    ]
-
     return InlineKeyboardMarkup(keyboard)
 
 
 def get_red_bisbas_menu_keyboard(user_id: int = None):
-    """Get Red Bisbas menu keyboard"""
+    """Get Red Bisbas menu keyboard."""
     keyboard = [
         [
-            InlineKeyboardButton(i18n.get_text("SIZE_SMALL", user_id=user_id), callback_data="red_bisbas_small"),
-            InlineKeyboardButton(i18n.get_text("SIZE_LARGE", user_id=user_id), callback_data="red_bisbas_large"),
+            InlineKeyboardButton(i18n.get_text("RED_BISBAS_SMALL", user_id=user_id), callback_data="red_bisbas_small"),
+            InlineKeyboardButton(i18n.get_text("RED_BISBAS_MEDIUM", user_id=user_id), callback_data="red_bisbas_medium"),
         ],
+        [
+            InlineKeyboardButton(i18n.get_text("RED_BISBAS_LARGE", user_id=user_id), callback_data="red_bisbas_large"),
+            InlineKeyboardButton(i18n.get_text("RED_BISBAS_XL", user_id=user_id), callback_data="red_bisbas_xl"),
+        ],
+        [InlineKeyboardButton(i18n.get_text("BUTTON_VIEW_CART", user_id=user_id), callback_data="cart_view")],
         [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")],
     ]
-
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_direct_add_keyboard(product_name: str, include_info: bool = True, user_id: int = None):
-    """Get direct add-to-cart keyboard."""
-    add_button = InlineKeyboardButton(
-        i18n.get_text("ADD_TO_CART", user_id=user_id),
-        callback_data=f"add_{product_name.lower().replace(' ', '_')}",
-    )
-
-    rows = [[add_button]]
-
-    if include_info:
-        info_button = InlineKeyboardButton(
-            i18n.get_text("INFO", user_id=user_id),
-            callback_data=f"info_{product_name.lower().replace(' ', '_')}",
-        )
-        rows.append([info_button])
-
-    rows.append([InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")])
-
-    return InlineKeyboardMarkup(rows)
-
-
 def get_hilbeh_menu_keyboard(user_id: int = None):
-    """Get Hilbeh menu keyboard (with availability check)"""
+    """Get Hilbeh menu keyboard with availability check."""
     if is_hilbeh_available():
         keyboard = [
-            [InlineKeyboardButton(i18n.get_text("ADD_TO_CART", user_id=user_id), callback_data="add_hilbeh")],
-            [InlineKeyboardButton(i18n.get_text("INFO", user_id=user_id), callback_data="info_hilbeh")],
+            [
+                InlineKeyboardButton(i18n.get_text("HILBEH_CLASSIC", user_id=user_id), callback_data="hilbeh_classic"),
+                InlineKeyboardButton(i18n.get_text("HILBEH_SPICY", user_id=user_id), callback_data="hilbeh_spicy"),
+            ],
+            [
+                InlineKeyboardButton(i18n.get_text("HILBEH_SWEET", user_id=user_id), callback_data="hilbeh_sweet"),
+                InlineKeyboardButton(i18n.get_text("HILBEH_PREMIUM", user_id=user_id), callback_data="hilbeh_premium"),
+            ],
+            [InlineKeyboardButton(i18n.get_text("BUTTON_VIEW_CART", user_id=user_id), callback_data="cart_view")],
             [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")],
         ]
     else:
         keyboard = [
-            [
-                InlineKeyboardButton(
-                    i18n.get_text("HILBEH_UNAVAILABLE", user_id=user_id),
-                    callback_data="hilbeh_unavailable",
-                )
-            ],
-            [InlineKeyboardButton(i18n.get_text("INFO", user_id=user_id), callback_data="info_hilbeh")],
             [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")],
-    ]
+        ]
+    return InlineKeyboardMarkup(keyboard)
 
+
+def get_direct_add_keyboard(product_type: str, user_id: int = None):
+    """Get direct add to cart keyboard for simple products."""
+    keyboard = [
+        [InlineKeyboardButton(i18n.get_text("ADD_TO_CART", user_id=user_id), callback_data=f"add_{product_type}")],
+        [InlineKeyboardButton(i18n.get_text("BUTTON_VIEW_CART", user_id=user_id), callback_data="cart_view")],
+        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")],
+    ]
     return InlineKeyboardMarkup(keyboard)
 
 

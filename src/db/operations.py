@@ -5,7 +5,7 @@ Enhanced with proper type annotations, constant usage, and performance optimizat
 """
 
 import logging
-import sqlite3
+# PostgreSQL operations only
 import time
 from datetime import datetime
 from functools import wraps
@@ -23,10 +23,15 @@ from src.config import get_config
 from src.db.models import (
     Base,
     Cart,
+    CartItem,
     Customer,
     Order,
     OrderItem,
     Product,
+    MenuCategory,
+    CoreBusiness,
+    AnalyticsDailySales,
+    AnalyticsProductPerformance,
 )
 from src.utils.logger import PerformanceLogger
 from src.utils.constants import (
@@ -108,27 +113,15 @@ class DatabaseManager:
             "echo": self.config.environment == "development",
         }
 
-        # SQLite-specific: use StaticPool and omit pool_size / max_overflow which are invalid
-        if database_url.startswith("sqlite"):
-            engine_kwargs.update(
-                {
-                    "poolclass": StaticPool,
-                    "connect_args": {
-                        "check_same_thread": False,
-                        "timeout": RetrySettings.CONNECTION_TIMEOUT_SECONDS,
-                    },
-                }
-            )
+        # PostgreSQL/Supabase: configure pool sizing
+        if self.config.environment == "production":
+            pool_size = DatabaseSettings.PRODUCTION_POOL_SIZE
+            max_overflow = DatabaseSettings.PRODUCTION_MAX_OVERFLOW
         else:
-            # PostgreSQL/Supabase: configure pool sizing
-            if self.config.environment == "production":
-                pool_size = DatabaseSettings.PRODUCTION_POOL_SIZE
-                max_overflow = DatabaseSettings.PRODUCTION_MAX_OVERFLOW
-            else:
-                pool_size = DatabaseSettings.DEVELOPMENT_POOL_SIZE
-                max_overflow = DatabaseSettings.DEVELOPMENT_MAX_OVERFLOW
+            pool_size = DatabaseSettings.DEVELOPMENT_POOL_SIZE
+            max_overflow = DatabaseSettings.DEVELOPMENT_MAX_OVERFLOW
 
-            engine_kwargs.update({"pool_size": pool_size, "max_overflow": max_overflow})
+        engine_kwargs.update({"pool_size": pool_size, "max_overflow": max_overflow})
 
         engine = create_engine(database_url, **engine_kwargs)
 
@@ -200,84 +193,48 @@ class DatabaseManager:
     def create_tables(self) -> None:
         """Create all database tables"""
         try:
-            with PerformanceLogger("create_tables", self.logger):
-                Base.metadata.create_all(self.get_engine())
+            # Create all tables
+            Base.metadata.create_all(self.get_engine())
 
-                # ------------------------------------------------------------------
-                # Lightweight auto-migration for SQLite: add newly introduced columns
-                # when the table already exists but column is missing.  This keeps
-                # Render deploys working without Alembic.
-                # ------------------------------------------------------------------
+            # ------------------------------------------------------------------
+            # Lightweight auto-migration for SQLite and PostgreSQL: add newly introduced columns
+            # when the table already exists but column is missing.  This keeps
+            # Render deploys working without Alembic.
+            # ------------------------------------------------------------------
 
-                if self.get_engine().dialect.name == "sqlite":
-                    conn = self.get_engine().connect()
+            engine = self.get_engine()
+            dialect_name = engine.dialect.name
+            
+            if dialect_name == "postgresql":
+                conn = engine.connect()
 
-                    def _column_exists(table: str, column: str) -> bool:
-                        res = conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
-                        return any(row[1] == column for row in res)
+                def _column_exists(table: str, column: str) -> bool:
+                    query = text("""
+                        SELECT column_name 
+                        FROM information_schema.columns 
+                        WHERE table_name = :table AND column_name = :column
+                    """)
+                    result = conn.execute(query, {"table": table, "column": column}).fetchone()
+                    return result is not None
 
-                    migrations = [
-                        ("products", "price", "ALTER TABLE products ADD COLUMN price FLOAT DEFAULT 0.0"),
-                        ("products", "category", "ALTER TABLE products ADD COLUMN category VARCHAR(50)"),
-                        # ------------------------------------------------------------------
-                        # Customers table – added in v0.2.0 but may be missing on old DBs
-                        # ------------------------------------------------------------------
-                        ("customers", "name", "ALTER TABLE customers ADD COLUMN name VARCHAR(100) DEFAULT ''"),
-                        (
-                            "customers",
-                            "phone_number",
-                            "ALTER TABLE customers ADD COLUMN phone_number VARCHAR(20) DEFAULT ''",
-                        ),
-                        (
-                            "customers",
-                            "delivery_address",
-                            "ALTER TABLE customers ADD COLUMN delivery_address VARCHAR(500)",
-                        ),
-                        (
-                            "customers",
-                            "created_at",
-                            "ALTER TABLE customers ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP",
-                        ),
-                        (
-                            "customers",
-                            "updated_at",
-                            "ALTER TABLE customers ADD COLUMN updated_at DATETIME",
-                        ),
-                        (
-                            "carts",
-                            "delivery_method",
-                            "ALTER TABLE carts ADD COLUMN delivery_method VARCHAR(20) DEFAULT 'pickup'",
-                        ),
-                        (
-                            "carts",
-                            "customer_id",
-                            "ALTER TABLE carts ADD COLUMN customer_id INTEGER",
-                        ),
-                        (
-                            "orders",
-                            "delivery_method",
-                            "ALTER TABLE orders ADD COLUMN delivery_method VARCHAR(20) DEFAULT 'pickup'",
-                        ),
-                        (
-                            "order_items",
-                            "product_id",
-                            "ALTER TABLE order_items ADD COLUMN product_id INTEGER REFERENCES products(id)",
-                        ),
-                        (
-                            "orders",
-                            "items",
-                            "ALTER TABLE orders ADD COLUMN items JSON",
-                        ),
-                    ]
+                migrations = [
+                    ("carts", "delivery_method", "ALTER TABLE carts ADD COLUMN delivery_method VARCHAR(20) DEFAULT 'pickup'"),
+                    ("carts", "delivery_address", "ALTER TABLE carts ADD COLUMN delivery_address VARCHAR(500)"),
+                    ("carts", "created_at", "ALTER TABLE carts ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP"),
+                    ("carts", "updated_at", "ALTER TABLE carts ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE"),
+                    ("cart_items", "product_options", "ALTER TABLE cart_items ADD COLUMN product_options JSONB DEFAULT '{}'"),
+                    ("cart_items", "created_at", "ALTER TABLE cart_items ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP"),
+                    ("cart_items", "updated_at", "ALTER TABLE cart_items ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE"),
+                ]
 
-                    for table, column, ddl in migrations:
-                        if not _column_exists(table, column):
-                            self.logger.info("Auto-migrating: %s", ddl)
-                            conn.execute(text(ddl))
+                for table, column, ddl in migrations:
+                    if not _column_exists(table, column):
+                        self.logger.info("Auto-migrating PostgreSQL: %s", ddl)
+                        conn.execute(text(ddl))
 
-                    conn.close()
+                conn.close()
 
-                self.logger.info("Database tables created/updated successfully")
+            self.logger.info("Database tables created/updated successfully")
         except SQLAlchemyError as e:
             self.logger.error(f"Failed to create database tables: {e}", exc_info=True)
             raise DatabaseOperationError(
@@ -405,6 +362,58 @@ def retry_on_database_error(
     return decorator
 
 
+def reinitialize_products_with_categories():
+    """Reinitialize products with proper category relationships"""
+    session = get_db_session()
+    try:
+        # First, create categories
+        categories_data = [
+            {"name": "bread", "description": "Traditional breads", "display_order": 1},
+            {"name": "spread", "description": "Traditional spreads and condiments", "display_order": 2},
+            {"name": "spice", "description": "Traditional spice blends", "display_order": 3},
+            {"name": "beverage", "description": "Traditional beverages", "display_order": 4},
+        ]
+        
+        # Create categories and store them in a dict for easy lookup
+        categories = {}
+        for cat_data in categories_data:
+            existing_cat = session.query(MenuCategory).filter(MenuCategory.name == cat_data["name"]).first()
+            if existing_cat:
+                categories[cat_data["name"]] = existing_cat
+            else:
+                category = MenuCategory(**cat_data)
+                session.add(category)
+                session.flush()  # Get the ID
+                categories[cat_data["name"]] = category
+
+        # Update existing products with proper category relationships
+        product_updates = [
+            ("Kubaneh", "bread"),
+            ("Samneh", "spread"),
+            ("Red Bisbas", "spice"),
+            ("Hawaij soup spice", "spice"),
+            ("Hawaij coffee spice", "spice"),
+            ("White coffee", "beverage"),
+            ("Hilbeh", "spread"),
+        ]
+
+        for product_name, category_name in product_updates:
+            product = session.query(Product).filter(Product.name == product_name).first()
+            if product and category_name in categories:
+                product.category_id = categories[category_name].id
+                logger.info(f"Updated product '{product_name}' with category '{category_name}'")
+
+        session.commit()
+        logger.info("Successfully reinitialized products with proper categories")
+
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error("Failed to reinitialize products: %s", e)
+        raise
+    finally:
+        session.close()
+
+
 def init_db():
     """Initialize database tables with connection retry logic"""
     max_retries = 3
@@ -426,6 +435,9 @@ def init_db():
 
             # Initialize default products
             init_default_products()
+            
+            # Reinitialize products with proper categories (in case they were created without categories)
+            reinitialize_products_with_categories()
             
             logger.info("Database initialization completed successfully")
             return
@@ -454,58 +466,78 @@ def init_default_products():
             logger.info("Products already exist, skipping initialization")
             return
 
+        # First, create categories
+        categories_data = [
+            {"name": "bread", "description": "Traditional breads", "display_order": 1},
+            {"name": "spread", "description": "Traditional spreads and condiments", "display_order": 2},
+            {"name": "spice", "description": "Traditional spice blends", "display_order": 3},
+            {"name": "beverage", "description": "Traditional beverages", "display_order": 4},
+        ]
+        
+        # Create categories and store them in a dict for easy lookup
+        categories = {}
+        for cat_data in categories_data:
+            existing_cat = session.query(MenuCategory).filter(MenuCategory.name == cat_data["name"]).first()
+            if existing_cat:
+                categories[cat_data["name"]] = existing_cat
+            else:
+                category = MenuCategory(**cat_data)
+                session.add(category)
+                session.flush()  # Get the ID
+                categories[cat_data["name"]] = category
+
         # Default products configuration
         products = [
             {
                 "name": "Kubaneh",
-                "category": "bread",
+                "category_id": categories["bread"].id,
                 "description": "Traditional Yemenite bread",
                 "price": 25.00,
             },
             {
                 "name": "Samneh",
-                "category": "spread",
+                "category_id": categories["spread"].id,
                 "description": "Traditional clarified butter",
                 "price": 15.00,
             },
             {
                 "name": "Red Bisbas",
-                "category": "spice",
+                "category_id": categories["spice"].id,
                 "description": "Traditional Yemenite spice blend",
                 "price": 12.00,
             },
             {
                 "name": "Hawaij soup spice",
-                "category": "spice",
+                "category_id": categories["spice"].id,
                 "description": "Traditional soup spice blend",
                 "price": 8.00,
             },
             {
                 "name": "Hawaij coffee spice",
-                "category": "spice",
+                "category_id": categories["spice"].id,
                 "description": "Traditional coffee spice blend",
                 "price": 8.00,
             },
             {
                 "name": "White coffee",
-                "category": "beverage",
+                "category_id": categories["beverage"].id,
                 "description": "Traditional Yemenite white coffee",
                 "price": 10.00,
             },
             {
                 "name": "Hilbeh",
-                "category": "spread",
+                "category_id": categories["spread"].id,
                 "description": "Traditional fenugreek spread (available Wed-Fri only)",
                 "price": 18.00,
             },
         ]
 
         for product_data in products:
-            # Ensure price field is set correctly
-            if "price" in product_data:
-                product_data["price"] = product_data["price"]
-            product = Product(**product_data)
-            session.add(product)
+            # Check if product already exists
+            existing_product = session.query(Product).filter(Product.name == product_data["name"]).first()
+            if not existing_product:
+                product = Product(**product_data)
+                session.add(product)
 
         session.commit()
         logger.info("Initialized %d default products", len(products))
@@ -526,27 +558,56 @@ def get_or_create_customer(
     """Get existing customer or create new one"""
     session = get_db_session()
     try:
+        # First check if customer exists with this telegram_id
         customer = (
             session.query(Customer)
-            .filter(Customer.phone_number == phone_number)
+            .filter(Customer.telegram_id == telegram_id)
             .first()
         )
 
         if customer:
-            # Update telegram_id if it changed
-            if customer.telegram_id != telegram_id:
-                customer.telegram_id = telegram_id
-                customer.updated_at = datetime.utcnow()
-                session.commit()
+            # Update existing customer's information
+            customer.name = full_name
+            customer.phone = phone_number
+            customer.language = language
+            customer.updated_at = datetime.utcnow()
+            session.commit()
+            session.refresh(customer)
+            logger.info("Updated existing customer %s with new information: name='%s', phone='%s', language='%s'", 
+                       telegram_id, full_name, phone_number, language)
             return customer
+
+        # Check if customer exists with this phone number (but different telegram_id)
+        existing_customer = (
+            session.query(Customer)
+            .filter(Customer.phone == phone_number)
+            .first()
+        )
+
+        if existing_customer:
+            # Update telegram_id if it changed
+            existing_customer.telegram_id = telegram_id
+            existing_customer.name = full_name
+            existing_customer.language = language
+            existing_customer.updated_at = datetime.utcnow()
+            session.commit()
+            session.refresh(existing_customer)
+            logger.info("Updated customer with phone %s to telegram_id %s", phone_number, telegram_id)
+            return existing_customer
 
         # Create new customer
         customer = Customer(
-            telegram_id=telegram_id, full_name=full_name, phone_number=phone_number, language=language
+            telegram_id=telegram_id, 
+            name=full_name, 
+            phone=phone_number, 
+            language=language,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
         )
         session.add(customer)
         session.commit()
         session.refresh(customer)
+        logger.info("Created new customer %s", telegram_id)
         return customer
 
     except SQLAlchemyError as e:
@@ -557,7 +618,6 @@ def get_or_create_customer(
         session.close()
 
 
-@retry_on_database_error()
 def get_customer_by_telegram_id(telegram_id: int) -> Customer | None:
     """Get customer by telegram ID"""
     session = get_db_session()
@@ -581,7 +641,32 @@ def get_all_products() -> list[Product]:
 
 
 @retry_on_database_error()
-def get_product_by_name(name: str) -> Product | None:
+def get_all_products_admin() -> list[dict]:
+    """Get all products (including inactive) for admin management"""
+    session = get_db_session()
+    try:
+        products = session.query(Product, MenuCategory.name.label('category_name')).join(MenuCategory).order_by(MenuCategory.name, Product.name).all()
+        
+        result = []
+        for product, category_name in products:
+            result.append({
+                "id": product.id,
+                "name": product.name,
+                "description": product.description,
+                "category": category_name,
+                "price": product.price,
+                "is_active": product.is_active,
+                "created_at": product.created_at,
+                "updated_at": product.updated_at
+            })
+        
+        return result
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def get_product_by_name(name: str) -> Optional[Product]:
     """Get product by name"""
     session = get_db_session()
     try:
@@ -591,11 +676,195 @@ def get_product_by_name(name: str) -> Product | None:
 
 
 @retry_on_database_error()
-def get_product_by_id(product_id: int) -> Product | None:
-    """Get product by ID"""
+def get_product_by_id(product_id: int) -> Optional[Product]:
+    """Get product by ID with category relationship loaded"""
     session = get_db_session()
     try:
-        return session.query(Product).filter(Product.id == product_id).first()
+        return session.query(Product).options(joinedload(Product.category_rel)).filter(Product.id == product_id).first()
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def get_product_dict_by_id(product_id: int) -> Optional[Dict]:
+    """Get product by ID as a dictionary with category name resolved"""
+    session = get_db_session()
+    try:
+        product = session.query(Product).options(joinedload(Product.category_rel)).filter(Product.id == product_id).first()
+        if not product:
+            return None
+        
+        return {
+            "id": product.id,
+            "name": product.name,
+            "description": product.description,
+            "category": product.category_rel.name if product.category_rel else "Uncategorized",
+            "price": product.price,
+            "is_active": product.is_active,
+            "created_at": product.created_at,
+            "updated_at": product.updated_at
+        }
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def create_product(name: str, description: str, category: str, price: float) -> Optional[Product]:
+    """Create a new product"""
+    session = get_db_session()
+    try:
+        # Check if product with same name already exists
+        existing_product = session.query(Product).filter(Product.name == name).first()
+        if existing_product:
+            logger.warning("Product with name '%s' already exists", name)
+            return None
+        
+        # Get category by name
+        category_obj = session.query(MenuCategory).filter(MenuCategory.name == category).first()
+        if not category_obj:
+            logger.warning("Category '%s' not found", category)
+            return None
+        
+        product = Product(
+            name=name,
+            description=description,
+            category_id=category_obj.id,
+            price=price,
+            is_active=True
+        )
+        session.add(product)
+        session.commit()
+        session.refresh(product)
+        logger.info("Created new product: %s (ID: %d)", name, product.id)
+        return product
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error("Failed to create product '%s': %s", name, e)
+        return None
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def update_product(product_id: int, **kwargs) -> bool:
+    """Update product by ID with provided fields"""
+    session = get_db_session()
+    try:
+        product = session.query(Product).filter(Product.id == product_id).first()
+        if not product:
+            logger.warning("Product with ID %d not found", product_id)
+            return False
+        
+        # Update allowed fields
+        allowed_fields = ['name', 'description', 'price', 'is_active']
+        for field, value in kwargs.items():
+            if field in allowed_fields:
+                setattr(product, field, value)
+            elif field == 'category':
+                # Handle category by name
+                category_obj = session.query(MenuCategory).filter(MenuCategory.name == value).first()
+                if category_obj:
+                    product.category_id = category_obj.id
+                else:
+                    logger.warning("Category '%s' not found", value)
+                    return False
+        
+        product.updated_at = datetime.utcnow()
+        session.commit()
+        logger.info("Updated product ID %d: %s", product_id, kwargs)
+        return True
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error("Failed to update product ID %d: %s", product_id, e)
+        return False
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def delete_product(product_id: int) -> bool:
+    """Soft delete product by setting is_active to False"""
+    session = get_db_session()
+    try:
+        product = session.query(Product).filter(Product.id == product_id).first()
+        if not product:
+            logger.warning("Product with ID %d not found", product_id)
+            return False
+        
+        product.is_active = False
+        product.updated_at = datetime.utcnow()
+        session.commit()
+        logger.info("Soft deleted product ID %d: %s", product_id, product.name)
+        return True
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error("Failed to delete product ID %d: %s", product_id, e)
+        return False
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def get_product_categories() -> list[str]:
+    """Get all unique product categories that have active products"""
+    session = get_db_session()
+    try:
+        # Get categories that have active products
+        categories = session.query(MenuCategory).join(Product).filter(
+            Product.is_active == True
+        ).distinct().all()
+        return [cat.name for cat in categories]
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def get_products_by_category(category: str) -> list[Product]:
+    """Get all active products in a specific category"""
+    session = get_db_session()
+    try:
+        # First get the category by name
+        category_obj = session.query(MenuCategory).filter(MenuCategory.name == category).first()
+        if not category_obj:
+            return []
+        
+        # Then get products by category_id
+        return session.query(Product).filter(
+            Product.category_id == category_obj.id,
+            Product.is_active == True
+        ).all()
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def get_all_products_by_category(category: str) -> list[Product]:
+    """Get all products in a specific category (including inactive ones)"""
+    session = get_db_session()
+    try:
+        # First get the category by name
+        category_obj = session.query(MenuCategory).filter(MenuCategory.name == category).first()
+        if not category_obj:
+            return []
+        
+        # Then get products by category_id
+        return session.query(Product).filter(
+            Product.category_id == category_obj.id
+        ).all()
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def search_products(search_term: str) -> list[Product]:
+    """Search products by name or description"""
+    session = get_db_session()
+    try:
+        search_pattern = f"%{search_term}%"
+        return session.query(Product).filter(
+            Product.is_active == True,
+            (Product.name.ilike(search_pattern) | Product.description.ilike(search_pattern))
+        ).all()
     finally:
         session.close()
 
@@ -606,10 +875,16 @@ def get_or_create_cart(telegram_id: int) -> Cart:
     """Get existing cart or create new one"""
     session = get_db_session()
     try:
-        cart = session.query(Cart).filter(Cart.telegram_id == telegram_id).first()
+        # First get the customer by telegram_id
+        customer = session.query(Customer).filter(Customer.telegram_id == telegram_id).first()
+        if not customer:
+            raise ValueError(f"Customer with telegram_id {telegram_id} not found")
+        
+        # Then get or create cart using customer_id
+        cart = session.query(Cart).filter(Cart.customer_id == customer.id).first()
 
         if not cart:
-            cart = Cart(telegram_id=telegram_id, items=[])
+            cart = Cart(customer_id=customer.id)
             session.add(cart)
             session.flush()
 
@@ -627,80 +902,119 @@ def get_or_create_cart(telegram_id: int) -> Cart:
 def add_to_cart(
     telegram_id: int, product_id: int, quantity: int = 1, options: dict | None = None
 ) -> bool:
-    """Add item to cart or update quantity if it exists"""
-    session = get_db_session()
+    """Add a product to the customer's cart"""
     try:
-        # Get or create cart within this session
-        cart = session.query(Cart).filter(Cart.telegram_id == telegram_id).first()
-        if not cart:
-            cart = Cart(telegram_id=telegram_id, items=[])
-            session.add(cart)
-            session.flush()
-        
-        # Get product within the same session
-        product = session.query(Product).filter(Product.id == product_id).first()
+        with get_db_manager().get_session_context() as session:
+            # Get or create customer
+            customer = session.query(Customer).filter(Customer.telegram_id == telegram_id).first()
+            if not customer:
+                logger.error("Customer %s not found for cart operation", telegram_id)
+                return False
 
-        if not product:
-            logger.warning("Product with ID %d not found", product_id)
-            return False
+            # Get or create cart
+            cart = session.query(Cart).filter(
+                Cart.customer_id == customer.id,
+                Cart.is_active == True
+            ).first()
+            
+            if not cart:
+                cart = Cart(
+                    customer_id=customer.id,
+                    is_active=True,
+                    delivery_method="pickup"
+                )
+                session.add(cart)
+                session.flush()
 
-        # Create a unique key for the item based on product_id and options
-        options_key = tuple(sorted(options.items())) if options else ()
+            # Get product
+            product = session.query(Product).filter(Product.id == product_id).first()
+            if not product:
+                logger.error("Product %d not found for cart operation", product_id)
+                return False
 
-        # Check if item with the same product_id and options already exists
-        existing_item = next(
-            (
-                item
-                for item in cart.items
-                if item.get("product_id") == product_id
-                and tuple(sorted(item.get("options", {}).items())) == options_key
-            ),
-            None,
-        )
+            # Check if item already exists in cart
+            existing_item = session.query(CartItem).filter(
+                CartItem.cart_id == cart.id,
+                CartItem.product_id == product_id
+            ).first()
 
-        if existing_item:
-            # Update quantity if item exists
-            existing_item["quantity"] += quantity
-            logger.info("Updated existing item quantity: %s", existing_item)
-        else:
-            # Add new item to cart
-            new_item = {
-                "product_id": product_id,
-                "quantity": quantity,
-                "options": options or {},
-                "price": product.price,  # Store price at time of adding
-                "product_name": product.name,  # Store product name for display
-            }
-            cart.items.append(new_item)
-            logger.info("Added new item to cart: %s", new_item)
+            if existing_item:
+                # Update quantity
+                existing_item.quantity += quantity
+                existing_item.updated_at = datetime.utcnow()
+                logger.info("Updated quantity for product %d in cart for customer %s", product_id, telegram_id)
+            else:
+                # Create new cart item
+                cart_item = CartItem(
+                    cart_id=cart.id,
+                    product_id=product_id,
+                    quantity=quantity,
+                    unit_price=product.price,
+                    product_options=options or {},
+                    special_instructions=""
+                )
+                session.add(cart_item)
+                logger.info("Added product %d to cart for customer %s", product_id, telegram_id)
 
-        # Mark 'items' field as modified for JSON mutation tracking
-        flag_modified(cart, "items")
+            session.commit()
+            return True
 
-        session.commit()
-        logger.info("Successfully committed cart changes")
-        return True
-
-    except SQLAlchemyError as e:
-        session.rollback()
+    except Exception as e:
         logger.error("Failed to add to cart: %s", e)
         return False
-    finally:
-        session.close()
 
 
 @retry_on_database_error()
 def get_cart_items(telegram_id: int) -> list[dict]:
-    """Get cart items for user"""
-    session = get_db_session()
+    """Get all items in the customer's cart"""
     try:
-        cart = session.query(Cart).filter(Cart.telegram_id == telegram_id).first()
-        if cart and cart.items:
-            # Return the actual cart items
-            return cart.items
+        with get_db_manager().get_session_context() as session:
+            # Get customer by telegram_id
+            customer = session.query(Customer).filter(Customer.telegram_id == telegram_id).first()
+            if not customer:
+                logger.warning("Customer with telegram_id %d not found", telegram_id)
+                return []
+
+            # Get cart within this session
+            cart = session.query(Cart).filter(
+                Cart.customer_id == customer.id,
+                Cart.is_active == True
+            ).first()
+            
+            if not cart:
+                logger.info("No active cart found for customer %d", telegram_id)
+                return []
+
+            # Get cart items with product information
+            cart_items = (
+                session.query(CartItem, Product)
+                .join(Product, CartItem.product_id == Product.id)
+                .filter(CartItem.cart_id == cart.id)
+                .all()
+            )
+
+            items = []
+            for cart_item, product in cart_items:
+                item_data = {
+                    "id": cart_item.id,
+                    "product_id": cart_item.product_id,
+                    "product_name": product.name,
+                    "quantity": cart_item.quantity,
+                    "unit_price": float(cart_item.unit_price),
+                    "total_price": float(cart_item.unit_price * cart_item.quantity),
+                    "options": cart_item.product_options or {},
+                    "special_instructions": cart_item.special_instructions or "",
+                    "product_description": product.description,
+                    "product_image_url": product.image_url
+                }
+                items.append(item_data)
+
+            logger.info("Retrieved %d items from cart for customer %d", len(items), telegram_id)
+            return items
+
+    except Exception as e:
+        logger.error("Failed to get cart items: %s", e)
         return []
-    finally:
-        session.close()
 
 
 @retry_on_database_error()
@@ -713,24 +1027,38 @@ def update_cart(
     """Update cart with new items and delivery info"""
     session = get_db_session()
     try:
+        customer = session.query(Customer).filter(Customer.telegram_id == telegram_id).first()
+        if not customer:
+            return False
+        
         # Get or create cart within this session
-        cart = session.query(Cart).filter(Cart.telegram_id == telegram_id).first()
+        cart = session.query(Cart).filter(Cart.customer_id == customer.id).first()
         if not cart:
-            cart = Cart(telegram_id=telegram_id, items=[])
+            cart = Cart(customer_id=customer.id)
             session.add(cart)
             session.flush()
 
-        # Update cart items
-        cart.items = items
+        # Clear existing cart items
+        session.query(CartItem).filter(CartItem.cart_id == cart.id).delete()
+
+        # Add new items
+        for item_data in items:
+            product = session.query(Product).filter(Product.id == item_data["product_id"]).first()
+            if product:
+                new_item = CartItem(
+                    cart_id=cart.id,
+                    product_id=item_data["product_id"],
+                    quantity=item_data["quantity"],
+                    unit_price=item_data.get("unit_price", product.price),
+                    product_options=item_data.get("options", {})
+                )
+                session.add(new_item)
 
         # Update delivery info
         if delivery_method:
             cart.delivery_method = delivery_method
         if delivery_address:
             cart.delivery_address = delivery_address
-
-        # Mark 'items' field as modified for JSON mutation tracking
-        flag_modified(cart, "items")
 
         session.commit()
         return True
@@ -748,8 +1076,15 @@ def clear_cart(telegram_id: int) -> bool:
     """Clear all items from a cart"""
     session = get_db_session()
     try:
-        cart = session.query(Cart).filter(Cart.telegram_id == telegram_id).first()
+        customer = session.query(Customer).filter(Customer.telegram_id == telegram_id).first()
+        if not customer:
+            return False
+        
+        cart = session.query(Cart).filter(Cart.customer_id == customer.id).first()
         if cart:
+            # Delete all cart items
+            session.query(CartItem).filter(CartItem.cart_id == cart.id).delete()
+            # Delete the cart itself
             session.delete(cart)
             session.commit()
         return True
@@ -766,17 +1101,19 @@ def remove_from_cart(telegram_id: int, product_id: int) -> bool:
     """Remove item from cart"""
     session = get_db_session()
     try:
-        cart = session.query(Cart).filter(Cart.telegram_id == telegram_id).first()
+        customer = session.query(Customer).filter(Customer.telegram_id == telegram_id).first()
+        if not customer:
+            return False
+        
+        cart = session.query(Cart).filter(Cart.customer_id == customer.id).first()
         if not cart:
             return False
 
-        # Find and remove item from cart
-        cart.items = [
-            item for item in cart.items if item.get("product_id") != product_id
-        ]
-
-        # Mark 'items' field as modified for JSON mutation tracking
-        flag_modified(cart, "items")
+        # Remove items with the specified product_id
+        session.query(CartItem).filter(
+            CartItem.cart_id == cart.id,
+            CartItem.product_id == product_id
+        ).delete()
 
         session.commit()
         return True
@@ -784,7 +1121,7 @@ def remove_from_cart(telegram_id: int, product_id: int) -> bool:
     except SQLAlchemyError as e:
         session.rollback()
         logger.error("Failed to remove from cart: %s", e)
-        raise
+        return False
     finally:
         session.close()
 
@@ -794,7 +1131,10 @@ def get_cart_by_telegram_id(telegram_id: int) -> Cart | None:
     """Get cart by telegram ID"""
     session = get_db_session()
     try:
-        return session.query(Cart).filter(Cart.telegram_id == telegram_id).first()
+        customer = session.query(Customer).filter(Customer.telegram_id == telegram_id).first()
+        if not customer:
+            return None
+        return session.query(Cart).filter(Cart.customer_id == customer.id).first()
     finally:
         session.close()
 
@@ -807,7 +1147,7 @@ def update_customer_delivery_address(telegram_id: int, delivery_address: str) ->
         customer = session.query(Customer).filter(Customer.telegram_id == telegram_id).first()
         if customer:
             customer.delivery_address = delivery_address
-            customer.updated_at = datetime.now()
+            customer.updated_at = datetime.utcnow()
             session.commit()
             logger.info("Updated delivery address for customer %s", telegram_id)
             return True
@@ -830,7 +1170,7 @@ def update_customer_language(telegram_id: int, language: str) -> bool:
         customer = session.query(Customer).filter(Customer.telegram_id == telegram_id).first()
         if customer:
             customer.language = language
-            customer.updated_at = datetime.now()
+            customer.updated_at = datetime.utcnow()
             session.commit()
             logger.info("Updated language preference for customer %s to %s", telegram_id, language)
             return True
@@ -851,17 +1191,23 @@ def create_order(
     customer_id: int,
     total_amount: float,
     delivery_method: str = "pickup",
-    delivery_address: str | None = None,
-) -> Order | None:
+    delivery_address: Optional[str] = None,
+) -> Optional[Order]:
     """Create a new order"""
     try:
         with get_db_manager().get_session_context() as session:
+            # Calculate subtotal and delivery charge
+            subtotal = total_amount
+            delivery_charge = 0.0  # For now, no delivery charge
+            
             order = Order(
                 customer_id=customer_id,
-                order_number=generate_order_number(),
+                total_amount=total_amount,
+                subtotal=subtotal,
+                delivery_charge=delivery_charge,
                 total=total_amount,
                 delivery_method=delivery_method,
-                delivery_address=delivery_address,
+                delivery_address=delivery_address or "",
                 status="pending",
             )
             session.add(order)
@@ -880,8 +1226,8 @@ def create_order_with_items(
     total_amount: float,
     items: list[dict],
     delivery_method: str = "pickup",
-    delivery_address: str | None = None,
-) -> Order | None:
+    delivery_address: Optional[str] = None,
+) -> Optional[Order]:
     """Create a new order with order items from cart items"""
     try:
         with get_db_manager().get_session_context() as session:
@@ -893,13 +1239,13 @@ def create_order_with_items(
             order = Order(
                 customer_id=customer_id,
                 order_number=order_number,
-                total=total_amount,
+                total_amount=total_amount,
                 subtotal=subtotal,
                 delivery_charge=delivery_charge,
+                total=total_amount,
                 delivery_method=delivery_method,
                 delivery_address=delivery_address or "",
-                status="pending",
-                items=items  # Store items as JSON in the order
+                status="pending"
             )
             session.add(order)
             session.flush()  # Get the order ID
@@ -908,8 +1254,8 @@ def create_order_with_items(
             for item in items:
                 product_name = item.get("product_name", "Unknown Product")
                 quantity = item.get("quantity", 1)
-                unit_price = item.get("price", 0)
-                total_price = unit_price * quantity
+                unit_price = item.get("unit_price", 0)  # Use unit_price from cart item
+                total_price = item.get("total_price", unit_price * quantity)  # Use total_price from cart item
                 
                 order_item = OrderItem(
                     order_id=order.id,
@@ -940,7 +1286,7 @@ def update_order_status(order_id: int, new_status: str) -> bool:
             order = session.query(Order).filter(Order.id == order_id).first()
             if order:
                 order.status = new_status
-                order.updated_at = datetime.now()
+                order.updated_at = datetime.utcnow()
                 session.commit()
                 logger.info("Updated order %d status to %s", order_id, new_status)
                 return True
@@ -1013,7 +1359,7 @@ def get_database_status() -> dict:
             status["database_type"] = "postgresql"
         else:
             status["connection_string"] = "local"
-            status["database_type"] = "sqlite" if "sqlite" in config.database_url else "other"
+            status["database_type"] = "postgresql" if "postgresql" in config.database_url else "other"
         
         # Test connection
         status["connected"] = check_database_connection()

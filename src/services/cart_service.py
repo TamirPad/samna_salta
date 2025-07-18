@@ -3,7 +3,7 @@ Cart management service
 """
 
 import logging
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 
 from src.db.operations import (
     add_to_cart,
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 class CartService:
     """Service for cart management operations"""
 
-    def validate_customer_data(self, full_name: str, phone: str) -> Dict[str, any]:
+    def validate_customer_data(self, full_name: str, phone: str) -> Dict[str, Any]:
         """Validate customer data"""
         errors = []
         
@@ -41,17 +41,19 @@ class CartService:
             "errors": errors
         }
 
-    def register_customer(self, telegram_id: int, full_name: str, phone: str, language: str = "en") -> Dict[str, any]:
+    def register_customer(self, telegram_id: int, full_name: str, phone: str, language: str = "en") -> Dict[str, Any]:
         """Register a new customer or update existing one"""
         try:
             # Check if customer already exists
             existing_customer = get_customer_by_telegram_id(telegram_id)
             
             if existing_customer:
-                # Update existing customer
-                existing_customer.full_name = full_name
-                existing_customer.phone_number = phone
-                # Note: In a real implementation, you'd need to save the updated customer
+                # Update existing customer with new information and language
+                from src.db.operations import update_customer_language
+                existing_customer.name = full_name
+                existing_customer.phone = phone
+                # Update language in database
+                update_customer_language(telegram_id, language)
                 return {
                     "success": True,
                     "customer": existing_customer,
@@ -109,7 +111,7 @@ class CartService:
     def calculate_total(self, items: List[Dict]) -> float:
         """Calculate total price of cart items"""
         try:
-            total = sum(item.get("price", 0) * item.get("quantity", 1) for item in items)
+            total = sum(item.get("unit_price", 0) * item.get("quantity", 1) for item in items)
             logger.info("Calculated cart total: %.2f", total)
             return total
         except Exception as e:
@@ -199,7 +201,7 @@ class CartService:
                 return False
             
             # Update cart with delivery address
-            success = self.update_cart(telegram_id, current_items, delivery_address=delivery_address)
+            success = self.update_cart(telegram_id, current_items, None, delivery_address)
             if success:
                 logger.info("Successfully set delivery address for user %s", telegram_id)
             else:
@@ -210,30 +212,25 @@ class CartService:
             return False
 
     def get_cart_info(self, telegram_id: int) -> Dict:
-        """Get cart information including delivery method and address"""
+        """Get cart information including customer, items, and totals"""
         try:
-            cart = get_cart_by_telegram_id(telegram_id)
-            if cart:
-                logger.info("DEBUG: Cart found for user %s - delivery_method: %s, delivery_address: %s", 
-                           telegram_id, cart.delivery_method, cart.delivery_address)
-                return {
-                    "delivery_method": cart.delivery_method,
-                    "delivery_address": cart.delivery_address,
-                    "items_count": len(cart.items) if cart.items else 0
-                }
-            else:
-                logger.info("DEBUG: No cart found for user %s, returning default pickup", telegram_id)
-                return {
-                    "delivery_method": "pickup",
-                    "delivery_address": None,
-                    "items_count": 0
-                }
+            customer = self.get_customer(telegram_id)
+            items = self.get_items(telegram_id)
+            total = self.calculate_total(items)
+            
+            return {
+                "customer": customer,
+                "items": items,
+                "total": total,
+                "item_count": len(items)
+            }
         except Exception as e:
             logger.error("Exception getting cart info: %s", e)
             return {
-                "delivery_method": "pickup",
-                "delivery_address": None,
-                "items_count": 0
+                "customer": None,
+                "items": [],
+                "total": 0.0,
+                "item_count": 0
             }
 
     def update_customer_delivery_address(self, telegram_id: int, delivery_address: str) -> bool:

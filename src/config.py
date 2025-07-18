@@ -23,7 +23,7 @@ class Settings(BaseSettings):
 
     # Database configuration
     database_url: str = Field(
-        default="sqlite:///data/samna_salta.db", description="Database connection URL"
+        default="postgresql://postgres:password@localhost:5432/samna_salta", description="Database connection URL"
     )
     supabase_connection_string: str = Field(
         default="", description="Supabase PostgreSQL connection string"
@@ -74,9 +74,16 @@ def get_config() -> Settings:
 
 import logging
 from pathlib import Path
-import httpx
 from sqlalchemy import exc, text  # type: ignore
 from src.utils.constants import ConfigValidation, LoggingConstants
+
+# Import httpx conditionally to avoid dependency issues
+try:
+    import httpx
+    HTTPX_AVAILABLE = True
+except ImportError:
+    HTTPX_AVAILABLE = False
+    httpx = None
 
 
 logger = logging.getLogger(__name__)
@@ -145,14 +152,17 @@ class ConfigValidator:
             self.errors.append("ADMIN_CHAT_ID must be positive")
 
         # Optional: live test token
-        try:
-            response = httpx.get(
-                f"https://api.telegram.org/bot{self.config.bot_token}/getMe", timeout=10
-            )
-            if response.status_code != 200:
-                self.warnings.append("Bot token verification failed (non-200 response)")
-        except httpx.RequestError as exc:
-            self.warnings.append(f"Could not verify bot token: {exc}")
+        if HTTPX_AVAILABLE and httpx:
+            try:
+                response = httpx.get(
+                    f"https://api.telegram.org/bot{self.config.bot_token}/getMe", timeout=10
+                )
+                if response.status_code != 200:
+                    self.warnings.append("Bot token verification failed (non-200 response)")
+            except httpx.RequestError as exc:
+                self.warnings.append(f"Could not verify bot token: {exc}")
+        else:
+            self.warnings.append("httpx not available - skipping bot token verification")
 
     def _validate_database_configuration(self):
         if not self.config:

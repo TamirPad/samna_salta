@@ -17,7 +17,7 @@ from src.config import get_config
 from src.db.operations import init_db, init_default_products
 from src.container import get_container
 from src.handlers.start import start_handler, OnboardingHandler, register_start_handlers
-from src.handlers.menu import menu_handler
+from src.handlers.menu import MenuHandler
 from src.handlers.cart import CartHandler
 from src.handlers.admin import register_admin_handlers
 from src.utils.logger import ProductionLogger
@@ -25,24 +25,28 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 
 def setup_bot():
     """Setup and configure the bot application"""
-    # Setup logging
-    ProductionLogger.setup_logging()
-    logger = logging.getLogger(__name__)
-    
-    # Get config
-    config = get_config()
-    logger.info("Configuration loaded successfully")
-
-    # Initialize database with retry logic
-    logger.info("Initializing database...")
     try:
-        init_db()
-        # init_default_products() is now called within init_db()
-        logger.info("Database initialization completed")
+        # Setup logging
+        ProductionLogger.setup_logging()
+        logger = logging.getLogger(__name__)
+        
+        # Get config
+        config = get_config()
+        logger.info("Configuration loaded successfully")
+
+        # Initialize database with retry logic
+        logger.info("Initializing database...")
+        try:
+            init_db()
+            # init_default_products() is now called within init_db()
+            logger.info("Database initialization completed")
+        except Exception as e:
+            logger.error(f"Database initialization failed: {e}")
+            logger.warning("Bot will start with limited functionality - database features may not work")
+            # Continue with bot startup even if database fails
     except Exception as e:
-        logger.error(f"Database initialization failed: {e}")
-        logger.warning("Bot will start with limited functionality - database features may not work")
-        # Continue with bot startup even if database fails
+        logger.error(f"Failed to setup bot: {e}")
+        raise
 
     # Create application
     logger.info("Creating Telegram application...")
@@ -73,12 +77,19 @@ def setup_bot():
     application.add_handler(CallbackQueryHandler(onboarding_handler.handle_main_page_callback, pattern="^customer_order_"))
     
     # Menu handlers
-    application.add_handler(CallbackQueryHandler(menu_handler, pattern="^menu_"))
+    menu_handler_instance = MenuHandler()
+    application.add_handler(CallbackQueryHandler(menu_handler_instance.handle_menu_callback, pattern="^menu_"))
+    
+    # Dynamic menu handlers (for new product system)
+    application.add_handler(CallbackQueryHandler(menu_handler_instance.handle_menu_callback, pattern="^category_"))
+    application.add_handler(CallbackQueryHandler(menu_handler_instance.handle_menu_callback, pattern="^product_"))
     
     # Cart handlers
     cart_handler = CartHandler()
     application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^add_"))
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^(kubaneh_|samneh_|red_bisbas_|hawaij_coffee_spice|white_coffee)"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^add_product_"))
+    # Register all product option callbacks
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^(kubaneh_|samneh_|red_bisbas_|hilbeh_|hawaij_coffee_spice|white_coffee)"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_view_cart, pattern="^cart_view"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart_confirmation, pattern="^cart_clear_confirm"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart, pattern="^cart_clear_yes"))
@@ -86,9 +97,6 @@ def setup_bot():
     application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_address_choice, pattern="^delivery_address_"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_method, pattern="^delivery_"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_confirm_order, pattern="^confirm_order"))
-    
-    # Text message handler for delivery address input
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, cart_handler.handle_delivery_address_input))
     
     # Register admin handlers
     register_admin_handlers(application)
@@ -111,7 +119,13 @@ def run_polling():
         print("🛑 Press Ctrl+C to stop the bot")
         
         # Start polling (this will run until interrupted)
-        application.run_polling()
+        try:
+            application.run_polling()
+        except KeyboardInterrupt:
+            print("\n🛑 Bot stopped by user")
+        except Exception as polling_error:
+            logging.getLogger(__name__).error(f"Error during polling: {polling_error}")
+            raise
         
     except Exception as e:
         logging.getLogger(__name__).error(f"Failed to start bot: {e}")
@@ -148,8 +162,12 @@ def run_webhook():
             # Set webhook (webhook mode only)
             webhook_url = os.getenv("WEBHOOK_URL")
             if webhook_url:
-                await application.bot.set_webhook(url=f"{webhook_url}/webhook")
-                logger.info(f"Webhook set to: {webhook_url}/webhook")
+                try:
+                    await application.bot.set_webhook(url=f"{webhook_url}/webhook")
+                    logger.info(f"Webhook set to: {webhook_url}/webhook")
+                except Exception as webhook_error:
+                    logger.error(f"Failed to set webhook: {webhook_error}")
+                    # Continue without webhook - bot will still work
             else:
                 logger.warning("WEBHOOK_URL not set! Bot will not receive updates.")
             
@@ -164,42 +182,45 @@ def run_webhook():
         """Cleanup on shutdown"""
         nonlocal application
         if application:
-            logger.info("Shutting down bot...")
-            await application.stop()
-            await application.shutdown()
+            try:
+                await application.stop()
+                await application.shutdown()
+                logger.info("Bot shutdown completed")
+            except Exception as e:
+                logger.error(f"Error during shutdown: {e}")
 
     @app.get("/health")
     async def health_check(background_tasks: BackgroundTasks):
-        """Health check endpoint for Render"""
-        from src.db.operations import get_database_status
-        
-        db_status = get_database_status()
-        
-        if db_status["connected"]:
-            return {
-                "status": "ok", 
-                "message": "Bot is running",
-                "database": "connected",
-                "database_type": db_status["database_type"]
-            }
-        else:
-            return {
-                "status": "degraded", 
-                "message": "Bot is running but database is unavailable",
-                "database": "disconnected",
-                "database_error": db_status["error"]
-            }
+        """Health check endpoint"""
+        try:
+            # Add health check to background tasks
+            background_tasks.add_task(log_health_check)
+            
+            if application and application.bot:
+                return {
+                    "status": "healthy",
+                    "bot": "running",
+                    "timestamp": asyncio.get_event_loop().time()
+                }
+            else:
+                return {
+                    "status": "unhealthy",
+                    "bot": "not_initialized",
+                    "timestamp": asyncio.get_event_loop().time()
+                }
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            raise HTTPException(status_code=500, detail="Health check failed")
+
+    async def log_health_check():
+        """Log health check for monitoring"""
+        logger.info("Health check performed")
 
     @app.post("/webhook")
     async def webhook_handler(request: Request):
-        """Handle incoming webhook updates from Telegram"""
-        nonlocal application
-        
-        if not application:
-            raise HTTPException(status_code=503, detail="Bot not initialized")
-        
+        """Handle incoming webhook updates"""
         try:
-            # Get the update data
+            # Get the update from the request
             update_data = await request.json()
             update = Update.de_json(update_data, application.bot)
             
@@ -207,31 +228,29 @@ def run_webhook():
             await application.process_update(update)
             
             return JSONResponse(content={"status": "ok"})
-            
         except Exception as e:
-            logger.error(f"Error processing webhook: {e}")
-            raise HTTPException(status_code=500, detail="Internal server error")
+            logger.error(f"Webhook handler error: {e}")
+            raise HTTPException(status_code=500, detail="Webhook processing failed")
 
     @app.get("/")
     async def root():
         """Root endpoint"""
-        return {"message": "Samna Salta Bot is running", "status": "active"}
+        return {
+            "message": "Samna Salta Bot API",
+            "status": "running",
+            "version": "1.0.0"
+        }
 
     # Run the FastAPI app
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
 
 def main():
-    """Main entry point - determines mode based on environment"""
+    """Main entry point"""
     # Check if we should run in webhook mode
-    webhook_url = os.getenv("WEBHOOK_URL")
-    port = os.getenv("PORT")
-    
-    # If WEBHOOK_URL or PORT is set, run in webhook mode (production)
-    if webhook_url or port:
+    if os.getenv("WEBHOOK_MODE", "false").lower() == "true":
         run_webhook()
     else:
-        # Otherwise run in polling mode (local development)
         run_polling()
 
 if __name__ == "__main__":

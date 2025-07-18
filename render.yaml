@@ -16,7 +16,7 @@ services:
       - key: ADMIN_CHAT_ID
         sync: false
       - key: DATABASE_URL
-        value: sqlite:///data/samna_salta.db
+        value: postgresql://postgres:password@localhost:5432/samna_salta
       - key: LOG_LEVEL
         value: INFO
       - key: ENVIRONMENT

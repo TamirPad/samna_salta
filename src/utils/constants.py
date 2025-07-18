@@ -76,54 +76,6 @@ class PerformanceSettings:
     PERFORMANCE_IMPROVEMENT_HIGH: Final[str] = "30-70% performance improvement"
 
 
-# Security and rate limiting constants
-class SecuritySettings:
-    """Security thresholds and rate limiting"""
-
-    DEFAULT_RATE_LIMIT_REQUESTS: Final[int] = 10
-    DEFAULT_RATE_LIMIT_WINDOW_SECONDS: Final[int] = 60
-    CIRCUIT_BREAKER_FAILURE_THRESHOLD: Final[int] = 5
-    CIRCUIT_BREAKER_TIMEOUT_SECONDS: Final[int] = 60
-
-    # Rate limits by endpoint type
-    MENU_RATE_LIMIT: Final[int] = 10
-    CART_RATE_LIMIT: Final[int] = 20
-    ORDER_RATE_LIMIT: Final[int] = 5
-    ADMIN_RATE_LIMIT: Final[int] = 30
-
-
-# Validation constants
-class ValidationSettings:
-    """Input validation limits and constraints"""
-
-    MIN_CUSTOMER_NAME_LENGTH: Final[int] = 2
-    MAX_CUSTOMER_NAME_LENGTH: Final[int] = 100
-    MIN_PRODUCT_NAME_LENGTH: Final[int] = 1
-    MAX_PRODUCT_NAME_LENGTH: Final[int] = 100
-    MAX_CART_ITEM_QUANTITY: Final[int] = 99
-    MIN_CART_ITEM_QUANTITY: Final[int] = 1
-
-
-# Business logic constants
-class BusinessSettings:
-    """Business rules and default values"""
-
-    DEFAULT_DELIVERY_CHARGE: Final[float] = 5.00
-    DEFAULT_DELIVERY_METHOD: Final[str] = "pickup"
-    DEFAULT_CURRENCY: Final[str] = "ILS"
-    DEFAULT_HILBEH_DAYS: Final[list] = ["wednesday", "thursday", "friday"]
-    DEFAULT_HILBEH_HOURS: Final[str] = "09:00-18:00"
-
-    # Product pricing
-    KUBANEH_BASE_PRICE: Final[float] = 25.00
-    SAMNEH_BASE_PRICE: Final[float] = 15.00
-    RED_BISBAS_BASE_PRICE: Final[float] = 12.00
-    HILBEH_BASE_PRICE: Final[float] = 18.00
-    HAWAIJ_SOUP_PRICE: Final[float] = 8.00
-    HAWAIJ_COFFEE_PRICE: Final[float] = 8.00
-    WHITE_COFFEE_PRICE: Final[float] = 10.00
-
-
 # Error codes and messages
 class ErrorCodes:
     """Standardized error codes and messages"""
@@ -150,7 +102,7 @@ class FileSettings:
 
     LOGS_DIRECTORY: Final[str] = "logs"
     DATA_DIRECTORY: Final[str] = "data"
-    DEFAULT_DATABASE_PATH: Final[str] = "sqlite:///data/samna_salta.db"
+    DEFAULT_DATABASE_PATH: Final[str] = "postgresql://postgres:password@localhost:5432/samna_salta"
 
     # Log file names
     MAIN_LOG_FILE: Final[str] = "app.log"
@@ -203,7 +155,8 @@ class SecurityPatterns:
     ISRAELI_PHONE_PREFIX: Final[str] = "+972"
     ISRAELI_PHONE_LENGTH: Final[int] = 13
 
-# Product mapping constants
+
+# Product-related constants and mappings
 class ProductConstants:
     """Product-related constants and mappings"""
     
@@ -218,39 +171,66 @@ class ProductConstants:
     
     # Product type mappings
     PRODUCT_NAME_MAP: Final[dict[str, dict]] = {
-        "hilbeh": {
-            "product_id": HILBEH_PRODUCT_ID,
-            "display_name_key": "PRODUCT_HILBEH",
-            "options": {},
+        "kubaneh": {
+            "id": KUBANEH_PRODUCT_ID,
+            "name": "Kubaneh",
+            "description": "Traditional Yemeni bread",
+            "price": 25.00,
+            "options": ["classic", "seeded", "herb", "aromatic"],
+            "category": "bread"
+        },
+        "samneh": {
+            "id": SAMNEH_PRODUCT_ID,
+            "name": "Samneh",
+            "description": "Clarified butter",
+            "price": 15.00,
+            "options": ["smoked", "not_smoked"],
+            "category": "spread"
+        },
+        "red_bisbas": {
+            "id": RED_BISBAS_PRODUCT_ID,
+            "name": "Red Bisbas",
+            "description": "Spicy sauce",
+            "price": 12.00,
+            "options": ["small", "large"],
+            "category": "spice"
         },
         "hawaij_soup": {
-            "product_id": HAWAIJ_SOUP_PRODUCT_ID,
-            "display_name_key": "PRODUCT_HAWAIJ_SOUP",
-            "options": {},
-        },
-        "hawaij_soup_spice": {
-            "product_id": HAWAIJ_SOUP_PRODUCT_ID,
-            "display_name_key": "PRODUCT_HAWAIJ_SOUP",
-            "options": {},
+            "id": HAWAIJ_SOUP_PRODUCT_ID,
+            "name": "Hawaij for Soup",
+            "description": "Spice blend for soup",
+            "price": 8.00,
+            "options": [],
+            "category": "spice"
         },
         "hawaij_coffee": {
-            "product_id": HAWAIJ_COFFEE_PRODUCT_ID,
-            "display_name_key": "PRODUCT_HAWAIJ_COFFEE",
-            "options": {},
-        },
-        "hawaij_coffee_spice": {
-            "product_id": HAWAIJ_COFFEE_PRODUCT_ID,
-            "display_name_key": "PRODUCT_HAWAIJ_COFFEE",
-            "options": {},
+            "id": HAWAIJ_COFFEE_PRODUCT_ID,
+            "name": "Hawaij for Coffee",
+            "description": "Spice blend for coffee",
+            "price": 8.00,
+            "options": [],
+            "category": "spice"
         },
         "white_coffee": {
-            "product_id": WHITE_COFFEE_PRODUCT_ID,
-            "display_name_key": "PRODUCT_WHITE_COFFEE",
-            "options": {},
+            "id": WHITE_COFFEE_PRODUCT_ID,
+            "name": "White Coffee",
+            "description": "Traditional Yemeni coffee",
+            "price": 10.00,
+            "options": [],
+            "category": "beverage"
         },
+        "hilbeh": {
+            "id": HILBEH_PRODUCT_ID,
+            "name": "Hilbeh",
+            "description": "Traditional Yemeni sauce",
+            "price": 18.00,
+            "options": [],
+            "category": "spread"
+        }
     }
 
-# Callback data patterns
+
+# Callback data patterns for menu interactions
 class CallbackPatterns:
     """Callback data patterns for menu interactions"""
     
@@ -277,6 +257,7 @@ class CallbackPatterns:
     # Delivery patterns
     DELIVERY_PREFIX: Final[str] = "delivery_"
 
+
 # Configuration validation constants
 class ConfigValidation:
     """Configuration validation constants"""
@@ -291,12 +272,13 @@ class ConfigValidation:
     MIN_BOT_TOKEN_LENGTH: Final[int] = 40
     
     # Database validation
-    SQLITE_PREFIX: Final[str] = "sqlite:///"
+    POSTGRESQL_PREFIX: Final[str] = "postgresql://"
     
     # File permissions
     SECURE_FILE_PERMISSIONS: Final[int] = 0o600
 
-# Logging constants
+
+# Logging-related constants
 class LoggingConstants:
     """Logging-related constants"""
     
@@ -313,22 +295,8 @@ class LoggingConstants:
     MAX_LOG_SIZE: Final[int] = 10 * 1024 * 1024  # 10MB
     LOG_BACKUP_COUNT: Final[int] = 5
 
-# Performance monitoring constants
-class PerformanceConstants:
-    """Performance monitoring constants"""
-    
-    # Monitoring intervals
-    DEFAULT_MONITORING_INTERVAL: Final[float] = 5.0
-    
-    # Thresholds
-    SLOW_QUERY_THRESHOLD: Final[float] = 1.0  # seconds
-    HIGH_MEMORY_THRESHOLD: Final[float] = 80.0  # percentage
-    HIGH_CPU_THRESHOLD: Final[float] = 80.0  # percentage
-    
-    # Cache TTL
-    DEFAULT_CACHE_TTL: Final[int] = 3600  # 1 hour
 
-# Error messages
+# Standardized error messages
 class ErrorMessages:
     """Standardized error messages"""
     
