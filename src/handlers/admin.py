@@ -1601,13 +1601,11 @@ class AdminHandler:
         try:
             user_id = update.effective_user.id
             category_name = update.message.text.strip()
-            
             if len(category_name) < 2:
                 await update.message.reply_text(
                     i18n.get_text("ADMIN_CATEGORY_NAME_TOO_SHORT", user_id=user_id)
                 )
                 return AWAITING_CATEGORY_NAME
-            
             # Check if category already exists
             existing_categories = await self.admin_service.get_product_categories_list()
             if category_name.lower() in [cat.lower() for cat in existing_categories]:
@@ -1615,31 +1613,23 @@ class AdminHandler:
                     i18n.get_text("ADMIN_CATEGORY_ALREADY_EXISTS", user_id=user_id).format(category=category_name)
                 )
                 return AWAITING_CATEGORY_NAME
-            
-            # Create the category (this would need to be implemented in the service)
+            # Create the category
             result = await self.admin_service.create_category(category_name)
-            
             if result["success"]:
-                success_text = i18n.get_text("ADMIN_CATEGORY_ADD_SUCCESS", user_id=user_id).format(category=category_name)
-                
-                keyboard = [
-                    [
-                        InlineKeyboardButton(
-                            i18n.get_text("ADMIN_CATEGORY_BACK_TO_LIST", user_id=user_id),
-                            callback_data="admin_view_categories"
-                        )
-                    ]
-                ]
-                
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                await update.message.reply_text(success_text, parse_mode="HTML", reply_markup=reply_markup)
+                # Show the updated category list
+                class FakeQuery:
+                    def __init__(self, message, from_user):
+                        self.message = message
+                        self.from_user = from_user
+                        self.edit_message_text = message.reply_text
+                fake_query = FakeQuery(update.message, update.effective_user)
+                await self._show_all_categories(fake_query)
+                return ConversationHandler.END
             else:
                 await update.message.reply_text(
                     i18n.get_text("ADMIN_CATEGORY_ADD_ERROR", user_id=user_id).format(error=result["error"])
                 )
-            
             return ConversationHandler.END
-            
         except Exception as e:
             self.logger.error("Error handling category name input: %s", e)
             await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
@@ -1835,7 +1825,6 @@ class AdminHandler:
         try:
             user_id = update.effective_user.id
             text = update.message.text
-            
             # Parse product details from text
             product_data = self._parse_product_input(text)
             if not product_data:
@@ -1843,7 +1832,6 @@ class AdminHandler:
                     i18n.get_text("ADMIN_PRODUCT_INVALID_INPUT", user_id=user_id)
                 )
                 return AWAITING_PRODUCT_DETAILS
-            
             # Create product
             result = await self.admin_service.create_new_product(
                 name=product_data["name"],
@@ -1851,34 +1839,22 @@ class AdminHandler:
                 category=product_data["category"],
                 price=product_data["price"]
             )
-            
             if result["success"]:
-                product = result["product"]
-                success_text = i18n.get_text("ADMIN_ADD_PRODUCT_SUCCESS", user_id=user_id).format(
-                    name=product["name"],
-                    description=product["description"],
-                    category=product["category"],
-                    price=product["price"]
-                )
-                
-                keyboard = [
-                    [
-                        InlineKeyboardButton(
-                            i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
-                            callback_data="admin_menu_management"
-                        )
-                    ]
-                ]
-                
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                await update.message.reply_text(success_text, parse_mode="HTML", reply_markup=reply_markup)
+                # Show the updated product list
+                # Use a fake CallbackQuery for compatibility
+                class FakeQuery:
+                    def __init__(self, message, from_user):
+                        self.message = message
+                        self.from_user = from_user
+                        self.edit_message_text = message.reply_text
+                fake_query = FakeQuery(update.message, update.effective_user)
+                await self._show_all_products(fake_query)
+                return ConversationHandler.END
             else:
                 await update.message.reply_text(
                     i18n.get_text("ADMIN_ADD_PRODUCT_ERROR", user_id=user_id).format(error=result["error"])
                 )
-            
             return ConversationHandler.END
-            
         except Exception as e:
             self.logger.error("Error handling add product input: %s", e)
             await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))

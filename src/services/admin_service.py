@@ -732,7 +732,7 @@ class AdminService:
                         "id": product.id,
                         "name": product.name,
                         "description": product.description,
-                        "category": product.category,
+                        "category": category,  # Use the category name passed to the function
                         "price": product.price,
                         "is_active": product.is_active
                     }
@@ -774,20 +774,17 @@ class AdminService:
             success = update_product(product_id, **kwargs)
             
             if success:
-                # Get updated product
-                updated_product = get_product_by_id(product_id)
-                logger.info("Successfully updated product ID %d", product_id)
-                return {
-                    "success": True,
-                    "product": {
-                        "id": updated_product.id,
-                        "name": updated_product.name,
-                        "description": updated_product.description,
-                        "category": updated_product.category,
-                        "price": updated_product.price,
-                        "is_active": updated_product.is_active
+                # Get updated product as dictionary
+                from src.db.operations import get_product_dict_by_id
+                updated_product = get_product_dict_by_id(product_id)
+                if updated_product:
+                    logger.info("Successfully updated product ID %d", product_id)
+                    return {
+                        "success": True,
+                        "product": updated_product
                     }
-                }
+                else:
+                    return {"success": False, "error": "Failed to retrieve updated product"}
             else:
                 return {"success": False, "error": "Failed to update product"}
                 
@@ -839,11 +836,18 @@ class AdminService:
             
             result = []
             for product in products:
+                # Get category name safely
+                category_name = "Uncategorized"
+                if hasattr(product, 'category_rel') and product.category_rel:
+                    category_name = product.category_rel.name
+                elif hasattr(product, 'category'):
+                    category_name = product.category or "Uncategorized"
+                
                 result.append({
                     "id": product.id,
                     "name": product.name,
                     "description": product.description or "",
-                    "category": product.category or "Uncategorized",
+                    "category": category_name,
                     "price": product.price,
                     "is_active": product.is_active
                 })
@@ -861,11 +865,18 @@ class AdminService:
             
             result = []
             for product in products:
+                # Get category name safely
+                category_name = "Uncategorized"
+                if hasattr(product, 'category_rel') and product.category_rel:
+                    category_name = product.category_rel.name
+                elif hasattr(product, 'category'):
+                    category_name = product.category or "Uncategorized"
+                
                 result.append({
                     "id": product.id,
                     "name": product.name,
                     "description": product.description or "",
-                    "category": product.category or "Uncategorized",
+                    "category": category_name,
                     "price": product.price,
                     "is_active": product.is_active
                 })

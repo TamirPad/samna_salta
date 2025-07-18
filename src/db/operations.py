@@ -686,6 +686,29 @@ def get_product_by_id(product_id: int) -> Optional[Product]:
 
 
 @retry_on_database_error()
+def get_product_dict_by_id(product_id: int) -> Optional[Dict]:
+    """Get product by ID as a dictionary with category name resolved"""
+    session = get_db_session()
+    try:
+        product = session.query(Product).options(joinedload(Product.category_rel)).filter(Product.id == product_id).first()
+        if not product:
+            return None
+        
+        return {
+            "id": product.id,
+            "name": product.name,
+            "description": product.description,
+            "category": product.category_rel.name if product.category_rel else "Uncategorized",
+            "price": product.price,
+            "is_active": product.is_active,
+            "created_at": product.created_at,
+            "updated_at": product.updated_at
+        }
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
 def create_product(name: str, description: str, category: str, price: float) -> Optional[Product]:
     """Create a new product"""
     session = get_db_session()
