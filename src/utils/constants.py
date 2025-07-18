@@ -150,7 +150,7 @@ class FileSettings:
 
     LOGS_DIRECTORY: Final[str] = "logs"
     DATA_DIRECTORY: Final[str] = "data"
-    DEFAULT_DATABASE_PATH: Final[str] = "sqlite:///data/samna_salta.db"
+    DEFAULT_DATABASE_PATH: Final[str] = "postgresql://postgres:password@localhost:5432/samna_salta"
 
     # Log file names
     MAIN_LOG_FILE: Final[str] = "app.log"
@@ -291,7 +291,7 @@ class ConfigValidation:
     MIN_BOT_TOKEN_LENGTH: Final[int] = 40
     
     # Database validation
-    SQLITE_PREFIX: Final[str] = "sqlite:///"
+    POSTGRESQL_PREFIX: Final[str] = "postgresql://"
     
     # File permissions
     SECURE_FILE_PERMISSIONS: Final[int] = 0o600

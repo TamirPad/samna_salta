@@ -80,27 +80,27 @@ class NotificationService:
 
     async def notify_order_status_update(self, order_id: str, new_status: str, customer_chat_id: int, delivery_method: str = "pickup") -> bool:
         """Notify customer about order status update"""
-        # Create user-friendly status messages using i18n
+        # Create user-friendly status messages using i18n with customer's language
         status_messages = {
-            "confirmed": i18n.get_text("ORDER_STATUS_CONFIRMED"),
-            "preparing": i18n.get_text("ORDER_STATUS_PREPARING"),
-            "ready": i18n.get_text("ORDER_STATUS_READY"),
-            "delivered": i18n.get_text("ORDER_STATUS_DELIVERED"),
-            "cancelled": i18n.get_text("ORDER_STATUS_CANCELLED")
+            "confirmed": i18n.get_text("ORDER_STATUS_CONFIRMED", user_id=customer_chat_id),
+            "preparing": i18n.get_text("ORDER_STATUS_PREPARING", user_id=customer_chat_id),
+            "ready": i18n.get_text("ORDER_STATUS_READY", user_id=customer_chat_id),
+            "delivered": i18n.get_text("ORDER_STATUS_DELIVERED", user_id=customer_chat_id),
+            "cancelled": i18n.get_text("ORDER_STATUS_CANCELLED", user_id=customer_chat_id)
         }
         
         # Get the appropriate message for the status
-        message = status_messages.get(new_status.lower(), i18n.get_text("ORDER_STATUS_UNKNOWN").format(status=new_status))
+        message = status_messages.get(new_status.lower(), i18n.get_text("ORDER_STATUS_UNKNOWN", user_id=customer_chat_id).format(status=new_status))
         
         # Add delivery-specific information for ready orders
         if new_status.lower() == "ready":
             if delivery_method.lower() == "delivery":
-                message += "\n\n" + i18n.get_text("DELIVERY_READY_INFO")
+                message += "\n\n" + i18n.get_text("DELIVERY_READY_INFO", user_id=customer_chat_id)
             else:
-                message += "\n\n" + i18n.get_text("PICKUP_READY_INFO")
+                message += "\n\n" + i18n.get_text("PICKUP_READY_INFO", user_id=customer_chat_id)
         
         # Add order number to the message
-        full_message = f"{i18n.get_text('CUSTOMER_ORDER_UPDATE_HEADER')}\n\n📋 <b>{i18n.get_text('ORDER_NUMBER_LABEL')} #{order_id}</b>\n\n{message}"
+        full_message = f"{i18n.get_text('CUSTOMER_ORDER_UPDATE_HEADER', user_id=customer_chat_id)}\n\n📋 <b>{i18n.get_text('ORDER_NUMBER_LABEL', user_id=customer_chat_id)} #{order_id}</b>\n\n{message}"
         
         return await self.send_customer_notification(customer_chat_id, full_message)
 

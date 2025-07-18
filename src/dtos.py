@@ -29,7 +29,7 @@ class CustomerRegistrationRequest:
 @dataclass
 class CustomerRegistrationResponse:
     success: bool
-    customer: Optional[Any] = None
+    customer: Optional[Dict[str, Any]] = None
     is_returning_customer: bool = False
     error_message: Optional[str] = None
 
@@ -47,7 +47,7 @@ class ProductCatalogRequest:
 @dataclass
 class ProductCatalogResponse:
     success: bool
-    products: List[Any]
+    products: List[Dict[str, Any]]
     error_message: Optional[str] = None
 
 

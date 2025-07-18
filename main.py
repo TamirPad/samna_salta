@@ -25,24 +25,28 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 
 def setup_bot():
     """Setup and configure the bot application"""
-    # Setup logging
-    ProductionLogger.setup_logging()
-    logger = logging.getLogger(__name__)
-    
-    # Get config
-    config = get_config()
-    logger.info("Configuration loaded successfully")
-
-    # Initialize database with retry logic
-    logger.info("Initializing database...")
     try:
-        init_db()
-        # init_default_products() is now called within init_db()
-        logger.info("Database initialization completed")
+        # Setup logging
+        ProductionLogger.setup_logging()
+        logger = logging.getLogger(__name__)
+        
+        # Get config
+        config = get_config()
+        logger.info("Configuration loaded successfully")
+
+        # Initialize database with retry logic
+        logger.info("Initializing database...")
+        try:
+            init_db()
+            # init_default_products() is now called within init_db()
+            logger.info("Database initialization completed")
+        except Exception as e:
+            logger.error(f"Database initialization failed: {e}")
+            logger.warning("Bot will start with limited functionality - database features may not work")
+            # Continue with bot startup even if database fails
     except Exception as e:
-        logger.error(f"Database initialization failed: {e}")
-        logger.warning("Bot will start with limited functionality - database features may not work")
-        # Continue with bot startup even if database fails
+        logger.error(f"Failed to setup bot: {e}")
+        raise
 
     # Create application
     logger.info("Creating Telegram application...")
@@ -84,7 +88,8 @@ def setup_bot():
     cart_handler = CartHandler()
     application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^add_"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^add_product_"))
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^(kubaneh_|samneh_|red_bisbas_|hawaij_coffee_spice|white_coffee)"))
+    # Register all product option callbacks
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^(kubaneh_|samneh_|red_bisbas_|hilbeh_|hawaij_coffee_spice|white_coffee)"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_view_cart, pattern="^cart_view"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart_confirmation, pattern="^cart_clear_confirm"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart, pattern="^cart_clear_yes"))
@@ -101,9 +106,12 @@ def setup_bot():
     
     # Simple text handler to debug conversation issues
     async def debug_text_handler(update, context):
-        print(f"🔍 DEBUG: Received text message: '{update.message.text}' from user {update.effective_user.id}")
-        print(f"🔍 DEBUG: Context user_data: {context.user_data}")
-        print(f"🔍 DEBUG: Conversation state: {context.user_data.get('conversation_state', 'None')}")
+        try:
+            print(f"🔍 DEBUG: Received text message: '{update.message.text}' from user {update.effective_user.id}")
+            print(f"🔍 DEBUG: Context user_data: {context.user_data}")
+            print(f"🔍 DEBUG: Conversation state: {context.user_data.get('conversation_state', 'None')}")
+        except Exception as e:
+            logger.error(f"Error in debug handler: {e}")
         return
     
     # Add debug handler with lower priority (after conversation handlers)
@@ -127,7 +135,13 @@ def run_polling():
         print("🛑 Press Ctrl+C to stop the bot")
         
         # Start polling (this will run until interrupted)
-        application.run_polling()
+        try:
+            application.run_polling()
+        except KeyboardInterrupt:
+            print("\n🛑 Bot stopped by user")
+        except Exception as polling_error:
+            logging.getLogger(__name__).error(f"Error during polling: {polling_error}")
+            raise
         
     except Exception as e:
         logging.getLogger(__name__).error(f"Failed to start bot: {e}")
@@ -164,8 +178,12 @@ def run_webhook():
             # Set webhook (webhook mode only)
             webhook_url = os.getenv("WEBHOOK_URL")
             if webhook_url:
-                await application.bot.set_webhook(url=f"{webhook_url}/webhook")
-                logger.info(f"Webhook set to: {webhook_url}/webhook")
+                try:
+                    await application.bot.set_webhook(url=f"{webhook_url}/webhook")
+                    logger.info(f"Webhook set to: {webhook_url}/webhook")
+                except Exception as webhook_error:
+                    logger.error(f"Failed to set webhook: {webhook_error}")
+                    # Continue without webhook - bot will still work
             else:
                 logger.warning("WEBHOOK_URL not set! Bot will not receive updates.")
             
@@ -180,30 +198,42 @@ def run_webhook():
         """Cleanup on shutdown"""
         nonlocal application
         if application:
-            logger.info("Shutting down bot...")
-            await application.stop()
-            await application.shutdown()
+            try:
+                logger.info("Shutting down bot...")
+                await application.stop()
+                await application.shutdown()
+            except Exception as e:
+                logger.error(f"Error during shutdown: {e}")
+                # Continue with shutdown even if there are errors
 
     @app.get("/health")
     async def health_check(background_tasks: BackgroundTasks):
         """Health check endpoint for Render"""
-        from src.db.operations import get_database_status
-        
-        db_status = get_database_status()
-        
-        if db_status["connected"]:
+        try:
+            from src.db.operations import get_database_status
+            
+            db_status = get_database_status()
+            
+            if db_status["connected"]:
+                return {
+                    "status": "ok", 
+                    "message": "Bot is running",
+                    "database": "connected",
+                    "database_type": db_status["database_type"]
+                }
+            else:
+                return {
+                    "status": "degraded", 
+                    "message": "Bot is running but database is unavailable",
+                    "database": "disconnected",
+                    "database_error": db_status["error"]
+                }
+        except Exception as e:
+            logger.error(f"Error in health check: {e}")
             return {
-                "status": "ok", 
-                "message": "Bot is running",
-                "database": "connected",
-                "database_type": db_status["database_type"]
-            }
-        else:
-            return {
-                "status": "degraded", 
-                "message": "Bot is running but database is unavailable",
-                "database": "disconnected",
-                "database_error": db_status["error"]
+                "status": "error",
+                "message": "Health check failed",
+                "error": str(e)
             }
 
     @app.post("/webhook")
@@ -224,6 +254,9 @@ def run_webhook():
             
             return JSONResponse(content={"status": "ok"})
             
+        except ValueError as e:
+            logger.error(f"Invalid JSON in webhook: {e}")
+            raise HTTPException(status_code=400, detail="Invalid JSON")
         except Exception as e:
             logger.error(f"Error processing webhook: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
@@ -231,24 +264,36 @@ def run_webhook():
     @app.get("/")
     async def root():
         """Root endpoint"""
-        return {"message": "Samna Salta Bot is running", "status": "active"}
+        try:
+            return {"message": "Samna Salta Bot is running", "status": "active"}
+        except Exception as e:
+            logger.error(f"Error in root endpoint: {e}")
+            return {"message": "Bot is running", "status": "error"}
 
     # Run the FastAPI app
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    try:
+        port = int(os.getenv("PORT", 8000))
+        uvicorn.run(app, host="0.0.0.0", port=port)
+    except Exception as e:
+        logger.error(f"Failed to start webhook server: {e}")
+        raise
 
 def main():
     """Main entry point - determines mode based on environment"""
-    # Check if we should run in webhook mode
-    webhook_url = os.getenv("WEBHOOK_URL")
-    port = os.getenv("PORT")
-    
-    # If WEBHOOK_URL or PORT is set, run in webhook mode (production)
-    if webhook_url or port:
-        run_webhook()
-    else:
-        # Otherwise run in polling mode (local development)
-        run_polling()
+    try:
+        # Check if we should run in webhook mode
+        webhook_url = os.getenv("WEBHOOK_URL")
+        port = os.getenv("PORT")
+        
+        # If WEBHOOK_URL or PORT is set, run in webhook mode (production)
+        if webhook_url or port:
+            run_webhook()
+        else:
+            # Otherwise run in polling mode (local development)
+            run_polling()
+    except Exception as e:
+        logging.getLogger(__name__).error(f"Fatal error in main: {e}")
+        raise
 
 if __name__ == "__main__":
     main() 

@@ -44,8 +44,8 @@ class OrderService:
                 delivery_address = cart.delivery_address or ""
                 logger.info("DEBUG: Order creation - delivery_method: %s, delivery_address: %s", delivery_method, delivery_address)
             
-            # Calculate total
-            total = sum(item.get("price", 0) * item.get("quantity", 1) for item in cart_items)
+            # Calculate total using unit_price from cart items
+            total = sum(item.get("unit_price", 0) * item.get("quantity", 1) for item in cart_items)
             
             # Generate order number
             order_number = generate_order_number()

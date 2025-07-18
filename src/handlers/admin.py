@@ -122,6 +122,12 @@ class AdminHandler:
             return await self._start_search_products(query)
         elif data == "admin_remove_products":
             await self._show_remove_products_list(query)
+        elif data == "admin_bulk_operations":
+            await self._show_bulk_operations(query)
+        elif data.startswith("admin_bulk_"):
+            await self._handle_bulk_operation(query, data)
+        elif data.startswith("admin_quick_"):
+            await self._handle_quick_action(query, data)
         elif data.startswith("admin_product_"):
             await self._handle_product_callback(query, data)
         elif data == "admin_category_management":
@@ -134,12 +140,14 @@ class AdminHandler:
         elif data.startswith("admin_edit_category_name_"):
             category = data.replace("admin_edit_category_name_", "")
             return await self._start_edit_category_name(query, category)
+        elif data.startswith("admin_delete_category_confirm_"):
+            # Extract category name from "admin_delete_category_confirm_CATEGORY_NAME"
+            # The category name is everything after "admin_delete_category_confirm_"
+            category = data.replace("admin_delete_category_confirm_", "")
+            await self._delete_category_confirmed(query, category)
         elif data.startswith("admin_delete_category_"):
             category = data.replace("admin_delete_category_", "")
             await self._show_delete_category_confirmation(query, category)
-        elif data.startswith("admin_delete_category_confirm_"):
-            category = data.replace("admin_delete_category_confirm_", "")
-            await self._delete_category_confirmed(query, category)
         elif data.startswith("admin_category_"):
             category = data.replace("admin_category_", "")
             await self._show_products_in_category(query, category)
@@ -1174,6 +1182,12 @@ class AdminHandler:
                 ],
                 [
                     InlineKeyboardButton(
+                        i18n.get_text("ADMIN_BULK_OPERATIONS", user_id=user_id),
+                        callback_data="admin_bulk_operations"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
                         i18n.get_text("ADMIN_PRODUCT_MANAGEMENT_BACK", user_id=user_id),
                         callback_data="admin_back"
                     )
@@ -1374,8 +1388,9 @@ class AdminHandler:
             
             # Add category list with edit/delete options
             for category in categories:
-                # Get product count for this category
-                products = await self.admin_service.get_products_by_category_admin(category)
+                # Get all products in category (including inactive ones) for accurate count
+                from src.db.operations import get_all_products_by_category
+                products = get_all_products_by_category(category)
                 product_count = len(products)
                 
                 keyboard.append([
@@ -1411,7 +1426,9 @@ class AdminHandler:
         """Show category edit options"""
         try:
             user_id = query.from_user.id
-            products = await self.admin_service.get_products_by_category_admin(category)
+            # Get all products in category (including inactive ones) for accurate count
+            from src.db.operations import get_all_products_by_category
+            products = get_all_products_by_category(category)
             product_count = len(products)
             
             text = i18n.get_text("ADMIN_CATEGORY_EDIT_TITLE", user_id=user_id).format(category=category, count=product_count)
@@ -1444,10 +1461,12 @@ class AdminHandler:
             self.logger.error("Error showing edit category: %s", e)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
 
-    async def _start_add_category(self, query: CallbackQuery) -> int:
+    async def _start_add_category(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         """Start the add category conversation"""
         try:
+            query = update.callback_query
             user_id = query.from_user.id
+            self.logger.info(f"🔧 Starting add category conversation for user {user_id}")
             text = i18n.get_text("ADMIN_CATEGORY_ADD_PROMPT", user_id=user_id)
             
             keyboard = [
@@ -1603,8 +1622,14 @@ class AdminHandler:
         """Show category deletion confirmation"""
         try:
             user_id = query.from_user.id
-            products = await self.admin_service.get_products_by_category_admin(category)
+            self.logger.info(f"Showing delete confirmation for category: '{category}'")
+            
+            # Get all products in category (including inactive ones) for accurate count
+            from src.db.operations import get_all_products_by_category
+            products = get_all_products_by_category(category)
             product_count = len(products)
+            
+            self.logger.info(f"Found {product_count} products in category '{category}'")
             
             if product_count > 0:
                 text = i18n.get_text("ADMIN_CATEGORY_DELETE_WITH_PRODUCTS", user_id=user_id).format(
@@ -1630,13 +1655,14 @@ class AdminHandler:
             await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
             
         except Exception as e:
-            self.logger.error("Error showing delete category confirmation: %s", e)
+            self.logger.error("Error showing delete category confirmation: %s", e, exc_info=True)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
 
     async def _delete_category_confirmed(self, query: CallbackQuery, category: str) -> None:
         """Handle confirmed category deletion"""
         try:
             user_id = query.from_user.id
+            self.logger.info(f"Deleting category: '{category}' for user {user_id}")
             
             # Delete the category (this would need to be implemented in the service)
             result = await self.admin_service.delete_category(category)
@@ -1661,7 +1687,7 @@ class AdminHandler:
                 )
             
         except Exception as e:
-            self.logger.error("Error deleting category: %s", e)
+            self.logger.error("Error deleting category: %s", e, exc_info=True)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
 
     async def _start_add_product(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2450,7 +2476,159 @@ class AdminHandler:
             self.logger.error("Error showing remove products list: %s", e)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
 
+    async def _show_bulk_operations(self, query: CallbackQuery) -> None:
+        """Show bulk operations menu"""
+        try:
+            user_id = query.from_user.id
+            text = i18n.get_text("ADMIN_BULK_OPERATIONS_TITLE", user_id=user_id)
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_BULK_ACTIVATE_ALL", user_id=user_id),
+                        callback_data="admin_bulk_activate_all"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_BULK_DEACTIVATE_ALL", user_id=user_id),
+                        callback_data="admin_bulk_deactivate_all"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_BULK_DELETE_INACTIVE", user_id=user_id),
+                        callback_data="admin_bulk_delete_inactive"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
+                        callback_data="admin_menu_management"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+        except Exception as e:
+            self.logger.error("Error showing bulk operations: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
 
+    async def _handle_bulk_operation(self, query: CallbackQuery, data: str) -> None:
+        """Handle bulk operations"""
+        try:
+            user_id = query.from_user.id
+            
+            if data == "admin_bulk_activate_all":
+                result = await self.admin_service.bulk_activate_all_products()
+                if result["success"]:
+                    text = i18n.get_text("ADMIN_BULK_ACTIVATE_SUCCESS", user_id=user_id).format(count=result["count"])
+                else:
+                    text = i18n.get_text("ADMIN_BULK_ACTIVATE_ERROR", user_id=user_id).format(error=result["error"])
+                    
+            elif data == "admin_bulk_deactivate_all":
+                result = await self.admin_service.bulk_deactivate_all_products()
+                if result["success"]:
+                    text = i18n.get_text("ADMIN_BULK_DEACTIVATE_SUCCESS", user_id=user_id).format(count=result["count"])
+                else:
+                    text = i18n.get_text("ADMIN_BULK_DEACTIVATE_ERROR", user_id=user_id).format(error=result["error"])
+                    
+            elif data == "admin_bulk_delete_inactive":
+                result = await self.admin_service.bulk_delete_inactive_products()
+                if result["success"]:
+                    text = i18n.get_text("ADMIN_BULK_DELETE_SUCCESS", user_id=user_id).format(count=result["count"])
+                else:
+                    text = i18n.get_text("ADMIN_BULK_DELETE_ERROR", user_id=user_id).format(error=result["error"])
+            else:
+                text = i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id)
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
+                        callback_data="admin_menu_management"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+        except Exception as e:
+            self.logger.error("Error handling bulk operation: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
+
+    async def _handle_quick_action(self, query: CallbackQuery, data: str) -> None:
+        """Handle quick actions for products"""
+        try:
+            user_id = query.from_user.id
+            
+            if data.startswith("admin_quick_toggle_"):
+                product_id = int(data.replace("admin_quick_toggle_", ""))
+                result = await self.admin_service.toggle_product_status(product_id)
+                
+                if result["success"]:
+                    status = "✅ Active" if result["new_status"] else "❌ Inactive"
+                    await query.answer(
+                        i18n.get_text("ADMIN_QUICK_TOGGLE_SUCCESS", user_id=user_id).format(status=status),
+                        show_alert=False
+                    )
+                else:
+                    await query.answer(
+                        i18n.get_text("ADMIN_QUICK_TOGGLE_ERROR", user_id=user_id).format(error=result["error"]),
+                        show_alert=True
+                    )
+                    
+            elif data.startswith("admin_quick_delete_"):
+                product_id = int(data.replace("admin_quick_delete_", ""))
+                result = await self.admin_service.delete_existing_product(product_id)
+                
+                if result["success"]:
+                    await query.answer(
+                        i18n.get_text("ADMIN_QUICK_DELETE_SUCCESS", user_id=user_id),
+                        show_alert=False
+                    )
+                    # Refresh the product list
+                    await self._show_all_products(query)
+                else:
+                    await query.answer(
+                        i18n.get_text("ADMIN_QUICK_DELETE_ERROR", user_id=user_id).format(error=result["error"]),
+                        show_alert=True
+                    )
+                    
+        except Exception as e:
+            self.logger.error("Error handling quick action: %s", e)
+            await query.answer(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id), show_alert=True)
+
+    async def _start_add_product(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Start the step-by-step add product conversation"""
+        try:
+            query = update.callback_query
+            user_id = query.from_user.id
+            self.logger.info(f"🚀 Starting step-by-step product creation for user {user_id}")
+            self.logger.info(f"🚀 Setting conversation state to AWAITING_PRODUCT_NAME ({AWAITING_PRODUCT_NAME})")
+            text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_NAME", user_id=user_id)
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("CANCEL", user_id=user_id),
+                        callback_data="admin_menu_management"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+            return AWAITING_PRODUCT_NAME
+            
+        except Exception as e:
+            self.logger.error("Error starting add product: %s", e)
+            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=update.callback_query.from_user.id))
+            return ConversationHandler.END
 
     def _parse_product_input(self, text: str) -> Optional[Dict]:
         """Parse product details from text input"""
@@ -2496,7 +2674,7 @@ def register_admin_handlers(application: Application):
 
     # Admin callback handlers (excluding conversation patterns)
     application.add_handler(
-        CallbackQueryHandler(handler.handle_admin_callback, pattern="^admin_(?!add_product_category_|add_product_confirm_|add_product$)")
+        CallbackQueryHandler(handler.handle_admin_callback, pattern="^admin_(?!add_product_category_|add_product_confirm_|add_product$|add_category$|edit_category_name_)")
     )
 
     # Admin conversation handler for status updates
@@ -2587,7 +2765,10 @@ def register_admin_handlers(application: Application):
         persistent=False,
     )
 
+    # Add debug logging to the conversation handler
+    handler.logger.info("🔧 Registering add_category_conversation handler")
     application.add_handler(add_category_handler)
+    handler.logger.info("✅ add_category_conversation handler registered successfully")
 
     # Admin conversation handler for editing category names
     edit_category_handler = ConversationHandler(

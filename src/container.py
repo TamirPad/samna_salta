@@ -44,52 +44,88 @@ class Container:
 
     def get_cart_service(self) -> CartService:
         """Get cart service instance"""
-        if 'cart_service' not in self.services:
-            self.services['cart_service'] = CartService()
-        return self.services['cart_service']
+        try:
+            if 'cart_service' not in self.services:
+                self.services['cart_service'] = CartService()
+            return self.services['cart_service']
+        except Exception as e:
+            logger.error(f"Error getting cart service: {e}")
+            raise
 
     def get_order_service(self) -> OrderService:
         """Get order service instance for customer operations"""
-        if 'order_service' not in self.services:
-            self.services['order_service'] = OrderService()
-        return self.services['order_service']
+        try:
+            if 'order_service' not in self.services:
+                self.services['order_service'] = OrderService()
+            return self.services['order_service']
+        except Exception as e:
+            logger.error(f"Error getting order service: {e}")
+            raise
 
     def get_admin_service(self) -> AdminService:
         """Get admin service instance for admin operations"""
-        if 'admin_service' not in self.services:
-            self.services['admin_service'] = AdminService()
-        return self.services['admin_service']
+        try:
+            if 'admin_service' not in self.services:
+                self.services['admin_service'] = AdminService()
+            return self.services['admin_service']
+        except Exception as e:
+            logger.error(f"Error getting admin service: {e}")
+            raise
 
     def get_delivery_service(self) -> DeliveryService:
         """Get delivery service instance"""
-        if 'delivery_service' not in self.services:
-            self.services['delivery_service'] = DeliveryService()
-        return self.services['delivery_service']
+        try:
+            if 'delivery_service' not in self.services:
+                self.services['delivery_service'] = DeliveryService()
+            return self.services['delivery_service']
+        except Exception as e:
+            logger.error(f"Error getting delivery service: {e}")
+            raise
 
     def get_notification_service(self) -> NotificationService:
         """Get notification service instance"""
-        if 'notification_service' not in self.services:
-            self.services['notification_service'] = NotificationService()
-        return self.services['notification_service']
+        try:
+            if 'notification_service' not in self.services:
+                self.services['notification_service'] = NotificationService()
+            return self.services['notification_service']
+        except Exception as e:
+            logger.error(f"Error getting notification service: {e}")
+            raise
 
     def get_customer_order_service(self) -> CustomerOrderService:
         """Get customer order service instance"""
-        if 'customer_order_service' not in self.services:
-            self.services['customer_order_service'] = CustomerOrderService()
-        return self.services['customer_order_service']
+        try:
+            if 'customer_order_service' not in self.services:
+                self.services['customer_order_service'] = CustomerOrderService()
+            return self.services['customer_order_service']
+        except Exception as e:
+            logger.error(f"Error getting customer order service: {e}")
+            raise
 
     def get_config(self) -> Any:
         """Get configuration"""
-        return self.config
+        try:
+            return self.config
+        except Exception as e:
+            logger.error(f"Error getting config: {e}")
+            raise
 
 # Global container instance
 container = Container()
 
 def get_container() -> Container:
     """Get the global container instance"""
-    return container
+    try:
+        return container
+    except Exception as e:
+        logger.error(f"Error getting container: {e}")
+        raise
 
 def initialize_container(bot: Bot) -> None:
     """Initialize the container with bot instance"""
-    container.set_bot(bot)
-    logger.info("Container initialized with bot instance") 
+    try:
+        container.set_bot(bot)
+        logger.info("Container initialized with bot instance")
+    except Exception as e:
+        logger.error(f"Error initializing container: {e}")
+        raise 

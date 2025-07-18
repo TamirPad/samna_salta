@@ -159,46 +159,76 @@ def validate_phone_number(phone: str) -> bool:
     return mobile_part in SecurityPatterns.ISRAELI_MOBILE_PREFIXES
 
 @cached(ttl=3600)  # Cache for 1 hour
-def translate_product_name(product_name: str, options: dict = None, user_id: int = None) -> str:
+def translate_product_name(product_name: str, options: Optional[dict] = None, user_id: Optional[int] = None) -> str:
     """Translate a product name from database format to localized display name"""
     from src.utils.i18n import i18n
     
     product_name_lower = product_name.lower()
     
+    # Handle Kubaneh with type options
     if "kubaneh" in product_name_lower:
         if options and "type" in options:
             kubaneh_type = options["type"]
             type_key = f"KUBANEH_{kubaneh_type.upper()}"
-            type_display = i18n.get_text(type_key, user_id=user_id)
-            return i18n.get_text("KUBANEH_DISPLAY_NAME", user_id=user_id).format(type=type_display)
+            try:
+                type_display = i18n.get_text(type_key, user_id=user_id)
+                return i18n.get_text("KUBANEH_DISPLAY_NAME", user_id=user_id).format(type=type_display)
+            except:
+                # Fallback if translation key doesn't exist
+                return f"Kubaneh ({kubaneh_type.title()})"
         return i18n.get_text("PRODUCT_KUBANEH_CLASSIC", user_id=user_id)
     
+    # Handle Samneh with type options
     elif "samneh" in product_name_lower:
-        if options and "smoking" in options:
-            smoking_type = options["smoking"].replace(" ", "_")
-            type_key = f"SAMNEH_{smoking_type.upper()}"
-            type_display = i18n.get_text(type_key, user_id=user_id)
-            return i18n.get_text("SAMNEH_DISPLAY_NAME", user_id=user_id).format(type=type_display)
+        if options and "type" in options:
+            samneh_type = options["type"]
+            type_key = f"SAMNEH_{samneh_type.upper()}"
+            try:
+                type_display = i18n.get_text(type_key, user_id=user_id)
+                return i18n.get_text("SAMNEH_DISPLAY_NAME", user_id=user_id).format(type=type_display)
+            except:
+                # Fallback if translation key doesn't exist
+                return f"Samneh ({samneh_type.title()})"
         return i18n.get_text("PRODUCT_SAMNEH_SMOKED", user_id=user_id)
     
+    # Handle Red Bisbas with size options
     elif "red bisbas" in product_name_lower or "bisbas" in product_name_lower:
         if options and "size" in options:
             size = options["size"]
             size_key = f"SIZE_{size.upper()}"
-            size_display = i18n.get_text(size_key, user_id=user_id)
-            return i18n.get_text("RED_BISBAS_DISPLAY_NAME", user_id=user_id).format(size=size_display)
+            try:
+                size_display = i18n.get_text(size_key, user_id=user_id)
+                return i18n.get_text("RED_BISBAS_DISPLAY_NAME", user_id=user_id).format(size=size_display)
+            except:
+                # Fallback if translation key doesn't exist
+                return f"Red Bisbas ({size.title()})"
         return i18n.get_text("PRODUCT_RED_BISBAS", user_id=user_id)
     
+    # Handle Hilbeh with type options
     elif "hilbeh" in product_name_lower:
+        if options and "type" in options:
+            hilbeh_type = options["type"]
+            type_key = f"HILBEH_{hilbeh_type.upper()}"
+            try:
+                type_display = i18n.get_text(type_key, user_id=user_id)
+                return i18n.get_text("HILBEH_DISPLAY_NAME", user_id=user_id).format(type=type_display)
+            except:
+                # Fallback if translation key doesn't exist
+                return f"Hilbeh ({hilbeh_type.title()})"
         return i18n.get_text("PRODUCT_HILBEH", user_id=user_id)
     
-    elif "hawaij" in product_name_lower and "soup" in product_name_lower:
-        return i18n.get_text("PRODUCT_HAWAIJ_SOUP", user_id=user_id)
+    # Handle Hawaij products
+    elif "hawaij" in product_name_lower:
+        if "soup" in product_name_lower:
+            return i18n.get_text("PRODUCT_HAWAIJ_SOUP", user_id=user_id)
+        elif "coffee" in product_name_lower:
+            return i18n.get_text("PRODUCT_HAWAIJ_COFFEE", user_id=user_id)
+        else:
+            return i18n.get_text("PRODUCT_HAWAIJ_SOUP", user_id=user_id)  # Default to soup
     
-    elif "hawaij" in product_name_lower and "coffee" in product_name_lower:
-        return i18n.get_text("PRODUCT_HAWAIJ_COFFEE", user_id=user_id)
-    
+    # Handle White Coffee
     elif "white coffee" in product_name_lower:
         return i18n.get_text("PRODUCT_WHITE_COFFEE", user_id=user_id)
     
+    # Fallback to original product name
     return product_name

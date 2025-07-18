@@ -3,7 +3,7 @@ Cart handler for managing shopping cart operations
 """
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, filters
@@ -126,7 +126,7 @@ class CartHandler:
             message = i18n.get_text("CART_VIEW_TITLE", user_id=user_id) + "\n\n"
             
             for i, item in enumerate(cart_items, 1):
-                item_total = item.get("price", 0) * item.get("quantity", 1)
+                item_total = item.get("unit_price", 0) * item.get("quantity", 1)
                 # Translate product name
                 from src.utils.helpers import translate_product_name
                 translated_product_name = translate_product_name(item.get('product_name', 'Unknown Product'), item.get('options', {}), user_id)
@@ -134,7 +134,7 @@ class CartHandler:
                     index=i,
                     product_name=translated_product_name,
                     quantity=item.get('quantity', 1),
-                    price=item.get('price', 0),
+                    price=item.get('unit_price', 0),
                     item_total=item_total
                 ) + "\n\n"
 
@@ -231,7 +231,7 @@ class CartHandler:
             message = i18n.get_text("CHECKOUT_TITLE", user_id=user_id) + "\n\n"
             
             for i, item in enumerate(cart_items, 1):
-                item_total = item.get("price", 0) * item.get("quantity", 1)
+                item_total = item.get("unit_price", 0) * item.get("quantity", 1)
                 # Translate product name
                 from src.utils.helpers import translate_product_name
                 translated_product_name = translate_product_name(item.get('product_name', 'Unknown Product'), item.get('options', {}), user_id)
@@ -239,7 +239,7 @@ class CartHandler:
                     index=i,
                     product_name=translated_product_name,
                     quantity=item.get('quantity', 1),
-                    price=item.get('price', 0),
+                    price=item.get('unit_price', 0),
                     item_total=item_total
                 ) + "\n\n"
 
@@ -475,7 +475,7 @@ class CartHandler:
                 reply_markup=self._get_back_to_cart_keyboard(user_id)
             )
 
-    def _parse_product_from_callback(self, callback_data: str) -> Dict[str, Any]:
+    def _parse_product_from_callback(self, callback_data: str) -> Optional[Dict[str, Any]]:
         """Parse product information from callback data"""
         try:
             # Handle new dynamic product pattern
@@ -491,56 +491,58 @@ class CartHandler:
                         "options": {}
                     }
             
-            # Handle different callback patterns
+            # Handle legacy product option patterns (from sub-menus)
+            # These map to specific product variants with options
+            legacy_product_mapping = {
+                # Kubaneh options - all map to product_id 1 with different types
+                "kubaneh_classic": {"product_id": 1, "display_name": "Kubaneh", "options": {"type": "classic"}},
+                "kubaneh_seeded": {"product_id": 1, "display_name": "Kubaneh", "options": {"type": "seeded"}},
+                "kubaneh_herb": {"product_id": 1, "display_name": "Kubaneh", "options": {"type": "herb"}},
+                "kubaneh_aromatic": {"product_id": 1, "display_name": "Kubaneh", "options": {"type": "aromatic"}},
+                
+                # Samneh options - all map to product_id 2 with different types
+                "samneh_classic": {"product_id": 2, "display_name": "Samneh", "options": {"type": "classic"}},
+                "samneh_spicy": {"product_id": 2, "display_name": "Samneh", "options": {"type": "spicy"}},
+                "samneh_herb": {"product_id": 2, "display_name": "Samneh", "options": {"type": "herb"}},
+                "samneh_honey": {"product_id": 2, "display_name": "Samneh", "options": {"type": "honey"}},
+                "samneh_smoked": {"product_id": 2, "display_name": "Samneh", "options": {"type": "smoked"}},
+                "samneh_not_smoked": {"product_id": 2, "display_name": "Samneh", "options": {"type": "not_smoked"}},
+                
+                # Red Bisbas options - all map to product_id 3 with different sizes
+                "red_bisbas_small": {"product_id": 3, "display_name": "Red Bisbas", "options": {"size": "small"}},
+                "red_bisbas_medium": {"product_id": 3, "display_name": "Red Bisbas", "options": {"size": "medium"}},
+                "red_bisbas_large": {"product_id": 3, "display_name": "Red Bisbas", "options": {"size": "large"}},
+                "red_bisbas_xl": {"product_id": 3, "display_name": "Red Bisbas", "options": {"size": "xl"}},
+                
+                # Hilbeh options - all map to product_id 7 with different types
+                "hilbeh_classic": {"product_id": 7, "display_name": "Hilbeh", "options": {"type": "classic"}},
+                "hilbeh_spicy": {"product_id": 7, "display_name": "Hilbeh", "options": {"type": "spicy"}},
+                "hilbeh_sweet": {"product_id": 7, "display_name": "Hilbeh", "options": {"type": "sweet"}},
+                "hilbeh_premium": {"product_id": 7, "display_name": "Hilbeh", "options": {"type": "premium"}},
+                
+                # Direct add products (no options)
+                "hawaij_coffee_spice": {"product_id": 5, "display_name": "Hawaij for Coffee", "options": {}},
+                "white_coffee": {"product_id": 6, "display_name": "White Coffee", "options": {}},
+            }
+            
+            if callback_data in legacy_product_mapping:
+                return legacy_product_mapping[callback_data]
+            
+            # Handle legacy add_ patterns (fallback for backward compatibility)
             if callback_data.startswith("add_"):
-                # Extract product info from callback data
                 parts = callback_data.split("_")
-                if len(parts) >= 3:
+                if len(parts) >= 2:
                     product_type = parts[1]
-                    variant = parts[2] if len(parts) > 2 else "default"
                     
-                    # Map callback data to product info
-                    product_mapping = {
-                        "kubaneh": {"product_id": 1, "display_name": "Kubaneh (Classic)", "options": {"type": "classic"}},
-                        "red": {"product_id": 3, "display_name": "Red Bisbas (Small)", "options": {"size": "small"}},
+                    # Simple mapping for basic products without options
+                    basic_product_mapping = {
                         "hawaij": {"product_id": 4, "display_name": "Hawaij for Soup", "options": {}},
-                        "hawaij": {"product_id": 5, "display_name": "Hawaij for Coffee", "options": {}},
                         "white": {"product_id": 6, "display_name": "White Coffee", "options": {}},
                         "hilbeh": {"product_id": 7, "display_name": "Hilbeh", "options": {}},
                     }
                     
-                    if product_type in product_mapping:
-                        return product_mapping[product_type]
-            
-            # Handle direct product option patterns (from sub-menus)
-            elif callback_data in [
-                "kubaneh_classic", "kubaneh_seeded", "kubaneh_herb", "kubaneh_aromatic",
-                "samneh_smoked", "samneh_not_smoked",
-                "red_bisbas_small", "red_bisbas_large",
-                "hawaij_coffee_spice", "white_coffee"
-            ]:
-                # Map specific product options to product info
-                product_mapping = {
-                    # Kubaneh options
-                    "kubaneh_classic": {"product_id": 1, "display_name": "Kubaneh (Classic)", "options": {"type": "classic"}},
-                    "kubaneh_seeded": {"product_id": 1, "display_name": "Kubaneh (Seeded)", "options": {"type": "seeded"}},
-                    "kubaneh_herb": {"product_id": 1, "display_name": "Kubaneh (Herb)", "options": {"type": "herb"}},
-                    "kubaneh_aromatic": {"product_id": 1, "display_name": "Kubaneh (Aromatic)", "options": {"type": "aromatic"}},
-                    
-                    # Samneh options
-                    "samneh_smoked": {"product_id": 2, "display_name": "Samneh (Smoked)", "options": {"type": "smoked"}},
-                    "samneh_not_smoked": {"product_id": 2, "display_name": "Samneh (Not Smoked)", "options": {"type": "not_smoked"}},
-                    
-                    # Red Bisbas options
-                    "red_bisbas_small": {"product_id": 3, "display_name": "Red Bisbas (Small)", "options": {"size": "small"}},
-                    "red_bisbas_large": {"product_id": 3, "display_name": "Red Bisbas (Large)", "options": {"size": "large"}},
-                    
-                    # Direct add products
-                    "hawaij_coffee_spice": {"product_id": 5, "display_name": "Hawaij for Coffee", "options": {}},
-                    "white_coffee": {"product_id": 6, "display_name": "White Coffee", "options": {}},
-                }
-                
-                return product_mapping.get(callback_data)
+                    if product_type in basic_product_mapping:
+                        return basic_product_mapping[product_type]
             
             return None
         except Exception as e:
@@ -660,7 +662,7 @@ class CartHandler:
             message += "\n"
             
             for i, item in enumerate(cart_items, 1):
-                item_total = item.get("price", 0) * item.get("quantity", 1)
+                item_total = item.get("unit_price", 0) * item.get("quantity", 1)
                 # Translate product name
                 from src.utils.helpers import translate_product_name
                 translated_product_name = translate_product_name(item.get('product_name', 'Unknown Product'), item.get('options', {}), user_id)
@@ -668,7 +670,7 @@ class CartHandler:
                     index=i,
                     product_name=translated_product_name,
                     quantity=item.get('quantity', 1),
-                    price=item.get('price', 0),
+                    price=item.get('unit_price', 0),
                     item_total=item_total
                 ) + "\n\n"
 
@@ -711,12 +713,12 @@ class CartHandler:
             confirmation_message += "\n"
             
             for i, item in enumerate(cart_items, 1):
-                item_total = item.get("price", 0) * item.get("quantity", 1)
+                item_total = item.get("unit_price", 0) * item.get("quantity", 1)
                 confirmation_message += i18n.get_text("CART_ITEM_FORMAT", user_id=user_id).format(
                     index=i,
                     product_name=item.get('product_name', 'Unknown Product'),
                     quantity=item.get('quantity', 1),
-                    price=item.get('price', 0),
+                    price=item.get('unit_price', 0),
                     item_total=item_total
                 ) + "\n\n"
 

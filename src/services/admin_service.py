@@ -875,6 +875,77 @@ class AdminService:
             logger.error("Error getting products by category: %s", e)
             return []
 
+    # Bulk Operations Methods
+    async def bulk_activate_all_products(self) -> Dict:
+        """Activate all inactive products"""
+        try:
+            from src.db.operations import bulk_activate_products
+            result = bulk_activate_products()
+            
+            if result["success"]:
+                logger.info("Bulk activated %d products", result["count"])
+            else:
+                logger.error("Bulk activate failed: %s", result["error"])
+                
+            return result
+        except Exception as e:
+            logger.error("Error in bulk activate: %s", e)
+            return {"success": False, "error": str(e)}
+
+    async def bulk_deactivate_all_products(self) -> Dict:
+        """Deactivate all active products"""
+        try:
+            from src.db.operations import bulk_deactivate_products
+            result = bulk_deactivate_products()
+            
+            if result["success"]:
+                logger.info("Bulk deactivated %d products", result["count"])
+            else:
+                logger.error("Bulk deactivate failed: %s", result["error"])
+                
+            return result
+        except Exception as e:
+            logger.error("Error in bulk deactivate: %s", e)
+            return {"success": False, "error": str(e)}
+
+    async def bulk_delete_inactive_products(self) -> Dict:
+        """Delete all inactive products"""
+        try:
+            from src.db.operations import bulk_delete_inactive_products
+            result = bulk_delete_inactive_products()
+            
+            if result["success"]:
+                logger.info("Bulk deleted %d inactive products", result["count"])
+            else:
+                logger.error("Bulk delete failed: %s", result["error"])
+                
+            return result
+        except Exception as e:
+            logger.error("Error in bulk delete: %s", e)
+            return {"success": False, "error": str(e)}
+
+    async def toggle_product_status(self, product_id: int) -> Dict:
+        """Toggle product active/inactive status"""
+        try:
+            from src.db.operations import get_product_by_id, update_product
+            
+            product = get_product_by_id(product_id)
+            if not product:
+                return {"success": False, "error": "Product not found"}
+            
+            new_status = not product.is_active
+            result = update_product(product_id, is_active=new_status)
+            
+            if result["success"]:
+                logger.info("Toggled product %d status to %s", product_id, new_status)
+                return {"success": True, "new_status": new_status}
+            else:
+                return {"success": False, "error": result["error"]}
+                
+        except Exception as e:
+            logger.error("Error toggling product status: %s", e)
+            return {"success": False, "error": str(e)}
+
     # Category Management Methods
     async def create_category(self, category_name: str) -> Dict:
         """Create a new category"""
@@ -958,8 +1029,9 @@ class AdminService:
     async def delete_category(self, category: str) -> Dict:
         """Delete a category (deactivate all products in it)"""
         try:
-            # Get all products in the category
-            products = get_products_by_category(category)
+            # Get all products in the category (including inactive ones)
+            from src.db.operations import get_all_products_by_category
+            products = get_all_products_by_category(category)
             
             if not products:
                 return {"success": False, "error": f"No products found in category '{category}'"}
