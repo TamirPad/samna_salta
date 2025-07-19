@@ -161,10 +161,7 @@ class AdminHandler:
                 await self._show_all_products(query)
         elif data.startswith("admin_product_"):
             await self._handle_product_callback(query, data)
-        # Edit product callbacks are now handled by the conversation handler
-        # elif data.startswith("admin_edit_product_field_"):
-        # elif data.startswith("admin_edit_product_confirm_"):
-        # elif data.startswith("admin_edit_product_category_"):
+        
         elif data == "admin_category_management":
             await self._show_category_management(query)
         elif data == "admin_business_settings":

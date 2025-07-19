@@ -5,7 +5,7 @@ Utility functions for the Samna Salta bot
 import logging
 import threading
 import time
-from datetime import datetime, time as dt_time
+from datetime import datetime
 from functools import wraps
 from threading import Lock
 from typing import Any, Dict, Generic, Optional, TypeVar, Union
