@@ -31,6 +31,7 @@ from src.states import (
     ONBOARDING_PHONE,
 )
 from src.utils.i18n import i18n
+from src.utils.helpers import get_dynamic_welcome_message, get_dynamic_welcome_for_returning_users
 
 
 logger = logging.getLogger(__name__)
@@ -62,8 +63,8 @@ class OnboardingHandler:
                     # Welcome back existing customer with main page
                     user_id = user.id
                     welcome_message = (
-                        f"🇾🇪 <b>{i18n.get_text('WELCOME', user_id=user_id)}</b> 🇾🇪\n\n"
-                        f"👋 <b>{i18n.get_text('WELCOME_BACK', user_id=user_id).format(name=existing_customer.name)}</b>\n\n"
+                        f"<b>{get_dynamic_welcome_for_returning_users(user_id=user_id)}</b>\n\n"
+                        f"<b>{i18n.get_text('WELCOME_BACK', user_id=user_id).format(name=existing_customer.name)}</b>\n\n"
                         f"{i18n.get_text('WHAT_TO_ORDER_TODAY', user_id=user_id)}"
                     )
                     await update.message.reply_text(
@@ -85,7 +86,7 @@ class OnboardingHandler:
             # Start onboarding for new customer or incomplete profile with language selection
             user_id = user.id
             await update.message.reply_text(
-                i18n.get_text("WELCOME_NEW_USER", user_id=user_id) + "\n\n" +
+                get_dynamic_welcome_message(user_id=user_id) + "\n\n" +
                 i18n.get_text("WELCOME_HELP_MESSAGE", user_id=user_id) + "\n\n" +
                 i18n.get_text("SELECT_LANGUAGE_PROMPT", user_id=user_id),
                 reply_markup=self._get_language_selection_keyboard(),
@@ -488,13 +489,13 @@ class OnboardingHandler:
             
             if customer:
                 welcome_message = (
-                    f"🇾🇪 <b>{i18n.get_text('WELCOME', user_id=user_id)}</b> 🇾🇪\n\n"
-                    f"👋 <b>{i18n.get_text('WELCOME_BACK', user_id=user_id).format(name=customer.name)}</b>\n\n"
+                    f"<b>{get_dynamic_welcome_for_returning_users(user_id=user_id)}</b>\n\n"
+                    f"<b>{i18n.get_text('WELCOME_BACK', user_id=user_id).format(name=customer.name)}</b>\n\n"
                     f"{i18n.get_text('WHAT_TO_ORDER_TODAY', user_id=user_id)}"
                 )
             else:
                 welcome_message = (
-                    f"🇾🇪 <b>{i18n.get_text('WELCOME', user_id=user_id)}</b> 🇾🇪\n\n"
+                    f"<b>{get_dynamic_welcome_for_returning_users(user_id=user_id)}</b>\n\n"
                     f"{i18n.get_text('WHAT_TO_ORDER_TODAY', user_id=user_id)}"
                 )
 

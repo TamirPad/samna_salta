@@ -271,3 +271,53 @@ def translate_category_name(category_name: str, user_id: Optional[int] = None) -
     except:
         # Fallback to capitalized category name if translation not found
         return category_name.title()
+
+@cached(ttl=300)  # Cache for 5 minutes
+def get_dynamic_welcome_message(user_id: Optional[int] = None) -> str:
+    """Get dynamic welcome message based on business settings"""
+    from src.utils.i18n import i18n
+    from src.db.operations import get_business_settings_dict
+    
+    try:
+        # Get business settings
+        settings = get_business_settings_dict()
+        business_name = settings.get('business_name', 'Samna Salta')
+        
+        # Get the welcome message template from i18n
+        welcome_template = i18n.get_text("WELCOME_NEW_USER", user_id=user_id)
+        
+        # Format the template with the business name
+        return welcome_template.format(business_name=business_name)
+        
+    except Exception as e:
+        # Fallback to default welcome message if there's an error
+        logger.error(f"Error getting dynamic welcome message: {e}")
+        try:
+            return i18n.get_text("WELCOME_NEW_USER", user_id=user_id).format(business_name="Samna Salta")
+        except:
+            return "Welcome to Samna Salta!"
+
+@cached(ttl=300)  # Cache for 5 minutes
+def get_dynamic_welcome_for_returning_users(user_id: Optional[int] = None) -> str:
+    """Get dynamic welcome message for returning users based on business settings"""
+    from src.utils.i18n import i18n
+    from src.db.operations import get_business_settings_dict
+    
+    try:
+        # Get business settings
+        settings = get_business_settings_dict()
+        business_name = settings.get('business_name', 'Samna Salta')
+        
+        # Get the welcome message template from i18n
+        welcome_template = i18n.get_text("WELCOME", user_id=user_id)
+        
+        # Format the template with the business name
+        return welcome_template.format(business_name=business_name)
+        
+    except Exception as e:
+        # Fallback to default welcome message if there's an error
+        logger.error(f"Error getting dynamic welcome for returning users: {e}")
+        try:
+            return i18n.get_text("WELCOME", user_id=user_id).format(business_name="Samna Salta")
+        except:
+            return "Welcome to Samna Salta!"
