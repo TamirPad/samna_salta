@@ -477,56 +477,7 @@ def retry_on_database_error(
     return decorator
 
 
-def reinitialize_products_with_categories():
-    """Reinitialize products with proper category relationships"""
-    session = get_db_session()
-    try:
-        # First, create categories with image URLs
-        categories_data = [
-            {"name": "bread", "description": "Traditional breads", "display_order": 1, "image_url": "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&h=600&fit=crop"},
-            {"name": "spread", "description": "Traditional spreads and condiments", "display_order": 2, "image_url": "https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=800&h=600&fit=crop"},
-            {"name": "spice", "description": "Traditional spice blends", "display_order": 3, "image_url": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop"},
-            {"name": "beverage", "description": "Traditional beverages", "display_order": 4, "image_url": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&h=600&fit=crop"},
-        ]
-        
-        # Create categories and store them in a dict for easy lookup
-        categories = {}
-        for cat_data in categories_data:
-            existing_cat = session.query(MenuCategory).filter(MenuCategory.name == cat_data["name"]).first()
-            if existing_cat:
-                categories[cat_data["name"]] = existing_cat
-            else:
-                category = MenuCategory(**cat_data)
-                session.add(category)
-                session.flush()  # Get the ID
-                categories[cat_data["name"]] = category
 
-        # Update existing products with proper category relationships
-        product_updates = [
-            ("Kubaneh", "bread"),
-            ("Samneh", "spread"),
-            ("Red Bisbas", "spice"),
-            ("Hawaij soup spice", "spice"),
-            ("Hawaij coffee spice", "spice"),
-            ("White coffee", "beverage"),
-            ("Hilbeh", "spread"),
-        ]
-
-        for product_name, category_name in product_updates:
-            product = session.query(Product).filter(Product.name == product_name).first()
-            if product and category_name in categories:
-                product.category_id = categories[category_name].id
-                logger.info(f"Updated product '{product_name}' with category '{category_name}'")
-
-        session.commit()
-        logger.info("Successfully reinitialized products with proper categories")
-
-    except SQLAlchemyError as e:
-        session.rollback()
-        logger.error("Failed to reinitialize products: %s", e)
-        raise
-    finally:
-        session.close()
 
 
 def init_db():
@@ -548,11 +499,8 @@ def init_db():
             get_db_manager().create_tables()
             logger.info("Database tables created successfully")
 
-            # Initialize default products
+            # Initialize default products (only if none exist)
             init_default_products()
-            
-            # Reinitialize products with proper categories (in case they were created without categories)
-            reinitialize_products_with_categories()
             
             logger.info("Database initialization completed successfully")
             return
@@ -897,6 +845,16 @@ def update_product(product_id: int, **kwargs) -> bool:
         
         product.updated_at = datetime.utcnow()
         session.commit()
+        
+        # Clear any cached data related to this product
+        try:
+            from src.utils.helpers import SimpleCache
+            cache = SimpleCache()
+            cache.clear()  # Clear all cache entries to ensure fresh data
+            logger.info("Cleared cache after updating product ID %d", product_id)
+        except Exception as cache_error:
+            logger.warning("Failed to clear cache after updating product ID %d: %s", product_id, cache_error)
+        
         logger.info("Updated product ID %d: %s", product_id, kwargs)
         return True
     except SQLAlchemyError as e:

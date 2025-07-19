@@ -1038,6 +1038,15 @@ class AdminService:
                     updated_count += 1
             
             if updated_count > 0:
+                # Clear cache after updating products
+                try:
+                    from src.utils.helpers import SimpleCache
+                    cache = SimpleCache()
+                    cache.clear()  # Clear all cache entries to ensure fresh data
+                    logger.info("Cleared cache after updating category from '%s' to '%s'", old_category, new_category)
+                except Exception as cache_error:
+                    logger.warning("Failed to clear cache after updating category: %s", cache_error)
+                
                 logger.info("Successfully updated category from '%s' to '%s' (%d products)", 
                           old_category, new_category, updated_count)
                 return {
