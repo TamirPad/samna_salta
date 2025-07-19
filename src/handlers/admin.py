@@ -55,6 +55,7 @@ class AdminHandler:
         self.container = get_container()
         self.admin_service = self.container.get_admin_service()
         self.notification_service = self.container.get_notification_service()
+        self.admin_conversations = {}  # Initialize admin conversations storage
 
     @error_handler("admin_dashboard")
     async def handle_admin_command(
@@ -170,9 +171,7 @@ class AdminHandler:
             await self._show_business_settings(query)
         elif data == "admin_edit_business_settings":
             await self._start_edit_business_settings(query)
-        elif data.startswith("admin_edit_business_"):
-            field = data.replace("admin_edit_business_", "")
-            await self._handle_business_settings_edit(query, field)
+
         elif data == "admin_view_categories":
             await self._show_all_categories(query)
         elif data == "admin_add_category":
@@ -3604,15 +3603,47 @@ class AdminHandler:
             self.logger.error("Error starting business settings edit: %s", e)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
 
-    async def _handle_business_settings_edit(self, query: CallbackQuery, field: str) -> None:
+    async def _handle_business_settings_edit(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         """Handle business settings field editing"""
         try:
+            query = update.callback_query
             user_id = query.from_user.id
+            
+            # Clear any existing conversation state first
+            self._clear_business_conversation(user_id)
+            
+            # Extract field from callback data
+            callback_data = query.data
+            field = None
+            
+            # Special case: exclude admin_edit_business_settings
+            if callback_data == "admin_edit_business_settings":
+                await query.answer(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+                return ConversationHandler.END
+            
+            if callback_data == "admin_edit_currency":
+                field = "currency"
+            elif callback_data.startswith("admin_edit_business_"):
+                # Extract the full field name (e.g., "admin_edit_business_name" -> "business_name")
+                field = callback_data.replace("admin_edit_", "")
+            
+            if not field:
+                await query.answer(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+                return ConversationHandler.END
+            
+            # Get current value from database
+            from src.db.operations import get_business_settings
+            settings = get_business_settings()
+            current_value = ""
+            
+            if settings:
+                current_value = getattr(settings, field, "")
             
             # Store the field being edited
             self.admin_conversations[user_id] = {
                 "state": "editing_business_field",
-                "field": field
+                "field": field,
+                "current_value": current_value
             }
             
             field_names = {
@@ -3645,9 +3676,14 @@ class AdminHandler:
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
             
+            self.logger.info("Started business settings edit for user %d, field: %s", user_id, field)
+            return AWAITING_BUSINESS_FIELD_INPUT
+            
         except Exception as e:
             self.logger.error("Error handling business settings edit: %s", e)
-            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            if update.callback_query:
+                await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
 
     async def _handle_business_settings_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         """Handle business settings input from user"""
@@ -3696,7 +3732,7 @@ class AdminHandler:
                 await update.message.reply_text(success_text, parse_mode="HTML", reply_markup=reply_markup)
                 
                 # Clear conversation state
-                del self.admin_conversations[user_id]
+                self._clear_business_conversation(user_id)
                 return ConversationHandler.END
             else:
                 await update.message.reply_text(
@@ -3707,6 +3743,45 @@ class AdminHandler:
         except Exception as e:
             self.logger.error("Error handling business settings input: %s", e)
             await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            self._clear_business_conversation(user_id)
+            return ConversationHandler.END
+
+    def _clear_business_conversation(self, user_id: int) -> None:
+        """Clear business settings conversation state for a user"""
+        if user_id in self.admin_conversations:
+            del self.admin_conversations[user_id]
+            self.logger.info("Cleared business conversation state for user %d", user_id)
+
+    async def _handle_business_conversation_fallback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """Handle business settings conversation fallback - clear state and end conversation"""
+        try:
+            user_id = update.effective_user.id
+            
+            # Log the fallback first
+            self.logger.info("Business conversation fallback triggered for user %d", user_id)
+            
+            # If it's a callback query, handle it appropriately
+            if update.callback_query:
+                callback_data = update.callback_query.data
+                
+                # If it's the edit business settings callback, show the edit selection screen
+                if callback_data == "admin_edit_business_settings":
+                    await self._start_edit_business_settings(update.callback_query)
+                elif callback_data == "admin_business_settings":
+                    await self._show_business_settings(update.callback_query)
+                elif callback_data == "admin_dashboard":
+                    await self._show_admin_dashboard_from_callback(update.callback_query)
+                else:
+                    # For other callbacks, just answer them
+                    await update.callback_query.answer()
+            
+            # Clear conversation state AFTER handling the callback
+            self._clear_business_conversation(user_id)
+            
+            return ConversationHandler.END
+            
+        except Exception as e:
+            self.logger.error("Error in business conversation fallback: %s", e)
             return ConversationHandler.END
 
     def _validate_business_field(self, field: str, value: str, user_id: int) -> dict:
@@ -3769,7 +3844,7 @@ def register_admin_handlers(application: Application):
 
     # Admin callback handlers (excluding conversation patterns)
     application.add_handler(
-        CallbackQueryHandler(handler.handle_admin_callback, pattern="^admin_(?!add_product_category_|add_product_confirm_|add_product$|add_category$|edit_category_name_|edit_product_field_|edit_product_confirm_|edit_product_category_|product_edit_)")
+        CallbackQueryHandler(handler.handle_admin_callback, pattern="^admin_(?!add_product_category_|add_product_confirm_|add_product$|add_category$|edit_category_name_|edit_product_field_|edit_product_confirm_|edit_product_category_|product_edit_|edit_business_name|edit_business_description|edit_business_address|edit_business_phone|edit_business_email|edit_business_website|edit_business_hours|edit_currency|edit_delivery_charge)")
     )
 
     # Admin conversation handler for status updates
@@ -3909,8 +3984,8 @@ def register_admin_handlers(application: Application):
     business_settings_handler = ConversationHandler(
         entry_points=[
             CallbackQueryHandler(
-                lambda u, c: AWAITING_BUSINESS_FIELD_INPUT,
-                pattern="^admin_edit_business_"
+                handler._handle_business_settings_edit,
+                pattern="^(admin_edit_business_name|admin_edit_business_description|admin_edit_business_address|admin_edit_business_phone|admin_edit_business_email|admin_edit_business_website|admin_edit_business_hours|admin_edit_currency|admin_edit_delivery_charge)$"
             )
         ],
         states={
@@ -3919,7 +3994,11 @@ def register_admin_handlers(application: Application):
             ]
         },
         fallbacks=[
-            CallbackQueryHandler(lambda u, c: ConversationHandler.END, pattern="^admin_edit_business_settings$")
+            CallbackQueryHandler(handler._handle_business_conversation_fallback, pattern="^admin_edit_business_settings$"),
+            CallbackQueryHandler(handler._handle_business_conversation_fallback, pattern="^admin_business_settings$"),
+            CallbackQueryHandler(handler._handle_business_conversation_fallback, pattern="^admin_dashboard$"),
+            CallbackQueryHandler(handler._handle_business_conversation_fallback, pattern="^admin_edit_business_.*$"),
+            CommandHandler("cancel", handler._handle_business_conversation_fallback)
         ],
         name="business_settings_conversation",
         persistent=False,
