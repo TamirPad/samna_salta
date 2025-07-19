@@ -22,7 +22,7 @@ from src.utils.error_handler import BusinessLogicError, error_handler
 from src.utils.i18n import i18n
 
 # Conversation states
-AWAITING_ORDER_ID, AWAITING_STATUS_UPDATE, AWAITING_PRODUCT_DETAILS, AWAITING_PRODUCT_UPDATE, AWAITING_PRODUCT_DELETE_CONFIRM, AWAITING_SEARCH_TERM = range(6)
+AWAITING_ORDER_ID, AWAITING_STATUS_UPDATE, AWAITING_PRODUCT_DETAILS, AWAITING_PRODUCT_UPDATE, AWAITING_PRODUCT_DELETE_CONFIRM = range(5)
 
 # Import the new states from states.py
 from src.states import (
@@ -120,8 +120,6 @@ class AdminHandler:
             await self._show_all_products(query)
         elif data == "admin_add_product":
             return await self._start_add_product(query)
-        elif data == "admin_search_products":
-            return await self._start_search_products(query)
         elif data == "admin_remove_products":
             await self._show_remove_products_list(query)
         
@@ -2131,95 +2129,7 @@ class AdminHandler:
             await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=update.callback_query.from_user.id))
             return ConversationHandler.END
 
-    async def _start_search_products(self, query: CallbackQuery):
-        """Start the search products conversation"""
-        try:
-            user_id = query.from_user.id
-            text = (
-                i18n.get_text("ADMIN_SEARCH_PRODUCTS_TITLE", user_id=user_id) + "\n\n" +
-                i18n.get_text("ADMIN_SEARCH_PRODUCTS_INSTRUCTIONS", user_id=user_id)
-            )
-            
-            keyboard = [
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("CANCEL", user_id=user_id),
-                        callback_data="admin_menu_management"
-                    )
-                ]
-            ]
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
-            
-            return AWAITING_SEARCH_TERM
-            
-        except Exception as e:
-            self.logger.error("Error starting search products: %s", e)
-            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
-            return ConversationHandler.END
 
-    async def _handle_search_products_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle search term input"""
-        try:
-            user_id = update.effective_user.id
-            search_term = update.message.text.strip()
-            
-            if len(search_term) < 2:
-                await update.message.reply_text(
-                    i18n.get_text("ADMIN_PRODUCT_SEARCH_MIN_LENGTH", user_id=user_id)
-                )
-                return AWAITING_SEARCH_TERM
-            
-            # Search products
-            products = await self.admin_service.search_products_admin(search_term)
-            
-            if not products:
-                text = i18n.get_text("ADMIN_SEARCH_PRODUCTS_NO_RESULTS", user_id=user_id).format(search_term=search_term)
-                keyboard = [
-                    [
-                        InlineKeyboardButton(
-                            i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
-                            callback_data="admin_menu_management"
-                        )
-                    ]
-                ]
-            else:
-                text = i18n.get_text("ADMIN_SEARCH_PRODUCTS_RESULTS", user_id=user_id).format(search_term=search_term)
-                
-                keyboard = []
-                for product in products:
-                    status_text = i18n.get_text("ADMIN_PRODUCT_ACTIVE", user_id=user_id) if product["is_active"] else i18n.get_text("ADMIN_PRODUCT_INACTIVE", user_id=user_id)
-                    product_text = i18n.get_text("ADMIN_PRODUCT_FORMAT", user_id=user_id).format(
-                        name=product["name"],
-                        category=product["category"],
-                        price=product["price"],
-                        status=status_text
-                    )
-                    
-                    keyboard.append([
-                        InlineKeyboardButton(
-                            product_text,
-                            callback_data=f"admin_product_details_{product['id']}"
-                        )
-                    ])
-                
-                keyboard.append([
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
-                        callback_data="admin_menu_management"
-                    )
-                ])
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
-            
-            return ConversationHandler.END
-            
-        except Exception as e:
-            self.logger.error("Error handling search products input: %s", e)
-            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
-            return ConversationHandler.END
 
     async def _handle_product_callback(self, query: CallbackQuery, data: str) -> None:
         """Handle product-related callbacks"""
@@ -2739,23 +2649,7 @@ def register_admin_handlers(application: Application):
     application.add_handler(add_product_handler)
     handler.logger.info("✅ add_product_conversation handler registered successfully")
 
-    # Admin conversation handler for searching products
-    search_products_handler = ConversationHandler(
-        entry_points=[
-            CallbackQueryHandler(handler._start_search_products, pattern="^admin_search_products$")
-        ],
-        states={
-            AWAITING_SEARCH_TERM: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_search_products_input)
-            ],
-        },
-        fallbacks=[
-            CommandHandler("cancel", lambda u, c: ConversationHandler.END),
-            CallbackQueryHandler(lambda u, c: ConversationHandler.END, pattern="^admin_menu_management$")
-        ],
-    )
 
-    application.add_handler(search_products_handler)
 
     # Admin conversation handler for adding categories
     add_category_handler = ConversationHandler(

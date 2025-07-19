@@ -221,7 +221,7 @@
   "ADMIN_EDIT_PRODUCT": "✏️ Edit Product",
   "ADMIN_DELETE_PRODUCT": "🗑️ Delete Product",
   "ADMIN_PRODUCT_CATEGORIES": "📂 Product Categories",
-  "ADMIN_SEARCH_PRODUCTS": "🔍 Search Products",
+
   "ADMIN_BACK_TO_MENU_MANAGEMENT": "⬅️ Back to Menu Management",
   "ADMIN_PRODUCTS_TITLE": "🍽️ <b>Product Management</b>",
   "ADMIN_NO_PRODUCTS": "📭 No products found.",
@@ -266,10 +266,7 @@
   "ADMIN_CATEGORIES_TITLE": "📂 <b>Product Categories</b>",
   "ADMIN_CATEGORIES_LIST": "📋 <b>Available Categories:</b>",
   "ADMIN_NO_CATEGORIES": "📭 No categories found.",
-  "ADMIN_SEARCH_PRODUCTS_TITLE": "🔍 <b>Search Products</b>",
-  "ADMIN_SEARCH_PRODUCTS_INSTRUCTIONS": "Please enter a search term (minimum 2 characters):",
-  "ADMIN_SEARCH_PRODUCTS_RESULTS": "🔍 <b>Search Results for '{search_term}':</b>",
-  "ADMIN_SEARCH_PRODUCTS_NO_RESULTS": "🔍 No products found matching '{search_term}'.",
+
   "ADMIN_PRODUCT_ACTIONS": "🛠️ <b>Product Actions:</b>",
   "ADMIN_PRODUCT_EDIT": "✏️ Edit",
   "ADMIN_PRODUCT_DELETE": "🗑️ Delete",
@@ -324,10 +321,7 @@
   "ADMIN_PRODUCT_FILTER_ACTIVE": "✅ Active Only",
   "ADMIN_PRODUCT_FILTER_INACTIVE": "❌ Inactive Only",
   "ADMIN_PRODUCT_FILTER_BY_CATEGORY": "📂 Filter by Category",
-  "ADMIN_PRODUCT_SEARCH_PLACEHOLDER": "Enter product name or description...",
-  "ADMIN_PRODUCT_SEARCH_MIN_LENGTH": "Please enter at least 2 characters to search.",
-  "ADMIN_PRODUCT_SEARCH_NO_RESULTS": "No products found matching your search.",
-  "ADMIN_PRODUCT_SEARCH_RESULTS_COUNT": "Found {count} product(s) matching '{search_term}'.",
+
   "ADMIN_PRODUCT_CATEGORY_EMPTY": "No products in this category.",
   "ADMIN_PRODUCT_CATEGORY_COUNT": "{category}: {count} product(s)",
   "ADMIN_CATEGORIES_TITLE": "📂 <b>Product Categories</b>",
@@ -586,12 +580,7 @@
   "ADMIN_BACK_TO_CUSTOMERS": "⬅️ Back to Customers",
   "CUSTOMER_DETAILS_ERROR": "❌ Error loading customer details. Please try again.",
   
-  "SEARCH_PRODUCTS": "🔍 Search Products",
-  "SEARCH_PROMPT": "🔍 <b>Search Products</b>\n\nPlease enter a search term (minimum 2 characters):",
-  "SEARCH_TOO_SHORT": "❌ Search term is too short. Please enter at least 2 characters.",
-  "SEARCH_NO_RESULTS": "🔍 No products found matching '{term}'.",
-  "SEARCH_RESULTS_TITLE": "🔍 <b>Search Results for '{term}':</b>\n\nFound {count} product(s):",
-  "SEARCH_ERROR": "❌ An error occurred during search. Please try again.",
+
   
   "QUICK_ADD_SUCCESS": "✅ {name} added to cart successfully!",
   "QUICK_ADD_ERROR": "❌ Failed to add {name}: {error}",

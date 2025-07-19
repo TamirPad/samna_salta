@@ -6,6 +6,7 @@ import logging
 
 from telegram import CallbackQuery, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
+from telegram.error import BadRequest
 
 from src.container import get_container
 from src.utils.error_handler import BusinessLogicError
@@ -18,7 +19,7 @@ from src.keyboards.menu_keyboards import (
     get_samneh_menu_keyboard,
     get_dynamic_main_menu_keyboard,
     get_category_menu_keyboard,
-    get_search_results_keyboard,
+
 )
 from src.utils.i18n import i18n
 from src.utils.helpers import translate_category_name
@@ -34,6 +35,40 @@ class MenuHandler:
         self.container = get_container()
         self.order_service = self.container.get_order_service()
         self.logger = logging.getLogger(self.__class__.__name__)
+
+    async def _safe_edit_message(self, query: CallbackQuery, text: str, reply_markup=None, parse_mode="HTML"):
+        """Safely edit a message, handling both text and photo messages"""
+        try:
+            # Check if the current message is a photo message
+            if query.message.photo:
+                # For photo messages, we need to delete and send a new text message
+                await query.message.delete()
+                await query.message.reply_text(
+                    text=text,
+                    reply_markup=reply_markup,
+                    parse_mode=parse_mode
+                )
+            else:
+                # For text messages, we can edit normally
+                await query.edit_message_text(
+                    text=text,
+                    reply_markup=reply_markup,
+                    parse_mode=parse_mode
+                )
+        except BadRequest as e:
+            if "There is no text in the message to edit" in str(e):
+                # Fallback: delete and send new message
+                try:
+                    await query.message.delete()
+                except:
+                    pass  # Message might already be deleted
+                await query.message.reply_text(
+                    text=text,
+                    reply_markup=reply_markup,
+                    parse_mode=parse_mode
+                )
+            else:
+                raise e
 
     async def handle_menu_callback(self, update: Update, _: ContextTypes.DEFAULT_TYPE):
         """Handle menu-related callbacks"""
@@ -63,8 +98,6 @@ class MenuHandler:
                 # Handle quick add to cart
                 product_id = int(data.replace("quick_add_", ""))
                 await self._quick_add_to_cart(query, product_id)
-            elif data == "menu_search":
-                await self._start_search(query)
             elif data == "menu_kubaneh":
                 await self._show_kubaneh_menu(query)
             elif data == "menu_samneh":
@@ -91,57 +124,10 @@ class MenuHandler:
                 e,
                 exc_info=True,
             )
-            await query.edit_message_text(ErrorMessages.MENU_ERROR_OCCURRED)
+            error_text = ErrorMessages.MENU_ERROR_OCCURRED
+            await self._safe_edit_message(query, error_text)
 
-    async def handle_search_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle search input from customers"""
-        try:
-            user_id = update.effective_user.id
-            search_term = update.message.text.strip()
-            
-            if len(search_term) < 2:
-                await update.message.reply_text(
-                    i18n.get_text("SEARCH_TOO_SHORT", user_id=user_id)
-                )
-                return
-            
-            # Search products
-            from src.db.operations import search_products
-            results = search_products(search_term)
-            
-            if not results:
-                text = i18n.get_text("SEARCH_NO_RESULTS", user_id=user_id).format(term=search_term)
-                keyboard = [
-                    [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")]
-                ]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
-                return
-            
-            # Show search results
-            text = i18n.get_text("SEARCH_RESULTS_TITLE", user_id=user_id).format(term=search_term, count=len(results))
-            reply_markup = get_search_results_keyboard(results, user_id)
-            await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
-            
-        except Exception as e:
-            self.logger.error("Error handling search input: %s", e)
-            await update.message.reply_text(i18n.get_text("SEARCH_ERROR", user_id=user_id))
 
-    async def _start_search(self, query: CallbackQuery):
-        """Start search functionality"""
-        try:
-            user_id = query.from_user.id
-            text = i18n.get_text("SEARCH_PROMPT", user_id=user_id)
-            
-            keyboard = [
-                [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
-            
-        except Exception as e:
-            self.logger.error("Error starting search: %s", e)
-            await query.edit_message_text(i18n.get_text("SEARCH_ERROR", user_id=query.from_user.id))
 
     async def _quick_add_to_cart(self, query: CallbackQuery, product_id: int):
         """Quick add product to cart without showing details"""
@@ -158,16 +144,16 @@ class MenuHandler:
             
             # Add to cart
             cart_service = self.container.get_cart_service()
-            result = cart_service.add_to_cart(user_id, product_id, 1)
+            success = cart_service.add_item(user_id, product_id, 1)
             
-            if result["success"]:
+            if success:
                 await query.answer(
                     i18n.get_text("QUICK_ADD_SUCCESS", user_id=user_id).format(name=product.name),
                     show_alert=False
                 )
             else:
                 await query.answer(
-                    i18n.get_text("QUICK_ADD_ERROR", user_id=user_id).format(error=result["error"]),
+                    i18n.get_text("QUICK_ADD_ERROR", user_id=user_id).format(error="Failed to add to cart"),
                     show_alert=True
                 )
                 
@@ -179,11 +165,9 @@ class MenuHandler:
         """Show the main menu"""
         self.logger.debug("📋 SHOWING: Main menu")
         user_id = query.from_user.id
-        await query.edit_message_text(
-            i18n.get_text("MENU_PROMPT", user_id=user_id), 
-            reply_markup=get_dynamic_main_menu_keyboard(user_id), 
-            parse_mode="HTML"
-        )
+        text = i18n.get_text("MENU_PROMPT", user_id=user_id)
+        reply_markup = get_dynamic_main_menu_keyboard(user_id)
+        await self._safe_edit_message(query, text, reply_markup, "HTML")
 
     async def _show_category_menu(self, query: CallbackQuery, category: str):
         """Show products in a specific category"""
@@ -199,35 +183,41 @@ class MenuHandler:
                     [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
-                await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+                await self._safe_edit_message(query, text, reply_markup, "HTML")
                 return
             
             text = i18n.get_text("CATEGORY_TITLE", user_id=user_id).format(
                 category=translate_category_name(category, user_id), count=len(products)
             )
             reply_markup = get_category_menu_keyboard(category, user_id)
-            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            await self._safe_edit_message(query, text, reply_markup, "HTML")
             
         except Exception as e:
             self.logger.error("Error showing category menu: %s", e)
-            await query.edit_message_text(i18n.get_text("MENU_ERROR_OCCURRED", user_id=user_id))
+            error_text = i18n.get_text("MENU_ERROR_OCCURRED", user_id=user_id)
+            await self._safe_edit_message(query, error_text)
 
     async def _show_product_details(self, query: CallbackQuery, product_id: int):
-        """Show detailed product information"""
+        """Show detailed product information with image"""
         try:
             user_id = query.from_user.id
             from src.db.operations import get_product_by_id
+            from src.utils.image_handler import get_product_image
             
             product = get_product_by_id(product_id)
             
             if not product:
-                await query.edit_message_text(
-                    i18n.get_text("PRODUCT_NOT_FOUND", user_id=user_id),
-                    reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")
-                    ]])
-                )
+                text = i18n.get_text("PRODUCT_NOT_FOUND", user_id=user_id)
+                keyboard = [
+                    [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await self._safe_edit_message(query, text, reply_markup, "HTML")
                 return
+            
+            # Get product image URL
+            category_name = product.category or "other"
+            image_url = get_product_image(product.image_url, category_name)
             
             # Format product details
             text = i18n.get_text("PRODUCT_DETAILS_TITLE", user_id=user_id).format(name=product.name)
@@ -263,74 +253,83 @@ class MenuHandler:
             ])
             
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+            # Send photo with caption if image URL exists, otherwise send text
+            if image_url and image_url != get_product_image(None, category_name):
+                try:
+                    await query.message.delete()  # Delete the previous text message
+                    await query.message.reply_photo(
+                        photo=image_url,
+                        caption=text,
+                        parse_mode="HTML",
+                        reply_markup=reply_markup
+                    )
+                except Exception as photo_error:
+                    self.logger.warning("Failed to send photo, falling back to text: %s", photo_error)
+                    await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            else:
+                await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
             
         except Exception as e:
             self.logger.error("Error showing product details: %s", e)
-            await query.edit_message_text(i18n.get_text("MENU_ERROR_OCCURRED", user_id=user_id))
+            error_text = i18n.get_text("MENU_ERROR_OCCURRED", user_id=user_id)
+            await self._safe_edit_message(query, error_text)
 
     async def _show_kubaneh_menu(self, query: CallbackQuery):
         """Show Kubaneh sub-menu"""
         self.logger.debug("📋 SHOWING: Kubaneh menu")
         user_id = query.from_user.id
         text = i18n.get_text("KUBANEH_DESC", user_id=user_id)
-        await query.edit_message_text(
-            text, reply_markup=get_kubaneh_menu_keyboard(user_id), parse_mode="HTML"
-        )
+        reply_markup = get_kubaneh_menu_keyboard(user_id)
+        await self._safe_edit_message(query, text, reply_markup, "HTML")
 
     async def _show_samneh_menu(self, query: CallbackQuery):
         """Show Samneh sub-menu"""
         self.logger.debug("📋 SHOWING: Samneh menu")
         user_id = query.from_user.id
         text = i18n.get_text("SAMNEH_DESC", user_id=user_id)
-        await query.edit_message_text(
-            text, reply_markup=get_samneh_menu_keyboard(user_id), parse_mode="HTML"
-        )
+        reply_markup = get_samneh_menu_keyboard(user_id)
+        await self._safe_edit_message(query, text, reply_markup, "HTML")
 
     async def _show_red_bisbas_menu(self, query: CallbackQuery):
         """Show Red Bisbas menu"""
         self.logger.debug("📋 SHOWING: Red Bisbas menu")
         user_id = query.from_user.id
         text = i18n.get_text("RED_BISBAS_DESC", user_id=user_id)
-        await query.edit_message_text(
-            text, reply_markup=get_red_bisbas_menu_keyboard(user_id), parse_mode="HTML"
-        )
+        reply_markup = get_red_bisbas_menu_keyboard(user_id)
+        await self._safe_edit_message(query, text, reply_markup, "HTML")
 
     async def _show_hilbeh_menu(self, query: CallbackQuery):
         """Show Hilbeh menu"""
         self.logger.debug("📋 SHOWING: Hilbeh menu")
         user_id = query.from_user.id
         text = i18n.get_text("HILBEH_DESC", user_id=user_id)
-        await query.edit_message_text(
-            text, reply_markup=get_hilbeh_menu_keyboard(user_id), parse_mode="HTML"
-        )
+        reply_markup = get_hilbeh_menu_keyboard(user_id)
+        await self._safe_edit_message(query, text, reply_markup, "HTML")
 
     async def _show_hawaij_soup_menu(self, query: CallbackQuery):
         """Show Hawaij for Soup menu"""
         self.logger.debug("📋 SHOWING: Hawaij for Soup menu")
         user_id = query.from_user.id
         text = i18n.get_text("HAWAIIJ_SOUP_DESC", user_id=user_id)
-        await query.edit_message_text(
-            text, reply_markup=get_direct_add_keyboard("hawaij_soup", user_id), parse_mode="HTML"
-        )
+        reply_markup = get_direct_add_keyboard("hawaij_soup", user_id)
+        await self._safe_edit_message(query, text, reply_markup, "HTML")
 
     async def _show_hawaij_coffee_menu(self, query: CallbackQuery):
         """Show Hawaij for Coffee menu"""
         self.logger.debug("📋 SHOWING: Hawaij for Coffee menu")
         user_id = query.from_user.id
         text = i18n.get_text("HAWAIIJ_COFFEE_DESC", user_id=user_id)
-        await query.edit_message_text(
-            text, reply_markup=get_direct_add_keyboard("hawaij_coffee_spice", user_id), parse_mode="HTML"
-        )
+        reply_markup = get_direct_add_keyboard("hawaij_coffee_spice", user_id)
+        await self._safe_edit_message(query, text, reply_markup, "HTML")
 
     async def _show_white_coffee_menu(self, query: CallbackQuery):
         """Show White Coffee menu"""
         self.logger.debug("📋 SHOWING: White Coffee menu")
         user_id = query.from_user.id
         text = i18n.get_text("WHITE_COFFEE_DESC", user_id=user_id)
-        await query.edit_message_text(
-            text, reply_markup=get_direct_add_keyboard("white_coffee", user_id), parse_mode="HTML"
-        )
+        reply_markup = get_direct_add_keyboard("white_coffee", user_id)
+        await self._safe_edit_message(query, text, reply_markup, "HTML")
 
 
 def register_menu_handlers(application: Application):
@@ -339,14 +338,4 @@ def register_menu_handlers(application: Application):
 
     application.add_handler(
         CallbackQueryHandler(handler.handle_menu_callback, pattern="^menu_")
-    )
-    
-    # Add search handler
-    application.add_handler(
-        CallbackQueryHandler(handler.handle_menu_callback, pattern="^menu_search$")
-    )
-    
-    # Add search input handler
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, handler.handle_search_input)
     )

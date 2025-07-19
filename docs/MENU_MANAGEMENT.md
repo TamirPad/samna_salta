@@ -18,10 +18,7 @@ The Admin Menu Management System allows restaurant administrators to fully contr
 - **Filter by Category**: View products organized by category
 - **Category-based Navigation**: Easy navigation through category-specific product lists
 
-### 🔍 Search Functionality
-- **Product Search**: Search products by name or description
-- **Real-time Results**: Instant search results with product details
-- **Minimum Search Length**: 2-character minimum for meaningful results
+
 
 ### 📊 Dashboard Overview
 - **Product Statistics**: Total, active, and inactive product counts
@@ -71,12 +68,7 @@ The Admin Menu Management System allows restaurant administrators to fully contr
 3. **Confirm deletion** in the confirmation dialog
 4. **Product is deactivated** (soft delete) and hidden from customers
 
-### Searching Products
 
-1. **Click "🔍 Search Products"** from the menu management dashboard
-2. **Enter search term** (minimum 2 characters)
-3. **View results** with product details and actions
-4. **Click on products** to view full details
 
 ### Managing Categories
 
@@ -99,7 +91,7 @@ update_product(product_id, **kwargs)     # Update product fields
 delete_product(product_id)         # Soft delete product
 get_product_categories()           # Get unique categories
 get_products_by_category(category) # Get products by category
-search_products(search_term)       # Search products
+
 ```
 
 ### Service Layer
@@ -113,7 +105,7 @@ async def create_new_product(self, name, desc, cat, price) -> Dict
 async def update_existing_product(self, product_id, **kwargs) -> Dict
 async def delete_existing_product(self, product_id) -> Dict
 async def get_product_categories_list(self) -> List[str]
-async def search_products_admin(self, search_term) -> List[Dict]
+
 async def get_products_by_category_admin(self, category) -> List[Dict]
 ```
 
@@ -140,7 +132,7 @@ The system uses conversation handlers for user input:
 ```python
 AWAITING_PRODUCT_DETAILS = 2      # Waiting for new product details
 AWAITING_PRODUCT_UPDATE = 3       # Waiting for product update details
-AWAITING_SEARCH_TERM = 5          # Waiting for search term
+
 ```
 
 ## Data Validation
@@ -157,9 +149,7 @@ AWAITING_SEARCH_TERM = 5          # Waiting for search term
 - **Category**: Minimum 2 characters if provided
 - **Status**: Must be 'active' or 'inactive' if provided
 
-### Search Validation
-- **Search Term**: Minimum 2 characters
-- **Case Insensitive**: Searches both name and description fields
+
 
 ## User Interface
 
@@ -177,7 +167,7 @@ AWAITING_SEARCH_TERM = 5          # Waiting for search term
 🛠️ Available Actions:
 
 [📋 View Products] [➕ Add Product]
-[📂 Manage Categories] [🔍 Search Products]
+[📂 Manage Categories]
 [⬅️ Back to Admin Dashboard]
 ```
 
@@ -296,7 +286,7 @@ python test_menu_management.py
 ### Common Issues
 - **Conversation stuck**: Use `/cancel` to reset
 - **Product not appearing**: Check if product is active
-- **Search not working**: Ensure minimum 2 characters
+
 - **Permission denied**: Verify admin status
 
 ## Conclusion

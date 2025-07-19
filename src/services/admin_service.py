@@ -17,7 +17,6 @@ from src.db.operations import (
     delete_product,
     get_product_categories,
     get_products_by_category,
-    search_products,
     get_product_by_id
 )
 from src.db.models import Order
@@ -703,7 +702,7 @@ class AdminService:
             logger.error("Error getting products for admin: %s", e)
             return []
 
-    async def create_new_product(self, name: str, description: str, category: str, price: float) -> Dict:
+    async def create_new_product(self, name: str, description: str, category: str, price: float, image_url: Optional[str] = None) -> Dict:
         """Create a new product"""
         try:
             # Validate inputs
@@ -716,12 +715,19 @@ class AdminService:
             if not category or len(category.strip()) < 2:
                 return {"success": False, "error": "Category must be at least 2 characters long"}
             
+            # Validate image URL if provided
+            if image_url:
+                from src.utils.image_handler import validate_image_url
+                if not validate_image_url(image_url):
+                    return {"success": False, "error": "Invalid image URL format"}
+            
             # Create product
             product = create_product(
                 name=name.strip(),
                 description=description.strip(),
                 category=category.strip(),
-                price=price
+                price=price,
+                image_url=image_url
             )
             
             if product:
@@ -734,7 +740,8 @@ class AdminService:
                         "description": product.description,
                         "category": category,  # Use the category name passed to the function
                         "price": product.price,
-                        "is_active": product.is_active
+                        "is_active": product.is_active,
+                        "image_url": product.image_url
                     }
                 }
             else:
@@ -826,37 +833,7 @@ class AdminService:
             logger.error("Error getting product categories: %s", e)
             return []
 
-    async def search_products_admin(self, search_term: str) -> List[Dict]:
-        """Search products by name or description"""
-        try:
-            if not search_term or len(search_term.strip()) < 2:
-                return []
-            
-            products = search_products(search_term.strip())
-            
-            result = []
-            for product in products:
-                # Get category name safely
-                category_name = "Uncategorized"
-                if hasattr(product, 'category_rel') and product.category_rel:
-                    category_name = product.category_rel.name
-                elif hasattr(product, 'category'):
-                    category_name = product.category or "Uncategorized"
-                
-                result.append({
-                    "id": product.id,
-                    "name": product.name,
-                    "description": product.description or "",
-                    "category": category_name,
-                    "price": product.price,
-                    "is_active": product.is_active
-                })
-            
-            logger.info("Found %d products matching '%s'", len(result), search_term)
-            return result
-        except Exception as e:
-            logger.error("Error searching products: %s", e)
-            return []
+
 
     async def get_products_by_category_admin(self, category: str) -> List[Dict]:
         """Get all products in a specific category"""

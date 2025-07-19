@@ -709,7 +709,7 @@ def get_product_dict_by_id(product_id: int) -> Optional[Dict]:
 
 
 @retry_on_database_error()
-def create_product(name: str, description: str, category: str, price: float) -> Optional[Product]:
+def create_product(name: str, description: str, category: str, price: float, image_url: Optional[str] = None) -> Optional[Product]:
     """Create a new product"""
     session = get_db_session()
     try:
@@ -730,7 +730,8 @@ def create_product(name: str, description: str, category: str, price: float) -> 
             description=description,
             category_id=category_obj.id,
             price=price,
-            is_active=True
+            is_active=True,
+            image_url=image_url
         )
         session.add(product)
         session.commit()
@@ -756,7 +757,7 @@ def update_product(product_id: int, **kwargs) -> bool:
             return False
         
         # Update allowed fields
-        allowed_fields = ['name', 'description', 'price', 'is_active']
+        allowed_fields = ['name', 'description', 'price', 'is_active', 'image_url']
         for field, value in kwargs.items():
             if field in allowed_fields:
                 setattr(product, field, value)
@@ -854,19 +855,6 @@ def get_all_products_by_category(category: str) -> list[Product]:
     finally:
         session.close()
 
-
-@retry_on_database_error()
-def search_products(search_term: str) -> list[Product]:
-    """Search products by name or description"""
-    session = get_db_session()
-    try:
-        search_pattern = f"%{search_term}%"
-        return session.query(Product).filter(
-            Product.is_active == True,
-            (Product.name.ilike(search_pattern) | Product.description.ilike(search_pattern))
-        ).all()
-    finally:
-        session.close()
 
 
 # Cart operations

@@ -54,9 +54,6 @@ def get_dynamic_main_menu_keyboard(user_id: int = None):
                     keyboard.append(row)
                     row = []
             
-            # Add search button
-            keyboard.append([InlineKeyboardButton(i18n.get_text("SEARCH_PRODUCTS", user_id=user_id), callback_data="menu_search")])
-            
             # Add standard action buttons
             keyboard.append([InlineKeyboardButton(i18n.get_text("BUTTON_VIEW_CART", user_id=user_id), callback_data="cart_view")])
             keyboard.append([InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="main_page")])
@@ -110,48 +107,6 @@ def get_category_menu_keyboard(category: str, user_id: int = None):
         return InlineKeyboardMarkup(keyboard)
 
 
-def get_search_results_keyboard(results, user_id: int = None):
-    """Get keyboard for search results."""
-    try:
-        keyboard = []
-        
-        # Add product buttons (max 2 per row)
-        row = []
-        for product in results:
-            button_text = f"{product.name}\n₪{product.price:.2f}"
-            callback_data = f"product_{product.id}"
-            
-            row.append(InlineKeyboardButton(button_text, callback_data=callback_data))
-            
-            if len(row) == 2 or product == results[-1]:
-                keyboard.append(row)
-                row = []
-        
-        # Add quick add buttons (max 2 per row)
-        row = []
-        for product in results:
-            quick_add_text = f"➕ {product.name}"
-            callback_data = f"quick_add_{product.id}"
-            
-            row.append(InlineKeyboardButton(quick_add_text, callback_data=callback_data))
-            
-            if len(row) == 2 or product == results[-1]:
-                keyboard.append(row)
-                row = []
-        
-        # Add action buttons
-        keyboard.append([InlineKeyboardButton(i18n.get_text("BUTTON_VIEW_CART", user_id=user_id), callback_data="cart_view")])
-        keyboard.append([InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")])
-        
-        return InlineKeyboardMarkup(keyboard)
-        
-    except Exception as e:
-        print(f"Error creating search results keyboard: {e}")
-        keyboard = [
-            [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")]
-        ]
-        return InlineKeyboardMarkup(keyboard)
-
 
 def get_main_menu_keyboard(user_id: int = None):
     """Get main menu keyboard (translated)."""
@@ -169,7 +124,6 @@ def get_main_menu_keyboard(user_id: int = None):
             InlineKeyboardButton(i18n.get_text("BUTTON_WHITE_COFFEE", user_id=user_id), callback_data="menu_white_coffee"),
         ],
         [InlineKeyboardButton(i18n.get_text("BUTTON_HILBEH", user_id=user_id), callback_data="menu_hilbeh")],
-        [InlineKeyboardButton(i18n.get_text("SEARCH_PRODUCTS", user_id=user_id), callback_data="menu_search")],
         [InlineKeyboardButton(i18n.get_text("BUTTON_VIEW_CART", user_id=user_id), callback_data="cart_view")],
         [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="main_page")],
     ]

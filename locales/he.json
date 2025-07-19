@@ -375,12 +375,7 @@
   "CONTACT_SUPPORT": "📞 צור קשר עם תמיכה",
   "SUPPORT_MESSAGE": "📞 <b>צור קשר עם תמיכה</b>\n\nלסיוע מיידי, אנא צור קשר איתנו:\n\n📱 <b>טלפון:</b> [מספר הטלפון שלך]\n📧 <b>אימייל:</b> [האימייל שלך]\n⏰ <b>שעות:</b> רביעי-שישי, 9:00 בבוקר - 6:00 בערב\n\nנחזור אליך בהקדם האפשרי!",
   
-  "SEARCH_PRODUCTS": "🔍 חפש מוצרים",
-  "SEARCH_PROMPT": "🔍 <b>חפש מוצרים</b>\n\nאנא הכנס מונח חיפוש (לפחות 2 תווים):",
-  "SEARCH_TOO_SHORT": "❌ מונח החיפוש קצר מדי. אנא הכנס לפחות 2 תווים.",
-  "SEARCH_NO_RESULTS": "🔍 לא נמצאו מוצרים התואמים ל-'{term}'.",
-  "SEARCH_RESULTS_TITLE": "🔍 <b>תוצאות חיפוש עבור '{term}':</b>\n\nנמצאו {count} מוצר(ים):",
-  "SEARCH_ERROR": "❌ אירעה שגיאה במהלך החיפוש. אנא נסה שוב.",
+
   "QUICK_ADD_SUCCESS": "✅ {name} נוסף לעגלה בהצלחה!",
   "QUICK_ADD_ERROR": "❌ נכשל בהוספת {name}: {error}",
   "PRODUCT_NOT_FOUND": "❌ המוצר לא נמצא.",
@@ -518,7 +513,7 @@
   "ADMIN_EDIT_PRODUCT": "✏️ ערוך מוצר",
   "ADMIN_DELETE_PRODUCT": "🗑️ מחק מוצר",
   "ADMIN_PRODUCT_CATEGORIES": "📂 קטגוריות מוצרים",
-  "ADMIN_SEARCH_PRODUCTS": "🔍 חפש מוצרים",
+
   "ADMIN_BACK_TO_MENU_MANAGEMENT": "⬅️ חזור לניהול תפריט",
   "ADMIN_PRODUCTS_TITLE": "🍽️ <b>ניהול מוצרים</b>",
   "ADMIN_NO_PRODUCTS": "📭 לא נמצאו מוצרים.",
@@ -581,10 +576,7 @@
   "ADMIN_CATEGORIES_TITLE": "📂 <b>קטגוריות מוצרים</b>",
   "ADMIN_CATEGORIES_LIST": "📋 <b>קטגוריות זמינות:</b>",
   "ADMIN_NO_CATEGORIES": "📭 לא נמצאו קטגוריות מוצרים.",
-  "ADMIN_SEARCH_PRODUCTS_TITLE": "🔍 <b>חפש מוצרים</b>",
-  "ADMIN_SEARCH_PRODUCTS_INSTRUCTIONS": "אנא הכנס מונח חיפוש (לפחות 2 תווים):",
-  "ADMIN_SEARCH_PRODUCTS_RESULTS": "🔍 <b>תוצאות חיפוש עבור '{search_term}':</b>",
-  "ADMIN_SEARCH_PRODUCTS_NO_RESULTS": "🔍 לא נמצאו מוצרים התואמים ל-'{search_term}'.",
+
   "ADMIN_PRODUCT_ACTIONS": "🛠️ <b>פעולות מוצר:</b>",
   "ADMIN_PRODUCT_EDIT": "✏️ ערוך",
   "ADMIN_PRODUCT_DELETE": "🗑️ מחק",
@@ -635,10 +627,7 @@
   "ADMIN_PRODUCT_FILTER_ACTIVE": "✅ פעילים בלבד",
   "ADMIN_PRODUCT_FILTER_INACTIVE": "❌ בלתי פעילים בלבד",
   "ADMIN_PRODUCT_FILTER_BY_CATEGORY": "📂 סנן לפי קטגוריה",
-  "ADMIN_PRODUCT_SEARCH_PLACEHOLDER": "הכנס שם מוצר או תיאור...",
-  "ADMIN_PRODUCT_SEARCH_MIN_LENGTH": "אנא הכנס לפחות 2 תווים לחיפוש.",
-  "ADMIN_PRODUCT_SEARCH_NO_RESULTS": "לא נמצאו מוצרים התואמים לחיפוש שלך.",
-  "ADMIN_PRODUCT_SEARCH_RESULTS_COUNT": "נמצאו {count} מוצר(ים) התואמים ל-'{search_term}'.",
+
   "ADMIN_PRODUCT_CATEGORY_EMPTY": "אין מוצרים בקטגוריה זו.",
   "ADMIN_PRODUCT_CATEGORY_COUNT": "{category}: {count} מוצר(ים)",
   "ADMIN_CATEGORY_TOTAL_COUNT": "סה\"כ קטגוריות: {count}",
