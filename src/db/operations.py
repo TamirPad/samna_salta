@@ -869,6 +869,20 @@ def get_product_categories() -> list[str]:
 
 
 @retry_on_database_error()
+def get_all_categories() -> list[str]:
+    """Get all categories (including those without products) - for admin use"""
+    session = get_db_session()
+    try:
+        # Get all categories
+        categories = session.query(MenuCategory).filter(
+            MenuCategory.is_active == True
+        ).order_by(MenuCategory.display_order, MenuCategory.name).all()
+        return [cat.name for cat in categories]
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
 def get_products_by_category(category: str) -> list[Product]:
     """Get all active products in a specific category"""
     session = get_db_session()
@@ -1406,3 +1420,71 @@ def get_database_status() -> dict:
         logger.error(f"Error getting database status: {e}")
     
     return status
+
+@retry_on_database_error()
+def create_category(name: str, description: str = None, display_order: int = None, image_url: str = None) -> Optional[MenuCategory]:
+    """Create a new menu category"""
+    session = get_db_session()
+    try:
+        # Check if category already exists
+        existing_category = session.query(MenuCategory).filter(MenuCategory.name == name).first()
+        if existing_category:
+            logger.warning("Category '%s' already exists", name)
+            return None
+        
+        # Create new category
+        category_data = {
+            "name": name.strip(),
+            "description": description.strip() if description else None,
+            "display_order": display_order,
+            "image_url": image_url,
+            "is_active": True
+        }
+        
+        category = MenuCategory(**category_data)
+        session.add(category)
+        session.commit()
+        
+        logger.info("Successfully created category: %s", name)
+        return category
+        
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error("Failed to create category '%s': %s", name, e)
+        return None
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def delete_category(name: str) -> bool:
+    """Delete a menu category and all its products"""
+    session = get_db_session()
+    try:
+        # Find the category
+        category = session.query(MenuCategory).filter(MenuCategory.name == name).first()
+        if not category:
+            logger.warning("Category '%s' not found", name)
+            return False
+        
+        # Get all products in this category
+        products = session.query(Product).filter(Product.category_id == category.id).all()
+        product_count = len(products)
+        
+        # Delete all products in the category first
+        for product in products:
+            session.delete(product)
+        
+        # Delete the category
+        session.delete(category)
+        session.commit()
+        
+        logger.info("Successfully deleted category '%s' with %d products", name, product_count)
+        return True
+        
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error("Failed to delete category '%s': %s", name, e)
+        return False
+    finally:
+        session.close()

@@ -855,9 +855,10 @@ class AdminService:
         return await self.deactivate_product(product_id)
 
     async def get_product_categories_list(self) -> List[str]:
-        """Get all unique product categories"""
+        """Get all unique product categories (including empty ones for admin)"""
         try:
-            categories = get_product_categories()
+            from src.db.operations import get_all_categories
+            categories = get_all_categories()
             logger.info("Retrieved %d product categories", len(categories))
             return categories
         except Exception as e:
@@ -932,18 +933,15 @@ class AdminService:
             if category_name.lower() in [cat.lower() for cat in existing_categories]:
                 return {"success": False, "error": f"Category '{category_name}' already exists"}
             
-            # For now, we'll create a dummy product with this category to establish it
-            # In a real implementation, you might want a separate categories table
-            dummy_product = create_product(
-                name=f"Category: {category_name}",
-                description=f"Category placeholder for {category_name}",
-                category=category_name.strip(),
-                price=0.01
+            # Create category directly using the new function
+            from src.db.operations import create_category
+            category = create_category(
+                name=category_name.strip(),
+                description=f"Category for {category_name}",
+                display_order=len(existing_categories) + 1
             )
             
-            if dummy_product:
-                # Immediately deactivate the dummy product
-                update_product(dummy_product.id, is_active=False)
+            if category:
                 logger.info("Successfully created category: %s", category_name)
                 return {
                     "success": True,
@@ -1000,33 +998,21 @@ class AdminService:
             return {"success": False, "error": f"Failed to update category: {str(e)}"}
 
     async def delete_category(self, category: str) -> Dict:
-        """Delete a category (deactivate all products in it)"""
+        """Delete a category and all its products"""
         try:
-            # Get all products in the category (including inactive ones)
-            from src.db.operations import get_all_products_by_category
-            products = get_all_products_by_category(category)
+            # Use the new delete_category function
+            from src.db.operations import delete_category
+            success = delete_category(category)
             
-            if not products:
-                return {"success": False, "error": f"No products found in category '{category}'"}
-            
-            # Deactivate all products in the category
-            deactivated_count = 0
-            for product in products:
-                success = update_product(product.id, is_active=False)
-                if success:
-                    deactivated_count += 1
-            
-            if deactivated_count > 0:
-                logger.info("Successfully deleted category '%s' (%d products deactivated)", 
-                          category, deactivated_count)
+            if success:
+                logger.info("Successfully deleted category: %s", category)
                 return {
                     "success": True,
                     "category": category,
-                    "deactivated_products": deactivated_count,
-                    "message": f"Category '{category}' deleted ({deactivated_count} products deactivated)"
+                    "message": f"Category '{category}' deleted successfully"
                 }
             else:
-                return {"success": False, "error": "Failed to deactivate any products"}
+                return {"success": False, "error": f"Failed to delete category '{category}'"}
                 
         except Exception as e:
             logger.error("Error deleting category '%s': %s", category, e)
