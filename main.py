@@ -264,6 +264,7 @@ def main():
     print(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
     print(f"Webhook Mode: {os.getenv('WEBHOOK_MODE', 'false')}")
     print(f"Port: {os.getenv('PORT', '8000')}")
+    print(f"RENDER_EXTERNAL_URL: {os.getenv('RENDER_EXTERNAL_URL', 'Not set')}")
     
     # Ensure required environment variables are set
     required_vars = ['BOT_TOKEN', 'ADMIN_CHAT_ID']
@@ -272,11 +273,29 @@ def main():
     if missing_vars:
         print(f"❌ Missing required environment variables: {missing_vars}")
         print("Please set these variables in your Render environment settings.")
-        return
+        return 1
+    
+    # Determine if we should run in webhook mode
+    # Force webhook mode if:
+    # 1. WEBHOOK_MODE is explicitly set to "true"
+    # 2. We're on Render (RENDER_EXTERNAL_URL is set)
+    # 3. PORT is set (indicating web service deployment)
+    should_use_webhook = (
+        os.getenv("WEBHOOK_MODE", "false").lower() == "true" or
+        os.getenv("RENDER_EXTERNAL_URL") is not None or
+        os.getenv("PORT") is not None
+    )
+    
+    if should_use_webhook:
+        print("🌐 Running in WEBHOOK mode (production deployment)")
+        if not os.getenv("WEBHOOK_MODE"):
+            print("⚠️  WEBHOOK_MODE not set, but detected Render environment - forcing webhook mode")
+    else:
+        print("🔄 Running in POLLING mode (local development)")
     
     try:
         # Check if we should run in webhook mode
-        if os.getenv("WEBHOOK_MODE", "false").lower() == "true":
+        if should_use_webhook:
             run_webhook()
         else:
             run_polling()
