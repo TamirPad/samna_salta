@@ -76,32 +76,24 @@
   "KUBANEH_SEEDED": "עם זרעים",
   "KUBANEH_HERB": "עם עשבי תיבול",
   "KUBANEH_AROMATIC": "ארומטית",
-  
   "OIL_OLIVE": "שמן זית",
   "OIL_SAMNEH": "סמנה",
-  
   "SAMNEH_SMOKED": "מעושנת",
   "SAMNEH_NOT_SMOKED": "לא מעושנת",
-  
   "SIZE_SMALL": "קטן",
   "SIZE_MEDIUM": "בינוני",
   "SIZE_LARGE": "גדול",
   "SIZE_XL": "גדול מאוד",
-  
   "ADD_TO_CART": "➕ הוסף לעגלה",
   "INFO": "ℹ️ מידע",
   "HILBEH_UNAVAILABLE": "❌ לא זמינה היום",
-  
   "DELIVERY_PICKUP": "🚶 איסוף עצמי (חינם)",
   "DELIVERY_DELIVERY": "🚚 משלוח (+5 ₪)",
-  
   "SEND_ORDER": "📝 שלח הזמנה",
   "ORDER_CONFIRM_YES": "✅ כן, אשר הזמנה",
   "ORDER_CONFIRM_NO": "✏️ לא, חזור",
-  
   "VIEW_CART": "🛒 צפה בעגלה",
   "CONTINUE_SHOPPING": "🍞 המשך קניות",
-  
   "KUBANEH_DESC": "🍞 <b>קובנה</b>\n\nבחרו את סוג הקובנה המועדף:\n\n• <b>קלאסית</b> - לחם תימני מסורתי ועשיר\n• <b>עם זרעים</b> - עם זרעי שומשום וכמון\n• <b>עם עשבי תיבול</b> - עם עשבי תיבול ארומטיים\n• <b>ארומטית</b> - עם תבלינים מיוחדים\n\n<i>מחיר: 25 ₪ ליחידה</i>",
   "SAMNEH_DESC": "🧈 <b>סמנה</b>\n\nבחרו את סוג הסמנה המועדף:\n\n• <b>מעושנת</b> - טעם מעושן עשיר\n• <b>לא מעושנת</b> - טהורה וטבעית\n\n<i>מחיר: 15 ₪</i>",
   "RED_BISBAS_DESC": "🌶️ <b>בסבס אדום</b>\n\nרוטב תימני מסורתי חריף - מושלם להוספת חריפות למנות שלכם!\n\n<i>מחיר: 12 ₪</i>",
@@ -110,48 +102,39 @@
   "HAWAIJ_SOUP_DESC": "🥘 <b>חוואיג' למרק</b>\n\nתערובת תבלינים תימנית מושלמת למרקים ותבשילים - מוסיפה טעם אותנטי!\n\n<i>מחיר: 8 ₪</i>",
   "HAWAIJ_COFFEE_DESC": "☕ <b>חוואיג' לקפה</b>\n\nתערובת תבלינים תימנית לקפה - משנה את חוויית הקפה שלכם!\n\n<i>מחיר: 8 ₪</i>",
   "WHITE_COFFEE_DESC": "קפה לבן תימני מסורתי, עשוי עם הל ותבלינים לחוויה ארומטית ייחודית.",
-  
   "INVALID_PRODUCT_SELECTION": "❌ בחירת מוצר לא תקינה. נסו שוב",
   "ADD_SUCCESS": "✅ <b>{item} נוסף לעגלה!</b>\n\n🛒 סה\"כ עגלה: ₪{total:.2f}\n📦 פריטים בעגלה: {count}",
   "ADD_FAILURE": "❌ לא ניתן להוסיף את {item} לעגלה\n\nשגיאה: {error}",
   "ADD_ERROR": "❌ אירעה שגיאה בעת הוספה לעגלה. נסו שוב",
-  
   "CART_EMPTY_OR_ERROR": "🛒 העגלה שלך ריקה או שאירעה שגיאה",
   "CART_EMPTY_ORDER": "🛒 העגלה שלך ריקה. הוסף כמה פריטים טעימים קודם!",
   "ORDER_SEND_PROBLEM": "❌ הייתה בעיה בשליחת ההזמנה. נסה שוב.",
   "ORDER_CREATE_ERROR": "❌ שגיאה ביצירת הזמנה: {error}",
   "UNEXPECTED_ERROR": "❌ משהו השתבש. נסה שוב.",
-  
   "ORDER_CONFIRMATION_HEADER": "🎉 <b>ההזמנה נשלחה בהצלחה!</b>",
   "ORDER_CONFIRMATION_THANKS": "תודה על ההזמנה! ניצור איתך קשר בקרוב לאישור הפרטים.",
   "ORDER_SUMMARY_TITLE": "📋 <b>סיכום הזמנה</b>",
   "ORDER_NUMBER_LABEL": "<b>מספר הזמנה:</b> {number}",
   "ORDER_TOTAL_LABEL": "<b>סה\"כ:</b> {total}",
   "ORDER_ITEMS_LABEL": "<b>פריטים:</b>",
-  
   "CART_EMPTY_TITLE": "🛒 <b>העגלה שלך ריקה</b> 🛒",
   "CART_EMPTY_MESSAGE": "מוכן להוסיף כמה פריטים טעימים? עיין בתפריט שלנו כדי להתחיל!",
   "CART_TITLE": "🛒 <b>העגלה שלך</b> 🛒",
-  
   "CART_CLEARED": "🗑️ העגלה שלך נוקתה בהצלחה",
   "CART_CLEAR_FAILED": "❌ לא ניתן לנקות עגלה: {error}",
   "CART_CLEAR_ERROR": "❌ שגיאה בניקוי עגלה: {error}",
-  
   "WELCOME_BACK": "👋 שלום {name}, נהדר לראות אותך שוב! 🎉",
   "WHAT_TO_ORDER_TODAY": "מה תרצה להזמין היום?",
-  "WELCOME_NEW_USER": "🇾🇪 ברוכים הבאים לסמנה סלתה! 🍞",
+  "WELCOME_NEW_USER": "ברוכים הבאים ל-{business_name}!",
   "WELCOME_HELP_MESSAGE": "אני כאן לעזור לך להזמין את המוצרים התימניים המסורתיים הטעימים שלנו. בואו נתחיל!",
   "PROFILE_INCOMPLETE": "⚠️ הפרופיל שלך לא שלם",
   "PLEASE_COMPLETE_PROFILE": "אנא השלם את פרטי הפרופיל שלך כדי להמשיך.",
   "LANGUAGE_CHANGED": "✅ השפה השתנתה בהצלחה!",
   "PLEASE_ENTER_NAME": "כדי להתחיל, אנא ספר לי את השם המלא שלך:",
-  
   "ERROR_TRY_START_AGAIN": "❌ אירעה שגיאה. אנא נסה /start שוב.",
-  
   "NAME_TOO_SHORT": "אנא הכנס את השם המלא שלך (לפחות 2 תווים):",
   "NICE_TO_MEET": "נעים להכיר אותך, {name}! 👋",
   "PLEASE_SHARE_PHONE": "עכשיו, אנא שתף את מספר הטלפון שלך כדי שנוכל ליצור איתך קשר לגבי ההזמנה:",
-  
   "SESSION_EXPIRED": "הפגישה שלך פגה. התחל שוב עם /start",
   "VALIDATION_ERROR": "❌ {error}",
   "PLEASE_TRY_AGAIN": "אנא נסה שוב:",
@@ -161,19 +144,15 @@
   "HOW_RECEIVE_ORDER": "איך תרצה לקבל את ההזמנה?",
   "CHOOSE_DELIVERY_METHOD": "אנא בחר את שיטת המשלוח:",
   "ENTER_VALID_PHONE": "אנא הכנס מספר טלפון תקין:",
-  
   "PICKUP_CHOSEN": "מושלם! בחרת באיסוף עצמי. ניצור איתך קשר לתיאום זמן איסוף נוח.",
   "WHAT_TO_ORDER": "מה תרצה להזמין?",
   "DELIVERY_CHOSEN": "נהדר! בחרת במשלוח. יש עלות משלוח של 5 ש\"ח.",
   "PROVIDE_DELIVERY_ADDRESS": "אנא ספק את כתובת המשלוח המלאה:",
-  
   "ADDRESS_TOO_SHORT": "אנא ספק כתובת משלוח מלאה (לפחות 10 תווים):",
   "DELIVERY_ADDRESS_SAVED": "תודה! כתובת המשלוח שלך נשמרה בהצלחה 🚚",
-  
   "ONBOARDING_CANCELLED": "הרישום בוטל. תוכל להתחיל שוב בכל עת עם /start",
   "UNKNOWN_COMMAND": "סליחה, לא הבנתי את הפקודה הזו. אנא עקוב אחר ההוראות שסופקו.",
   "UNKNOWN_MESSAGE": "סליחה, לא הבנתי את זה. אנא ספק את המידע שביקשתי.",
-  
   "ADMIN_ACCESS_DENIED": "⛔ גישה נדחתה. נדרשות הרשאות מנהל.",
   "ADMIN_DASHBOARD_TITLE": "👑 <b>לוח בקרה למנהל</b>",
   "ADMIN_ORDER_STATS": "📊 <b>סטטיסטיקות הזמנות:</b>",
@@ -189,7 +168,6 @@
   "ADMIN_UPDATE_STATUS": "🔄 עדכן סטטוס",
   "ADMIN_ANALYTICS": "📊 אנליטיקה",
   "ADMIN_ERROR_MESSAGE": "אירעה שגיאה. נסה שוב או צור קשר עם התמיכה.",
-  
   "ADMIN_NEW_ORDER_HEADER": "🔔 <b>הזמנה חדשה התקבלה!</b>",
   "ADMIN_ORDER_STATUS_UPDATE_HEADER": "🔄 <b>סטטוס הזמנה עודכן!</b>",
   "ADMIN_ORDER_DETAILS_TITLE": "📋 <b>הזמנה #{number} (ID: {id})</b>",
@@ -225,7 +203,6 @@
   "ADMIN_COMPLETED_ORDERS_TITLE": "✅ <b>הזמנות שהושלמו</b>",
   "ADMIN_NO_COMPLETED_ORDERS": "📭 לא נמצאו הזמנות שהושלמו.",
   "ADMIN_COMPLETED_ORDERS_LIST": "📋 <b>רשימת הזמנות שהושלמו:</b>",
-  
   "CUSTOMER_ORDER_UPDATE_HEADER": "🔔 <b>עדכון הזמנה</b>",
   "CUSTOMER_ORDER_READY_HEADER": "🎉 <b>ההזמנה שלך מוכנה!</b>",
   "CUSTOMER_PICKUP_DETAILS": "🏪 <b>פרטי איסוף:</b>",
@@ -241,15 +218,12 @@
   "ORDER_NUMBER_LABEL": "מספר הזמנה",
   "DELIVERY_READY_INFO": "🚚 <b>מידע משלוח:</b>\nההזמנה שלך בדרך! אנא וודא שמישהו זמין לקבל אותה.",
   "PICKUP_READY_INFO": "🏪 <b>מידע איסוף:</b>\n📍 <b>מיקום:</b> מסעדת סמנה סלתה\n⏰ <b>שעות:</b> רביעי-שישי, 9:00-18:00\n\nאנא הבא את מספר ההזמנה בעת האיסוף.",
-  
   "PRODUCT_KUBANEH_CLASSIC": "קובנה קלאסית - לחם תימני מסורתי ועשיר",
   "PRODUCT_KUBANEH_SEEDED": "קובנה עם זרעים - לחם תימני עם זרעי שומשום וכמון",
   "PRODUCT_KUBANEH_HERB": "קובנה עם עשבי תיבול - לחם תימני עם עשבי תיבול ארומטיים",
   "PRODUCT_KUBANEH_AROMATIC": "קובנה ארומטית - לחם תימני עם תבלינים מיוחדים",
-  
   "PRODUCT_SAMNEH_SMOKED": "סמנה מעושנת - חמאה מובהרת עם טעם מעושן עשיר",
   "PRODUCT_SAMNEH_NOT_SMOKED": "סמנה לא מעושנת - חמאה מובהרת טהורה וטבעית",
-  
   "PRODUCT_RED_BISBAS": "ביסבס אדום - רוטב חריף תימני מסורתי",
   "PRODUCT_HILBEH": "חילבה - רוטב תימני מסורתי מגרעיני חילבה",
   "PRODUCT_HAWAIJ_SOUP": "חוואיג' למרק - תערובת תבלינים תימנית למרק",
@@ -261,12 +235,10 @@
   "BACK_TO_CART_VIEW": "⬅️ חזור לעגלה",
   "CART_EDIT_MODE_INSTRUCTIONS": "השתמש בכפתורים למטה לעריכת פריטי העגלה:",
   "CART_EDIT_MODE_TITLE": "✏️ ערוך פריטי עגלה",
-  
   "MENU_FUNCTIONALITY_AVAILABLE": "פונקציונליות התפריט עובדת בצורה מושלמת!",
   "MENU_ERROR_OCCURRED": "אירעה שגיאה. נסה שוב.",
   "AVAILABILITY_CHECK_ERROR": "❌ {error}",
   "AVAILABILITY_CHECK_ERROR_GENERIC": "שגיאה בבדיקת זמינות. נסה שוב.",
-  
   "LANGUAGE_SELECTION": "🌐 בחירת שפה",
   "LANGUAGE_ENGLISH": "🇺🇸 English",
   "LANGUAGE_HEBREW": "🇮🇱 עברית",
@@ -339,7 +311,6 @@
   "ANALYTICS_PRODUCT_SUMMARY": "📊 סיכום:",
   "ANALYTICS_CUSTOMER_BEHAVIOR": "📊 התנהגות לקוחות:",
   "ANALYTICS_TOP_CUSTOMERS": "🏆 5 הלקוחות המובילים לפי הוצאות:",
-  
   "ADMIN_MULTILINGUAL_NAME_PROMPT": "🌐 <b>הכנס שם מוצר/קטגוריה</b>\n\nאנא הכנס את השם בשפה המועדפת שלך. המערכת תזהה אוטומטית את השפה ותשמור אותה בהתאם.",
   "ADMIN_MULTILINGUAL_DESCRIPTION_PROMPT": "🌐 <b>הכנס תיאור מוצר/קטגוריה</b>\n\nאנא הכנס את התיאור בשפה המועדפת שלך. המערכת תזהה אוטומטית את השפה ותשמור אותה בהתאם.",
   "ADMIN_MULTILINGUAL_GENERIC_PROMPT": "🌐 <b>הכנס תוכן</b>\n\nאנא הכנס את התוכן בשפה המועדפת שלך. המערכת תזהה אוטומטית את השפה ותשמור אותה בהתאם.",
@@ -360,7 +331,6 @@
   "ANALYTICS_GROWING_TREND": "↗️ צומח",
   "ANALYTICS_DECLINING_TREND": "↘️ יורד",
   "ANALYTICS_NO_DATA_TREND": "📊 אין נתונים",
-  
   "ORDER_DETAILS_HEADER": "📋 <b>פרטי הזמנה:</b>",
   "ORDER_NUMBER_FIELD": "🔢 מספר הזמנה:",
   "STATUS_FIELD": "סטטוס:",
@@ -372,43 +342,29 @@
   "DELIVERY_FIELD": "<b>משלוח:</b>",
   "ADDRESS_FIELD": "📍 כתובת:",
   "TOTAL_FIELD": "💳 <b>סה\"כ:</b>",
-  
   "KUBANEH_DISPLAY_NAME": "קובנה ({type})",
   "SAMNEH_DISPLAY_NAME": "סמנה ({type})",
   "RED_BISBAS_DISPLAY_NAME": "ביסבס אדום ({size})",
   "HILBEH_DISPLAY_NAME": "חילבה ({type})",
-  
   "KUBANEH_CLASSIC": "קלאסי",
-  "KUBANEH_SEEDED": "עם זרעים",
   "KUBANEH_HERB": "עשבי תיבול",
   "KUBANEH_AROMATIC": "ארומטי",
-  
   "SAMNEH_CLASSIC": "קלאסי",
   "SAMNEH_SPICY": "חריף",
   "SAMNEH_HERB": "עשבי תיבול",
   "SAMNEH_HONEY": "דבש",
   "SAMNEH_SMOKED": "מעושן",
   "SAMNEH_NOT_SMOKED": "לא מעושן",
-  
   "HILBEH_CLASSIC": "קלאסי",
   "HILBEH_SPICY": "חריף",
   "HILBEH_SWEET": "מתוק",
   "HILBEH_PREMIUM": "פרימיום",
-  
-  "SIZE_SMALL": "קטן",
-  "SIZE_MEDIUM": "בינוני",
-  "SIZE_LARGE": "גדול",
-  "SIZE_XL": "גדול מאוד",
   "PLEASE_ENTER_DELIVERY_ADDRESS_ONBOARDING": "📍 <b>כתובת למשלוח</b> 📍",
   "REGISTRATION_COMPLETE": "✅ <b>ההרשמה הושלמה!</b> ✅",
   "DELIVERY_ADDRESS_SAVED_ONBOARDING": "📍 <b>כתובת המשלוח נשמרה:</b> {address}",
   "UNKNOWN_COMMAND_ONBOARDING": "סליחה, לא הבנתי את הפקודה הזו. אנא עקוב אחר ההוראות שסיפקתי.",
   "UNKNOWN_MESSAGE_ONBOARDING": "סליחה, לא הבנתי את זה. אנא ספק את המידע שביקשתי.",
-  "DELIVERY_ADDRESS_ONBOARDING_HELP": "אנא הזן את כתובת המשלוח שלך. כתובת זו תישמר להזמנות עתידיות ותוכל לשנות אותה בכל עת בפרופיל שלך.",
-  "ADDRESS_TOO_SHORT": "❌ הכתובת קצרה מדי. אנא הזן כתובת מלאה (לפחות 5 תווים).",
-  "WELCOME_NEW_USER": "🇾🇪 ברוכים הבאים לסמנה סלתה! 🍞",
   "WELCOME_HELP_MESSAGE": "אני כאן כדי לעזור לך להזמין את המוצרים התימניים המסורתיים הטעימים שלנו. בואו נתחיל!",
-  
   "DELIVERY_ADDRESS_CURRENT": "📍 <b>כתובת משלוח נוכחית:</b> {address}",
   "DELIVERY_ADDRESS_PROMPT": "אנא הכנס את כתובת המשלוח שלך:",
   "CLEAR_CART": "🗑️ נקה עגלה",
@@ -416,7 +372,6 @@
   "CLEAR_CART_NO": "❌ לא, שמור פריטים",
   "CHANGE_DELIVERY": "🚚 שנה משלוח",
   "CLEAR_CART_CONFIRMATION": "🗑️ <b>אישור ניקוי עגלה</b>\n\nהאם אתה בטוח שברצונך לנקות את כל הפריטים מהעגלה שלך? פעולה זו לא ניתנת לביטול.",
-  "LANGUAGE_BUTTON": "🌐 שנה שפה",
   "MY_INFO_LANGUAGE_SECTION": "🌐 <b>הגדרות שפה</b>\n\nשפה נוכחית: {current_language}\n\nאתה יכול לשנות את העדפת השפה שלך כאן:",
   "LANGUAGE_CHANGE_SUCCESS": "✅ <b>השפה עודכנה!</b>\n\nהעדפת השפה שלך שונתה ל-{language}.",
   "LANGUAGE_CHANGE_ERROR": "❌ נכשל בעדכון השפה. אנא נסה שוב.",
@@ -426,8 +381,6 @@
   "BACK_TO_HELP": "⬅️ חזור לעזרה",
   "CONTACT_SUPPORT": "📞 צור קשר עם תמיכה",
   "SUPPORT_MESSAGE": "📞 <b>צור קשר עם תמיכה</b>\n\nלסיוע מיידי, אנא צור קשר איתנו:\n\n📱 <b>טלפון:</b> [מספר הטלפון שלך]\n📧 <b>אימייל:</b> [האימייל שלך]\n⏰ <b>שעות:</b> רביעי-שישי, 9:00 בבוקר - 6:00 בערב\n\nנחזור אליך בהקדם האפשרי!",
-  
-
   "QUICK_ADD_SUCCESS": "✅ {name} נוסף לעגלה בהצלחה!",
   "QUICK_ADD_ERROR": "❌ נכשל בהוספת {name}: {error}",
   "PRODUCT_NOT_FOUND": "❌ המוצר לא נמצא.",
@@ -441,7 +394,6 @@
   "NO_DESCRIPTION": "אין תיאור זמין",
   "UNCATEGORIZED": "ללא קטגוריה",
   "ADD_TO_CART": "🛒 הוסף לעגלה",
-  
   "KUBANEH_CLASSIC": "🍞 קובאנה קלאסי - ₪25",
   "KUBANEH_SEEDED": "🌱 קובאנה עם זרעים - ₪28",
   "KUBANEH_HERB": "🌿 קובאנה עשבי תיבול - ₪30",
@@ -458,16 +410,12 @@
   "HILBEH_SPICY": "🌶️ חילבה חריפה - ₪22",
   "HILBEH_SWEET": "🍯 חילבה מתוקה - ₪24",
   "HILBEH_PREMIUM": "🌱 חילבה פרימיום - ₪26",
-  
-
-  
   "ADMIN_QUICK_TOGGLE_STATUS": "🔄 החלף סטטוס",
   "ADMIN_QUICK_DELETE": "🗑️ מחיקה מהירה",
   "ADMIN_QUICK_EDIT": "✏️ עריכה מהירה",
   "ADMIN_QUICK_VIEW": "👁️ צפייה מהירה",
   "ADMIN_QUICK_ACTION_SUCCESS": "✅ הפעולה המהירה הושלמה בהצלחה!",
   "ADMIN_QUICK_ACTION_ERROR": "❌ הפעולה המהירה נכשלה: {error}",
-  
   "ADMIN_CATEGORY_MANAGEMENT": "📂 ניהול קטגוריות",
   "ADMIN_CATEGORY_MANAGEMENT_SUMMARY": "📊 <b>סקירת קטגוריות:</b>\n📂 סה\"כ קטגוריות: {total}\n📦 סה\"כ מוצרים: {products}",
   "ADMIN_CATEGORY_MANAGEMENT_ACTIONS": "🛠️ <b>פעולות זמינות:</b>",
@@ -475,7 +423,6 @@
   "ADMIN_CATEGORY_MANAGEMENT_ADD": "➕ הוסף קטגוריה חדשה",
   "ADMIN_CATEGORY_MANAGEMENT_BACK": "⬅️ חזור לניהול תפריט",
   "ADMIN_CATEGORY_BUTTON_FORMAT": "📂 {name} ({count} מוצרים)",
-  
   "CATEGORY_BREAD": "מאפים",
   "CATEGORY_SPICE": "תבלין",
   "CATEGORY_BEVERAGE": "משקה",
@@ -503,20 +450,14 @@
   "ADMIN_CATEGORY_EDIT_PROMPT": "✏️ <b>ערוך קטגוריה</b>\n\nשם נוכחי: {current_name}\n\nאנא הכנס את שם הקטגוריה החדש:",
   "ADMIN_CATEGORY_NAME_TOO_SHORT": "❌ שם הקטגוריה חייב להיות לפחות 2 תווים.",
   "ADMIN_CATEGORY_BACK_TO_MANAGEMENT": "⬅️ חזור לניהול קטגוריות",
-  
   "ADMIN_MENU_OPTIMIZED": "🚀 <b>ניהול תפריט מותאם</b>\n\nתכונות משופרות לחוויית מנהל טובה יותר:",
   "ADMIN_MENU_FEATURES": "✨ <b>תכונות חדשות:</b>\n• פעולות מהירות (החלף סטטוס, מחק)\n• ניווט משופר\n• טיפול שגיאות טוב יותר\n• פונקציית חיפוש משופרת",
-
   "ADMIN_MENU_QUICK_ACTIONS": "⚡ פעולות מהירות",
   "ADMIN_MENU_PRODUCT_MANAGEMENT": "📦 ניהול מוצרים",
   "ADMIN_MENU_CATEGORY_MANAGEMENT": "📂 ניהול קטגוריות",
   "ADMIN_MENU_BACK_TO_DASHBOARD": "⬅️ חזור ללוח בקרה",
-  
-  "ERROR_TRY_START_AGAIN": "❌ אירעה שגיאה. אנא נסה /start שוב.",
   "UNEXPECTED_ERROR": "❌ אירעה שגיאה בלתי צפויה. אנא נסה שוב.",
   "WELCOME_BACK": "ברוכים השבים, {name}!",
-  "WHAT_TO_ORDER_TODAY": "מה תרצה להזמין היום?",
-  
   "PENDING_ORDERS_ERROR": "❌ שגיאה בטעינת הזמנות ממתינות.",
   "ACTIVE_ORDERS_ERROR": "❌ שגיאה בטעינת הזמנות פעילות.",
   "ALL_ORDERS_ERROR": "❌ שגיאה בטעינת כל ההזמנות.",
@@ -527,7 +468,6 @@
   "CANCEL_ORDER": "❌ בטל הזמנה",
   "ENTER_DELIVERY_ADDRESS": "📍 הכנס כתובת משלוח",
   "VIEW_ORDER_STATUS": "📋 צפה בסטטוס הזמנה",
-  
   "ADMIN_CUSTOMERS": "👥 לקוחות",
   "ADMIN_CUSTOMERS_TITLE": "👥 <b>ניהול לקוחות</b>",
   "ADMIN_NO_CUSTOMERS": "📭 לא נמצאו לקוחות.",
@@ -547,10 +487,6 @@
   "ADMIN_CUSTOMER_AVG_ORDER": "📊 <b>ממוצע הזמנה:</b> ₪{avg:.2f}",
   "ADMIN_BACK_TO_CUSTOMERS": "⬅️ חזור ללקוחות",
   "CUSTOMER_DETAILS_ERROR": "❌ שגיאה בטעינת פרטי לקוח.",
-  
-
-
-  
   "ADMIN_MENU_MANAGEMENT": "🍽️ ניהול תפריט",
   "ADMIN_MENU_MANAGEMENT_TITLE": "🍽️ <b>ניהול תפריט</b>",
   "ADMIN_MENU_MANAGEMENT_SUMMARY": "📊 <b>סקירת תפריט:</b>\n📋 סה\"כ מוצרים: {total}\n✅ מוצרים פעילים: {active}\n❌ מוצרים בלתי פעילים: {inactive}\n📂 קטגוריות: {categories}",
@@ -569,7 +505,6 @@
   "ADMIN_EDIT_PRODUCT": "✏️ ערוך מוצר",
   "ADMIN_DELETE_PRODUCT": "🗑️ מחק מוצר",
   "ADMIN_PRODUCT_CATEGORIES": "📂 קטגוריות מוצרים",
-
   "ADMIN_BACK_TO_MENU_MANAGEMENT": "⬅️ חזור לניהול תפריט",
   "ADMIN_PRODUCTS_TITLE": "🍽️ <b>ניהול מוצרים</b>",
   "ADMIN_NO_PRODUCTS": "📭 לא נמצאו מוצרים.",
@@ -608,7 +543,6 @@
   "ADMIN_EDIT_PRODUCT_INSTRUCTIONS": "אנא ספק את פרטי המוצר המעודכנים בפורמט הבא:\n\n<code>שם: שם מוצר חדש\nתיאור: תיאור חדש\nקטגוריה: קטגוריה חדשה\nמחיר: 25.00\nסטטוס: פעיל</code>\n\nהשמט שדות שלא השתנו.",
   "ADMIN_EDIT_PRODUCT_SUCCESS": "✅ <b>המוצר עודכן בהצלחה!</b>\n\n📝 <b>שם:</b> {name}\n📄 <b>תיאור:</b> {description}\n📂 <b>קטגוריה:</b> {category}\n💰 <b>מחיר:</b> ₪{price:.2f}\n🔄 <b>סטטוס:</b> {status}",
   "ADMIN_EDIT_PRODUCT_ERROR": "❌ <b>נכשל בעדכון מוצר:</b>\n{error}",
-  
   "ADMIN_EDIT_PRODUCT_WIZARD_TITLE": "✏️ <b>אשף עריכת מוצר</b>",
   "ADMIN_EDIT_PRODUCT_CURRENT_VALUES": "📋 <b>ערכי המוצר הנוכחיים:</b>",
   "ADMIN_EDIT_PRODUCT_SELECT_FIELD": "🛠️ <b>בחר שדה לעריכה:</b>",
@@ -618,7 +552,6 @@
   "ADMIN_EDIT_PRODUCT_FIELD_PRICE": "💰 ערוך מחיר",
   "ADMIN_EDIT_PRODUCT_FIELD_STATUS": "🔄 ערוך סטטוס",
   "ADMIN_EDIT_PRODUCT_FIELD_IMAGE": "🖼️ ערוך כתובת תמונה",
-  
   "ADMIN_EDIT_PRODUCT_NAME_PROMPT": "📝 <b>ערוך שם מוצר</b>\n\nשם נוכחי: <b>{current}</b>\n\nאנא הזן את שם המוצר החדש:",
   "ADMIN_EDIT_PRODUCT_DESCRIPTION_PROMPT": "📄 <b>ערוך תיאור מוצר</b>\n\nתיאור נוכחי: <b>{current}</b>\n\nאנא הזן את התיאור החדש:",
   "ADMIN_EDIT_PRODUCT_CATEGORY_PROMPT": "📂 <b>ערוך קטגוריית מוצר</b>\n\nקטגוריה נוכחית: <b>{current}</b>\n\nאנא הזן את הקטגוריה החדשה:",
@@ -627,7 +560,6 @@
   "ADMIN_EDIT_PRODUCT_PRICE_PROMPT": "💰 <b>ערוך מחיר מוצר</b>\n\nמחיר נוכחי: <b>₪{current}</b>\n\nאנא הזן את המחיר החדש (למשל, 25.00):",
   "ADMIN_EDIT_PRODUCT_STATUS_PROMPT": "🔄 <b>ערוך סטטוס מוצר</b>\n\nסטטוס נוכחי: <b>{current}</b>\n\nאנא הזן את הסטטוס החדש (פעיל/לא פעיל):",
   "ADMIN_EDIT_PRODUCT_GENERIC_PROMPT": "✏️ <b>ערוך {field}</b>\n\nערך נוכחי: <b>{current}</b>\n\nאנא הזן את הערך החדש:",
-  
   "ADMIN_EDIT_PRODUCT_NAME_TOO_SHORT": "❌ שם המוצר קצר מדי. אנא הזן שם עם לפחות 2 תווים.",
   "ADMIN_EDIT_PRODUCT_DESCRIPTION_TOO_SHORT": "❌ תיאור המוצר קצר מדי. אנא הזן תיאור עם לפחות 5 תווים.",
   "ADMIN_EDIT_PRODUCT_CATEGORY_TOO_SHORT": "❌ קטגוריית המוצר קצרה מדי. אנא הזן קטגוריה עם לפחות 2 תווים.",
@@ -636,7 +568,6 @@
   "ADMIN_EDIT_PRODUCT_STATUS_INVALID": "❌ סטטוס לא תקין. אנא הזן 'פעיל' או 'לא פעיל'.",
   "ADMIN_EDIT_PRODUCT_IMAGE_PROMPT": "🖼️ <b>ערוך כתובת תמונת מוצר</b>\n\nכתובת תמונה נוכחית: <b>{current}</b>\n\nאנא הזן את כתובת התמונה החדשה (או השאר ריק להסרה):",
   "ADMIN_EDIT_PRODUCT_IMAGE_INVALID": "❌ כתובת תמונה לא תקינה. אנא הזן כתובת תקינה המתחילה ב-http:// או https://",
-  
   "ADMIN_EDIT_PRODUCT_CONFIRM_TITLE": "✅ <b>אשר עדכון מוצר</b>",
   "ADMIN_EDIT_PRODUCT_CONFIRM_DETAILS": "📋 <b>פרטי העדכון:</b>\n\nשדה: <b>{field}</b>\nנוכחי: <b>{current}</b>\nחדש: <b>{new}</b>\n\nהאם תרצה להחיל שינוי זה?",
   "ADMIN_EDIT_PRODUCT_CONFIRM_YES": "✅ כן, עדכן",
@@ -647,7 +578,6 @@
   "ADMIN_PRODUCT_STATUS_TOGGLE_SUCCESS": "✅ סטטוס המוצר הוחלף בהצלחה!",
   "ADMIN_PRODUCT_STATUS_TOGGLE_ERROR": "❌ נכשל בהחלפת סטטוס המוצר: {error}",
   "ADMIN_PRODUCT_UPDATE_INVALID_STATUS": "❌ סטטוס לא תקין. אנא בחר 'פעיל' או 'לא פעיל'.",
-  
   "ANALYTICS_LABEL_ORDERS": "📦 הזמנות",
   "ANALYTICS_LABEL_TOTAL_CUSTOMERS": "👥 סה\"כ לקוחות",
   "ANALYTICS_LABEL_TOTAL_CUSTOMER_REVENUE": "💰 הכנסות לקוחות",
@@ -660,14 +590,12 @@
   "ANALYTICS_LABEL_PICKUP_ORDERS": "🏪 הזמנות איסוף",
   "ANALYTICS_LABEL_CUSTOMER_REVENUE": "💰 הכנסות לקוחות",
   "ANALYTICS_INSIGHT_ORDER_VOLUME": "📊 תובנה: נפח הזמנות {trend} ב-{percentage}% בהשוואה לתקופה הקודמת",
-  
   "ADMIN_DELETE_PRODUCT_CONFIRM": "🗑️ <b>מחק מוצר</b>\n\nהאם אתה בטוח שברצונך לבטל מוצר זה?\n\n📝 <b>שם:</b> {name}\n📂 <b>קטגוריה:</b> {category}\n💰 <b>מחיר:</b> ₪{price:.2f}",
   "ADMIN_DELETE_PRODUCT_SUCCESS": "✅ <b>המוצר בוטל בהצלחה!</b>\n\nהמוצר '{name}' בוטל ולא יופיע עוד בתפריט הלקוחות.",
   "ADMIN_DELETE_PRODUCT_ERROR": "❌ <b>נכשל במחיקת מוצר:</b>\n{error}",
   "ADMIN_CATEGORIES_TITLE": "📂 <b>קטגוריות מוצרים</b>",
   "ADMIN_CATEGORIES_LIST": "📋 <b>קטגוריות זמינות:</b>",
   "ADMIN_NO_CATEGORIES": "📭 לא נמצאו קטגוריות מוצרים.",
-
   "ADMIN_PRODUCT_ACTIONS": "🛠️ <b>פעולות מוצר:</b>",
   "ADMIN_PRODUCT_EDIT": "✏️ ערוך",
   "ADMIN_PRODUCT_DELETE": "🗑️ מחק",
@@ -718,7 +646,6 @@
   "ADMIN_PRODUCT_FILTER_ACTIVE": "✅ פעילים בלבד",
   "ADMIN_PRODUCT_FILTER_INACTIVE": "❌ בלתי פעילים בלבד",
   "ADMIN_PRODUCT_FILTER_BY_CATEGORY": "📂 סנן לפי קטגוריה",
-
   "ADMIN_PRODUCT_CATEGORY_EMPTY": "אין מוצרים בקטגוריה זו.",
   "ADMIN_PRODUCT_CATEGORY_COUNT": "{category}: {count} מוצר(ים)",
   "ADMIN_CATEGORY_TOTAL_COUNT": "סה\"כ קטגוריות: {count}",
@@ -745,7 +672,6 @@
   "ADMIN_CATEGORY_DELETE_ERROR": "❌ <b>נכשל במחיקת קטגוריה:</b> {error}",
   "ADMIN_PRODUCT_ACTIVE_COUNT": "פעילים: {count} מוצר(ים)",
   "ADMIN_PRODUCT_INACTIVE_COUNT": "בלתי פעילים: {count} מוצר(ים)",
-
   "ADMIN_REMOVE_PRODUCTS_TITLE": "🗑️ <b>הסר מוצרים</b>",
   "ADMIN_REMOVE_PRODUCT_CONFIRM": "⚠️ <b>אשר הסרת מוצר</b>\n\nהאם אתה בטוח שברצונך להסיר מוצר זה?\n\n📋 <b>מוצר:</b> {name}\n📂 <b>קטגוריה:</b> {category}\n💰 <b>מחיר:</b> ₪{price}\n\nפעולה זו לא ניתנת לביטול!",
   "ADMIN_REMOVE_PRODUCT_ERROR": "❌ שגיאה בהסרת מוצר: {error}",
@@ -769,14 +695,10 @@
   "ANALYTICS_LABEL_PRODUCT_REVENUE": "הכנסות מוצרים",
   "ANALYTICS_INSIGHT_DAILY_REVENUE": "דפוסי הכנסות יומיות מראים ביצועי עסק",
   "ANALYTICS_INSIGHT_COMPARE_PERIODS": "השווה עם תקופות קודמות לניתוח צמיחה",
-
   "ADMIN_QUICK_TOGGLE_SUCCESS": "✅ סטטוס המוצר השתנה ל: {status}",
   "ADMIN_QUICK_TOGGLE_ERROR": "❌ נכשל בהחלפת סטטוס: {error}",
   "ADMIN_QUICK_DELETE_SUCCESS": "✅ המוצר נמחק בהצלחה!",
   "ADMIN_QUICK_DELETE_ERROR": "❌ נכשל במחיקת מוצר: {error}",
-  
-
-  
   "STATUS_PENDING": "⏳ ממתין",
   "STATUS_CONFIRMED": "✅ אושר",
   "STATUS_PREPARING": "👨‍🍳 בהכנה",

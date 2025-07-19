@@ -112,7 +112,7 @@
   "CART_CLEAR_ERROR": "❌ Error clearing cart: {error}",
   "WELCOME_BACK": "👋 Hello {name}, great to see you again! 🎉",
   "WHAT_TO_ORDER_TODAY": "What would you like to order today?",
-  "WELCOME_NEW_USER": "🇾🇪 Welcome to Samna Salta! 🍞",
+  "WELCOME_NEW_USER": "Welcome to {business_name}!",
   "WELCOME_HELP_MESSAGE": "I'm here to help you order our delicious traditional Yemeni products. Let's get started!",
   "PROFILE_INCOMPLETE": "⚠️ Your profile is incomplete",
   "PLEASE_COMPLETE_PROFILE": "Please complete your profile information to continue.",
@@ -247,7 +247,6 @@
   "ADMIN_MULTILINGUAL_GENERIC_PROMPT": "🌐 <b>Enter Content</b>\n\nPlease enter the content in your preferred language. The system will automatically detect the language and store it appropriately.",
   "ADMIN_MULTILINGUAL_HEBREW_INSTRUCTIONS": "💡 <b>Instructions:</b>\n• You can enter content in Hebrew or English\n• The system will automatically detect the language\n• Content will be displayed to users in their preferred language\n• You can add translations later through the admin interface",
   "ADMIN_MULTILINGUAL_ENGLISH_INSTRUCTIONS": "💡 <b>Instructions:</b>\n• You can enter content in Hebrew or English\n• The system will automatically detect the language\n• Content will be displayed to users in their preferred language\n• You can add translations later through the admin interface",
-  
   "ADMIN_MENU_MANAGEMENT": "🍽️ Menu Management",
   "ADMIN_MENU_MANAGEMENT_TITLE": "🍽️ <b>Menu Management</b>",
   "ADMIN_MENU_MANAGEMENT_SUMMARY": "📊 <b>Menu Overview:</b>\n📋 Total Products: {total}\n✅ Active Products: {active}\n❌ Inactive Products: {inactive}\n📂 Categories: {categories}",
@@ -266,7 +265,6 @@
   "ADMIN_EDIT_PRODUCT": "✏️ Edit Product",
   "ADMIN_DELETE_PRODUCT": "🗑️ Delete Product",
   "ADMIN_PRODUCT_CATEGORIES": "📂 Product Categories",
-
   "ADMIN_BACK_TO_MENU_MANAGEMENT": "⬅️ Back to Menu Management",
   "ADMIN_PRODUCTS_TITLE": "🍽️ <b>Product Management</b>",
   "ADMIN_NO_PRODUCTS": "📭 No products found.",
@@ -305,7 +303,6 @@
   "ADMIN_EDIT_PRODUCT_INSTRUCTIONS": "Please provide the updated product details in the following format:\n\n<code>Name: New Product Name\nDescription: New description\nCategory: New category\nPrice: 25.00\nStatus: active</code>\n\nLeave fields unchanged by omitting them.",
   "ADMIN_EDIT_PRODUCT_SUCCESS": "✅ <b>Product Updated Successfully!</b>\n\n📝 <b>Name:</b> {name}\n📄 <b>Description:</b> {description}\n📂 <b>Category:</b> {category}\n💰 <b>Price:</b> ₪{price:.2f}\n🔄 <b>Status:</b> {status}",
   "ADMIN_EDIT_PRODUCT_ERROR": "❌ <b>Failed to update product:</b>\n{error}",
-  
   "ADMIN_EDIT_PRODUCT_WIZARD_TITLE": "✏️ <b>Edit Product Wizard</b>",
   "ADMIN_EDIT_PRODUCT_CURRENT_VALUES": "📋 <b>Current Product Values:</b>",
   "ADMIN_EDIT_PRODUCT_SELECT_FIELD": "🛠️ <b>Select a field to edit:</b>",
@@ -315,7 +312,6 @@
   "ADMIN_EDIT_PRODUCT_FIELD_PRICE": "💰 Edit Price",
   "ADMIN_EDIT_PRODUCT_FIELD_STATUS": "🔄 Edit Status",
   "ADMIN_EDIT_PRODUCT_FIELD_IMAGE": "🖼️ Edit Image URL",
-  
   "ADMIN_EDIT_PRODUCT_NAME_PROMPT": "📝 <b>Edit Product Name</b>\n\nCurrent name: <b>{current}</b>\n\nPlease enter the new product name:",
   "ADMIN_EDIT_PRODUCT_DESCRIPTION_PROMPT": "📄 <b>Edit Product Description</b>\n\nCurrent description: <b>{current}</b>\n\nPlease enter the new product description:",
   "ADMIN_EDIT_PRODUCT_CATEGORY_PROMPT": "📂 <b>Edit Product Category</b>\n\nCurrent category: <b>{current}</b>\n\nPlease enter the new product category:",
@@ -324,7 +320,6 @@
   "ADMIN_EDIT_PRODUCT_PRICE_PROMPT": "💰 <b>Edit Product Price</b>\n\nCurrent price: <b>₪{current}</b>\n\nPlease enter the new price (e.g., 25.00):",
   "ADMIN_EDIT_PRODUCT_STATUS_PROMPT": "🔄 <b>Edit Product Status</b>\n\nCurrent status: <b>{current}</b>\n\nPlease enter the new status (active/inactive):",
   "ADMIN_EDIT_PRODUCT_GENERIC_PROMPT": "✏️ <b>Edit {field}</b>\n\nCurrent value: <b>{current}</b>\n\nPlease enter the new value:",
-  
   "ADMIN_EDIT_PRODUCT_NAME_TOO_SHORT": "❌ Product name is too short. Please enter a name with at least 2 characters.",
   "ADMIN_EDIT_PRODUCT_DESCRIPTION_TOO_SHORT": "❌ Product description is too short. Please enter a description with at least 5 characters.",
   "ADMIN_EDIT_PRODUCT_CATEGORY_TOO_SHORT": "❌ Product category is too short. Please enter a category with at least 2 characters.",
@@ -333,7 +328,6 @@
   "ADMIN_EDIT_PRODUCT_STATUS_INVALID": "❌ Invalid status. Please enter 'active' or 'inactive'.",
   "ADMIN_EDIT_PRODUCT_IMAGE_PROMPT": "🖼️ <b>Edit Product Image URL</b>\n\nCurrent image URL: <b>{current}</b>\n\nPlease enter the new image URL (or leave empty to remove):",
   "ADMIN_EDIT_PRODUCT_IMAGE_INVALID": "❌ Invalid image URL. Please enter a valid URL starting with http:// or https://",
-  
   "ADMIN_EDIT_PRODUCT_CONFIRM_TITLE": "✅ <b>Confirm Product Update</b>",
   "ADMIN_EDIT_PRODUCT_CONFIRM_DETAILS": "📋 <b>Update Details:</b>\n\nField: <b>{field}</b>\nCurrent: <b>{current}</b>\nNew: <b>{new}</b>\n\nDo you want to apply this change?",
   "ADMIN_EDIT_PRODUCT_CONFIRM_YES": "✅ Yes, Update",
@@ -346,7 +340,6 @@
   "ADMIN_CATEGORIES_TITLE": "📂 <b>Product Categories</b>",
   "ADMIN_CATEGORIES_LIST": "📋 <b>Available Categories:</b>",
   "ADMIN_NO_CATEGORIES": "📭 No categories found.",
-
   "ADMIN_PRODUCT_ACTIONS": "🛠️ <b>Product Actions:</b>",
   "ADMIN_PRODUCT_EDIT": "✏️ Edit",
   "ADMIN_PRODUCT_DELETE": "🗑️ Delete",
@@ -401,10 +394,8 @@
   "ADMIN_PRODUCT_FILTER_ACTIVE": "✅ Active Only",
   "ADMIN_PRODUCT_FILTER_INACTIVE": "❌ Inactive Only",
   "ADMIN_PRODUCT_FILTER_BY_CATEGORY": "📂 Filter by Category",
-
   "ADMIN_PRODUCT_CATEGORY_EMPTY": "No products in this category.",
   "ADMIN_PRODUCT_CATEGORY_COUNT": "{category}: {count} product(s)",
-  "ADMIN_CATEGORIES_TITLE": "📂 <b>Product Categories</b>",
   "ADMIN_CATEGORY_TOTAL_COUNT": "Total categories: {count}",
   "ADMIN_NO_CATEGORIES": "📭 No product categories found.",
   "ADMIN_PRODUCTS_IN_CATEGORY_TITLE": "📂 <b>Products in {category}</b>\n\nTotal products: {count}",
@@ -419,7 +410,6 @@
   "ADMIN_CATEGORY_MANAGEMENT_ADD": "➕ Add New Category",
   "ADMIN_CATEGORY_MANAGEMENT_BACK": "⬅️ Back to Menu Management",
   "ADMIN_CATEGORY_BUTTON_FORMAT": "📂 {name} ({count} products)",
-  
   "CATEGORY_BREAD": "Bread",
   "CATEGORY_SPICE": "Spice",
   "CATEGORY_BEVERAGE": "Beverage",
@@ -449,7 +439,6 @@
   "ADMIN_CATEGORY_DELETE_ERROR": "❌ <b>Failed to delete category:</b> {error}",
   "ADMIN_PRODUCT_ACTIVE_COUNT": "Active: {count} product(s)",
   "ADMIN_PRODUCT_INACTIVE_COUNT": "Inactive: {count} product(s)",
-
   "ADMIN_REMOVE_PRODUCTS_TITLE": "🗑️ <b>Remove Products</b>",
   "ADMIN_REMOVE_PRODUCT_CONFIRM": "⚠️ <b>Confirm Product Removal</b>\n\nAre you sure you want to remove this product?\n\n📋 <b>Product:</b> {name}\n📂 <b>Category:</b> {category}\n💰 <b>Price:</b> ₪{price}\n\nThis action cannot be undone!",
   "ADMIN_REMOVE_PRODUCT_ERROR": "❌ Error removing product: {error}",
@@ -505,7 +494,6 @@
   "BACK_TO_CART_VIEW": "⬅️ Back to Cart",
   "CART_EDIT_MODE_INSTRUCTIONS": "Use the controls below to edit your cart items:",
   "CART_EDIT_MODE_TITLE": "✏️ Edit Cart Items",
-  
   "KUBANEH_DESC": "🍞 <b>Kubaneh</b>\n\nChoose your preferred kubaneh type:\n\n• <b>Classic</b> - Traditional rich Yemeni bread\n• <b>Seeded</b> - With sesame and cumin seeds\n• <b>Herb</b> - With aromatic herbs\n• <b>Aromatic</b> - With special spices\n\n<i>Price: 25 ₪ per unit</i>",
   "SAMNEH_DESC": "🧈 <b>Samneh</b>\n\nChoose your preferred samneh type:\n\n• <b>Smoked</b> - Rich smoky flavor\n• <b>Not Smoked</b> - Pure and natural\n\n<i>Price: 15 ₪</i>",
   "RED_BISBAS_DESC": "🌶️ <b>Red Bisbas</b>\n\nTraditional Yemeni spicy sauce - perfect for adding heat to your dishes!\n\n<i>Price: 12 ₪</i>",
@@ -514,12 +502,10 @@
   "HAWAIJ_SOUP_DESC": "🥘 <b>Hawaij for Soup</b>\n\nPerfect Yemeni spice blend for soups and stews - adds authentic flavor!\n\n<i>Price: 8 ₪</i>",
   "HAWAIJ_COFFEE_DESC": "☕ <b>Hawaij for Coffee</b>\n\nYemeni spice blend for coffee - transforms your coffee experience!\n\n<i>Price: 8 ₪</i>",
   "WHITE_COFFEE_DESC": "Traditional Yemenite white coffee, made with cardamom and spices for a unique aromatic experience.",
-  
   "INVALID_PRODUCT_SELECTION": "❌ Invalid product selection. Please try again",
   "ADD_SUCCESS": "✅ <b>{item} added to cart!</b>\n\n🛒 Cart total: ₪{total:.2f}\n📦 Items in cart: {count}",
   "ADD_FAILURE": "❌ Could not add {item} to cart\n\nError: {error}",
   "ADD_ERROR": "❌ An error occurred while adding to cart. Please try again",
-  
   "MENU_FUNCTIONALITY_AVAILABLE": "Menu functionality is working perfectly!",
   "MENU_ERROR_OCCURRED": "❌ An error occurred while loading the menu. Please try again.",
   "AVAILABILITY_CHECK_ERROR": "❌ {error}",
@@ -541,16 +527,12 @@
   "CUSTOMER_ORDER_ITEM_LINE": "• {name} x{quantity} - ₪{price:.2f}",
   "CUSTOMER_ORDER_NOT_FOUND": "❌ Order not found or you don't have access to it.",
   "CUSTOMER_ORDERS_ERROR": "❌ Error loading your orders. Please try again.",
-  "LANGUAGE_CHANGED": "✅ Language changed successfully!",
   "CURRENT_LANGUAGE": "Current Language",
   "SELECT_LANGUAGE_PROMPT": "🌐 <b>Select your preferred language:</b>",
   "ORDER_DETAILS_ERROR": "Error loading order details",
   "ORDER_DETAILS_HEADER": "📋 <b>Order Details:</b>",
   "ORDER_NUMBER_FIELD": "🔢 Order Number:",
   "STATUS_FIELD": "Status:",
-  
-
-
   "DATE_FIELD": "📅 Date:",
   "CUSTOMER_INFO_HEADER": "👤 <b>Customer Info:</b>",
   "NAME_FIELD": "👨‍💼 Name:",
@@ -567,38 +549,20 @@
   "RED_BISBAS_LARGE": "Large",
   "RED_BISBAS_XL": "Extra Large",
   "HILBEH_DISPLAY_NAME": "Hilbeh ({type})",
-  
-  "KUBANEH_CLASSIC": "Classic",
   "KUBANEH_SEEDED": "Seeded", 
-  "KUBANEH_HERB": "Herb",
-  "KUBANEH_AROMATIC": "Aromatic",
-  
   "SAMNEH_CLASSIC": "Classic",
   "SAMNEH_SPICY": "Spicy",
   "SAMNEH_HERB": "Herb",
   "SAMNEH_HONEY": "Honey",
-  "SAMNEH_SMOKED": "Smoked",
-  "SAMNEH_NOT_SMOKED": "Not Smoked",
-  
   "HILBEH_CLASSIC": "Classic",
   "HILBEH_SPICY": "Spicy",
   "HILBEH_SWEET": "Sweet",
   "HILBEH_PREMIUM": "Premium",
-  
-  "SIZE_SMALL": "Small",
-  "SIZE_MEDIUM": "Medium",
-  "SIZE_LARGE": "Large",
-  "SIZE_XL": "Extra Large",
   "PLEASE_ENTER_DELIVERY_ADDRESS_ONBOARDING": "📍 <b>Delivery Address</b> 📍",
   "REGISTRATION_COMPLETE": "✅ <b>Registration Complete!</b> ✅",
   "DELIVERY_ADDRESS_SAVED_ONBOARDING": "📍 <b>Delivery Address Saved:</b> {address}",
   "UNKNOWN_COMMAND_ONBOARDING": "❌ Unknown command. Please follow the instructions or use /cancel to stop.",
   "UNKNOWN_MESSAGE_ONBOARDING": "❌ Please provide the requested information or use /cancel to stop.",
-  "DELIVERY_ADDRESS_ONBOARDING_HELP": "Please enter your delivery address. This will be saved for future orders and you can change it anytime in your profile.",
-  "ADDRESS_TOO_SHORT": "❌ Address is too short. Please enter a complete address (at least 5 characters).",
-  "WELCOME_NEW_USER": "🇾🇪 Welcome to Samna Salta! 🍞",
-  "WELCOME_HELP_MESSAGE": "I'm here to help you order our delicious traditional Yemeni products. Let's get started!",
-  
   "DELIVERY_ADDRESS_CURRENT": "📍 <b>Current Delivery Address:</b> {address}",
   "DELIVERY_ADDRESS_PROMPT": "Please enter your delivery address:",
   "CLEAR_CART": "🗑️ Clear Cart",
@@ -606,7 +570,6 @@
   "CLEAR_CART_NO": "❌ No, Keep Items",
   "CHANGE_DELIVERY": "🚚 Change Delivery",
   "CLEAR_CART_CONFIRMATION": "🗑️ <b>Clear Cart Confirmation</b>\n\nAre you sure you want to clear all items from your cart? This action cannot be undone.",
-  "LANGUAGE_BUTTON": "🌐 Change Language",
   "MY_INFO_LANGUAGE_SECTION": "🌐 <b>Language Settings</b>\n\nCurrent language: {current_language}\n\nYou can change your language preference here:",
   "LANGUAGE_CHANGE_SUCCESS": "✅ <b>Language Updated!</b>\n\nYour language preference has been changed to {language}.",
   "LANGUAGE_CHANGE_ERROR": "❌ Failed to update language. Please try again.",
@@ -616,13 +579,11 @@
   "BACK_TO_HELP": "⬅️ Back to Help",
   "CONTACT_SUPPORT": "📞 Contact Support",
   "SUPPORT_MESSAGE": "📞 <b>Contact Support</b>\n\nFor immediate assistance, please contact us:\n\n📱 <b>Phone:</b> [Your phone number]\n📧 <b>Email:</b> [Your email]\n⏰ <b>Hours:</b> Wednesday-Friday, 9:00 AM - 6:00 PM\n\nWe'll get back to you as soon as possible!",
-  
   "DELIVERY_ADDRESS_REQUIRED": "Please provide your delivery address to continue with delivery orders.",
   "ADMIN_NO_ORDERS_FOUND": "📭 No orders found.",
   "CANCEL_ORDER": "❌ Cancel Order",
   "ENTER_DELIVERY_ADDRESS": "📍 Enter Delivery Address",
   "VIEW_ORDER_STATUS": "📋 View Order Status",
-  
   "ANALYTICS_LABEL_PENDING": "Pending",
   "ANALYTICS_LABEL_ACTIVE": "Active", 
   "ANALYTICS_LABEL_COMPLETED": "Completed",
@@ -674,9 +635,6 @@
   "ADMIN_CUSTOMER_AVG_ORDER": "📊 <b>Average Order Value:</b> ₪{avg:.2f}",
   "ADMIN_BACK_TO_CUSTOMERS": "⬅️ Back to Customers",
   "CUSTOMER_DETAILS_ERROR": "❌ Error loading customer details. Please try again.",
-  
-
-  
   "QUICK_ADD_SUCCESS": "✅ {name} added to cart successfully!",
   "QUICK_ADD_ERROR": "❌ Failed to add {name}: {error}",
   "PRODUCT_NOT_FOUND": "❌ Product not found.",
@@ -687,14 +645,8 @@
   "NO_DESCRIPTION": "No description available",
   "UNCATEGORIZED": "Uncategorized",
   "ADD_TO_CART": "🛒 Add to Cart",
-  
   "CATEGORY_TITLE": "📂 <b>{category}</b>\n\nTotal products: {count}",
   "CATEGORY_EMPTY": "📂 <b>Category: {category}</b>\n\nThis category is currently empty.",
-  
-  "MENU_ERROR_OCCURRED": "❌ An error occurred while loading the menu. Please try again.",
-  
-
-  
   "ADMIN_QUICK_TOGGLE_SUCCESS": "✅ Product status changed to: {status}",
   "ADMIN_QUICK_TOGGLE_ERROR": "❌ Failed to toggle status: {error}",
   "ADMIN_QUICK_DELETE_SUCCESS": "✅ Product deleted successfully!",
