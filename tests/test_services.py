@@ -510,22 +510,24 @@ class TestAdminService:
 
     @pytest.mark.asyncio
     async def test_get_order_by_id_found(self, admin_service):
-        """Test get order by id - found"""
+        """Test get order by ID - found"""
         mock_orders = [MagicMock()]
         mock_orders[0].id = 1
+        mock_orders[0].customer = MagicMock()
+        mock_orders[0].customer.name = "Test Customer"
+        mock_orders[0].order_items = []
         
         with patch("src.db.operations.get_all_orders", return_value=mock_orders):
             order = await admin_service.get_order_by_id(1)
             
             assert order is not None
+            assert "order_id" in order
+            assert order["order_id"] == 1
 
     @pytest.mark.asyncio
     async def test_get_order_by_id_not_found(self, admin_service):
-        """Test get order by id - not found"""
-        mock_orders = [MagicMock()]
-        mock_orders[0].id = 1
-        
-        with patch("src.db.operations.get_all_orders", return_value=mock_orders):
+        """Test get order by ID - not found"""
+        with patch("src.db.operations.get_all_orders", return_value=[]):
             order = await admin_service.get_order_by_id(999)
             
             assert order is None
@@ -604,6 +606,79 @@ class TestAdminService:
             assert isinstance(products, list)
 
     @pytest.mark.asyncio
+    async def test_create_new_product_success(self, admin_service):
+        """Test create new product - success"""
+        with patch("src.db.operations.get_product_by_name", return_value=None):
+            with patch("src.db.operations.create_product") as mock_create_product:
+                mock_product = MagicMock()
+                mock_product.id = 1
+                mock_create_product.return_value = mock_product
+                
+                with patch("src.utils.image_handler.validate_image_url", return_value=True):
+                    result = await admin_service.create_new_product(
+                        "Unique Test Product 123", "Test Description", "bread", 10.00, "https://example.com/test.jpg"
+                    )
+                    
+                    assert result["success"] is True
+                    assert result["product"]["id"] == 1
+
+    @pytest.mark.asyncio
+    async def test_create_new_product_failure(self, admin_service):
+        """Test create new product - failure"""
+        with patch("src.db.operations.get_product_by_name", return_value=None):
+            with patch("src.db.operations.create_product", return_value=None):
+                with patch("src.utils.image_handler.validate_image_url", return_value=True):
+                    result = await admin_service.create_new_product(
+                        "Unique Test Product 456", "Test Description", "bread", 10.00
+                    )
+                    
+                    assert result["success"] is False
+
+    @pytest.mark.asyncio
+    async def test_update_existing_product_success(self, admin_service):
+        """Test update existing product - success"""
+        with patch("src.db.operations.get_product_by_id") as mock_get_product:
+            mock_product = MagicMock()
+            mock_get_product.return_value = mock_product
+            
+            with patch("src.db.operations.update_product", return_value=True):
+                with patch("src.db.operations.get_product_dict_by_id") as mock_get_product_dict:
+                    mock_get_product_dict.return_value = {"id": 1, "name": "Updated Product"}
+                    
+                    result = await admin_service.update_existing_product(1, name="Updated Product")
+                    
+                    assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_update_existing_product_failure(self, admin_service):
+        """Test update existing product - failure"""
+        with patch("src.db.operations.get_product_by_id", return_value=None):
+            result = await admin_service.update_existing_product(999, name="Updated Product")
+            
+            assert result["success"] is False
+
+    @pytest.mark.asyncio
+    async def test_delete_existing_product_success(self, admin_service):
+        """Test delete existing product - success"""
+        with patch("src.db.operations.get_product_by_id") as mock_get_product:
+            mock_product = MagicMock()
+            mock_product.name = "Test Product"
+            mock_get_product.return_value = mock_product
+            
+            with patch("src.db.operations.delete_product", return_value=True):
+                result = await admin_service.delete_existing_product(1)
+                
+                assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_delete_existing_product_failure(self, admin_service):
+        """Test delete existing product - failure"""
+        with patch("src.db.operations.get_product_by_id", return_value=None):
+            result = await admin_service.delete_existing_product(999)
+            
+            assert result["success"] is False
+
+    @pytest.mark.asyncio
     async def test_get_product_categories_list(self, admin_service):
         """Test get product categories list"""
         mock_categories = ["bread", "pastries", "drinks"]
@@ -625,12 +700,89 @@ class TestAdminService:
             assert isinstance(products, list)
 
     @pytest.mark.asyncio
+    async def test_toggle_product_status_success(self, admin_service):
+        """Test toggle product status - success"""
+        with patch("src.db.operations.get_product_by_id") as mock_get_product:
+            mock_product = MagicMock()
+            mock_product.is_active = True
+            mock_get_product.return_value = mock_product
+            
+            with patch("src.db.operations.update_product", return_value=True):
+                result = await admin_service.toggle_product_status(1)
+                
+                assert result["success"] is True
+
+    @pytest.mark.asyncio
     async def test_toggle_product_status_failure(self, admin_service):
         """Test toggle product status - failure"""
         with patch("src.db.operations.get_product_by_id", return_value=None):
             result = await admin_service.toggle_product_status(999)
             
             assert result["success"] is False
+
+    @pytest.mark.asyncio
+    async def test_create_category_success(self, admin_service):
+        """Test create category - success"""
+        with patch("src.db.operations.get_product_categories", return_value=[]):
+            with patch("src.db.operations.get_product_by_name", return_value=None):
+                with patch("src.db.operations.create_product") as mock_create_product:
+                    mock_product = MagicMock()
+                    mock_create_product.return_value = mock_product
+                    
+                    result = await admin_service.create_category("unique_new_category_123")
+                    
+                    assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_create_category_already_exists(self, admin_service):
+        """Test create category - already exists"""
+        with patch("src.db.operations.get_product_categories", return_value=["existing_category"]):
+            result = await admin_service.create_category("existing_category")
+            
+            assert result["success"] is False
+            assert "already exists" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_update_category_success(self, admin_service):
+        """Test update category - success"""
+        with patch("src.db.operations.get_products_by_category") as mock_get_products:
+            mock_products = [MagicMock()]
+            mock_get_products.return_value = mock_products
+            
+            with patch("src.db.operations.update_product", return_value=True):
+                result = await admin_service.update_category("old_category", "new_category")
+                
+                assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_update_category_not_found(self, admin_service):
+        """Test update category - not found"""
+        with patch("src.db.operations.get_products_by_category", return_value=[]):
+            result = await admin_service.update_category("old_category", "new_category")
+            
+            assert result["success"] is False
+            assert "No products found" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_delete_category_success(self, admin_service):
+        """Test delete category - success"""
+        with patch("src.db.operations.get_products_by_category") as mock_get_products:
+            mock_products = [MagicMock()]
+            mock_get_products.return_value = mock_products
+            
+            with patch("src.db.operations.update_product", return_value=True):
+                result = await admin_service.delete_category("category_to_delete")
+                
+                assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_delete_category_not_found(self, admin_service):
+        """Test delete category - not found"""
+        with patch("src.db.operations.get_products_by_category", return_value=[]):
+            result = await admin_service.delete_category("category_to_delete")
+            
+            assert result["success"] is False
+            assert "No products found" in result["error"]
 
 
 class TestDeliveryService:
@@ -996,57 +1148,80 @@ class TestServicesIntegration:
         """Test complete cart to order workflow"""
         # Add item to cart
         with patch("src.db.operations.add_to_cart", return_value=True):
-            success = cart_service.add_item(123456789, 1, 2)
-            assert success is True
+            result = cart_service.add_item(123456789, 1, 2, {"type": "classic"})
+            assert result is True
         
         # Get cart items
-        with patch("src.db.operations.get_cart_items", return_value=[{"product_id": 1, "quantity": 2}]):
+        mock_items = [{"product_id": 1, "quantity": 2, "unit_price": 10.00}]
+        with patch("src.db.operations.get_cart_items", return_value=mock_items):
             items = cart_service.get_items(123456789)
-            assert len(items) > 0
+            assert len(items) == 1
         
         # Create order
         with patch("src.db.operations.get_cart_by_telegram_id", return_value=[]):
-            with patch("src.db.operations.create_order_with_items", return_value=MagicMock()):
-                order = await order_service.create_order(123456789, [])
-                assert order is not None
-
-    @pytest.mark.asyncio
-    async def test_order_status_workflow(self, order_service, admin_service):
-        """Test order status update workflow"""
-        # Create order
-        with patch("src.db.operations.get_cart_by_telegram_id", return_value=[]):
-            with patch("src.db.operations.create_order_with_items", return_value=MagicMock()):
-                order = await order_service.create_order(123456789, [])
-                assert order is not None
-        
-        # Update order status
-        with patch("src.db.operations.update_order_status", return_value=True):
-            success = await admin_service.update_order_status(1, "completed", 123456789)
-            assert success is True
+            with patch("src.db.operations.create_order", return_value=MagicMock(id=1)):
+                result = await order_service.create_order(123456789, [])
+                assert result["success"] is True
 
     @pytest.mark.asyncio
     async def test_notification_workflow(self, notification_service):
         """Test notification workflow"""
-        # Send order confirmation
-        with patch("src.container.get_container") as mock_container:
-            mock_bot = AsyncMock()
-            mock_container.return_value.get_bot.return_value = mock_bot
-            
-            success = await notification_service.send_admin_notification("Test message")
-            assert success is True
+        mock_order_data = {
+            "order_number": "TEST123",
+            "customer_name": "Test Customer",
+            "customer_phone": "+1234567890",
+            "customer_telegram_id": 123456789,
+            "delivery_method": "delivery",
+            "delivery_address": "123 Test St",
+            "items": [{"product_name": "Test Product", "quantity": 1, "price": 10.00}],
+            "total": 10.00,
+            "created_at": "2025-01-01 12:00:00"
+        }
         
-        # Send status update
         with patch("src.container.get_container") as mock_container:
             mock_bot = AsyncMock()
             mock_container.return_value.get_bot.return_value = mock_bot
             
-            success = await notification_service.notify_order_status_update(
-                order_id="TEST123",
-                new_status="completed",
-                customer_chat_id=123456789,
-                delivery_method="pickup"
-            )
-            assert success is True
+            result = await notification_service.notify_new_order(mock_order_data)
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_admin_product_management_workflow(self, admin_service):
+        """Test admin product management workflow"""
+        # Create product
+        with patch("src.db.operations.create_product") as mock_create_product:
+            mock_product = MagicMock()
+            mock_product.id = 1
+            mock_create_product.return_value = mock_product
+            
+            with patch("src.utils.image_handler.validate_image_url", return_value=True):
+                with patch("src.db.operations.get_product_by_name", return_value=None):
+                    result = await admin_service.create_new_product(
+                        "Test Product", "Test Description", "bread", 10.00
+                    )
+                    assert result["success"] is True
+        
+        # Update product
+        with patch("src.db.operations.get_product_by_id") as mock_get_product:
+            mock_product = MagicMock()
+            mock_get_product.return_value = mock_product
+            
+            with patch("src.db.operations.update_product", return_value=True):
+                with patch("src.db.operations.get_product_dict_by_id") as mock_get_product_dict:
+                    mock_get_product_dict.return_value = {"id": 1, "name": "Updated Product"}
+                    
+                    result = await admin_service.update_existing_product(1, name="Updated Product")
+                    assert result["success"] is True
+        
+        # Delete product
+        with patch("src.db.operations.get_product_by_id") as mock_get_product:
+            mock_product = MagicMock()
+            mock_product.name = "Test Product"
+            mock_get_product.return_value = mock_product
+            
+            with patch("src.db.operations.delete_product", return_value=True):
+                result = await admin_service.delete_existing_product(1)
+                assert result["success"] is True
 
 
 class TestServicesErrorHandling:

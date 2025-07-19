@@ -157,7 +157,7 @@ class Cart(Base):
     customer_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("customers.id"), nullable=True, unique=True
     )
-    is_active: Mapped[Optional[bool]] = mapped_column(Boolean, default=True, nullable=True, unique=True)
+    is_active: Mapped[Optional[bool]] = mapped_column(Boolean, default=True, nullable=True)
     created_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=True
     )

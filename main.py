@@ -9,6 +9,10 @@ import logging
 import os
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -125,20 +129,29 @@ def run_polling():
     try:
         application = setup_bot()
         
-        # Clean up any existing webhook before polling
-        import asyncio
-        asyncio.run(cleanup_webhook(application.bot))
-        
         print("✅ Bot started successfully!")
         print("📱 Send /start to your bot in Telegram to test it!")
         print("🛑 Press Ctrl+C to stop the bot")
         
         # Start polling (this will run until interrupted)
         try:
-            # Use the standard polling method
-            application.run_polling()
-        except KeyboardInterrupt:
-            print("\n🛑 Bot stopped by user")
+            # Use asyncio.run() for proper event loop handling in Python 3.11
+            async def run_bot():
+                await application.initialize()
+                await application.start()
+                await application.updater.start_polling()
+                try:
+                    # Keep the bot running
+                    await asyncio.Event().wait()
+                except KeyboardInterrupt:
+                    print("\n🛑 Bot stopped by user")
+                finally:
+                    await application.updater.stop()
+                    await application.stop()
+                    await application.shutdown()
+            
+            asyncio.run(run_bot())
+            
         except Exception as polling_error:
             logging.getLogger(__name__).error(f"Error during polling: {polling_error}")
             raise

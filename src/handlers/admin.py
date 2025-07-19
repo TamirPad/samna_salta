@@ -2155,12 +2155,10 @@ class AdminHandler:
                 await self._show_all_products(query)
             elif data == "admin_product_back_to_management":
                 await self._show_products_management(query)
-            elif data == "admin_product_yes_delete":
+            elif data.startswith("admin_product_yes_delete_"):
                 # Handle delete confirmation
-                context = query.data.split("_")[-1] if "_" in query.data else None
-                if context and context.isdigit():
-                    product_id = int(context)
-                    await self._delete_product(query, product_id)
+                product_id = int(data.split("_")[-1])
+                await self._delete_product(query, product_id)
             elif data == "admin_product_no_delete":
                 await self._show_all_products(query)
             elif data.startswith("admin_remove_yes_"):
