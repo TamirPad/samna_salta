@@ -60,8 +60,11 @@ class Customer(Base):
 
     @property
     def phone_number(self) -> Optional[str]:
-        """Backward compatibility property for phone"""
+        """Get phone number for backward compatibility"""
         return self.phone
+
+    def __str__(self) -> str:
+        return f"<Customer(id={self.id}, telegram_id={self.telegram_id}, name='{self.name}')>"
 
 
 class MenuCategory(Base):
@@ -84,6 +87,14 @@ class MenuCategory(Base):
 
     # Relationships
     products: Mapped[List["Product"]] = relationship("Product", back_populates="category_rel")
+    
+    @property
+    def display_name(self) -> str:
+        """Get display name for the category"""
+        return self.name.title()
+
+    def __str__(self) -> str:
+        return f"<MenuCategory(id={self.id}, name='{self.name}')>"
 
 
 class Product(Base):
@@ -125,6 +136,16 @@ class Product(Base):
     def category(self) -> Optional[str]:
         """Get category name for backward compatibility"""
         return self.category_rel.name if self.category_rel else None
+    
+    @category.setter
+    def category(self, value: Optional[str]):
+        """Set category name for backward compatibility"""
+        # This is a read-only property for backward compatibility
+        # To set category, use category_rel relationship directly
+        pass
+
+    def __str__(self) -> str:
+        return f"<Product(id={self.id}, name='{self.name}')>"
 
 
 class Cart(Base):
@@ -155,6 +176,9 @@ class Cart(Base):
         foreign_keys=[customer_id],
     )
     cart_items: Mapped[List["CartItem"]] = relationship("CartItem", back_populates="cart", cascade="all, delete-orphan")
+
+    def __str__(self) -> str:
+        return f"<Cart(id={self.id}, customer_id={self.customer_id})>"
 
 
 class CartItem(Base):
@@ -191,6 +215,9 @@ class CartItem(Base):
         """Calculate total price for this item"""
         return self.unit_price * self.quantity
 
+    def __str__(self) -> str:
+        return f"<CartItem(id={self.id}, cart_id={self.cart_id}, product_id={self.product_id}, quantity={self.quantity})>"
+
 
 class Order(Base):
     """Order model"""
@@ -202,7 +229,7 @@ class Order(Base):
         Integer, ForeignKey("customers.id"), nullable=True
     )
     status: Mapped[Optional[str]] = mapped_column(String(50), default="pending", nullable=True)
-    total_amount: Mapped[float] = mapped_column(Float, nullable=False)
+    total_amount: Mapped[float] = mapped_column(Float, nullable=False, server_default="0.0")
     delivery_fee: Mapped[Optional[float]] = mapped_column(Float, default=0, nullable=True)
     delivery_address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     delivery_instructions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -225,6 +252,9 @@ class Order(Base):
     order_items: Mapped[List["OrderItem"]] = relationship(
         "OrderItem", back_populates="order", cascade="all, delete-orphan"
     )
+
+    def __str__(self) -> str:
+        return f"<Order(id={self.id}, customer_id={self.customer_id}, order_number='{self.order_number}')>"
 
 
 class OrderItem(Base):
@@ -253,6 +283,9 @@ class OrderItem(Base):
     # Relationships
     order: Mapped["Order"] = relationship("Order", back_populates="order_items")
     product: Mapped["Product"] = relationship("Product", back_populates="order_items")
+
+    def __str__(self) -> str:
+        return f"<OrderItem(id={self.id}, order_id={self.order_id}, product_id={self.product_id}, quantity={self.quantity})>"
 
 
 class CoreBusiness(Base):

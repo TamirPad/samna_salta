@@ -173,6 +173,7 @@ class ConfigValidation:
     
     # Database validation
     POSTGRESQL_PREFIX: Final[str] = "postgresql://"
+    SQLITE_PREFIX: Final[str] = "sqlite://"
     
     # File permissions
     SECURE_FILE_PERMISSIONS: Final[int] = 0o600

@@ -22,6 +22,7 @@ from src.handlers.cart import CartHandler
 from src.handlers.admin import register_admin_handlers
 from src.utils.logger import ProductionLogger
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
+from telegram import Update
 
 def setup_bot():
     """Setup and configure the bot application"""
@@ -103,6 +104,16 @@ def setup_bot():
     
     return application
 
+async def cleanup_webhook(bot):
+    """Clean up any existing webhook to prevent conflicts"""
+    try:
+        await bot.delete_webhook()
+        logger = logging.getLogger(__name__)
+        logger.info("Cleaned up existing webhook")
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to cleanup webhook: {e}")
+
 async def ping_handler(update, context):
     """Simple ping handler"""
     await update.message.reply_text('pong')
@@ -114,12 +125,17 @@ def run_polling():
     try:
         application = setup_bot()
         
+        # Clean up any existing webhook before polling
+        import asyncio
+        asyncio.run(cleanup_webhook(application.bot))
+        
         print("✅ Bot started successfully!")
         print("📱 Send /start to your bot in Telegram to test it!")
         print("🛑 Press Ctrl+C to stop the bot")
         
         # Start polling (this will run until interrupted)
         try:
+            # Use the standard polling method
             application.run_polling()
         except KeyboardInterrupt:
             print("\n🛑 Bot stopped by user")
@@ -137,27 +153,28 @@ def run_webhook():
     from fastapi.responses import JSONResponse
     from telegram import Update
     import uvicorn
+    from contextlib import asynccontextmanager
     
     print("🚀 Starting Samna Salta Bot in PRODUCTION mode (webhook)...")
-    
-    # Initialize FastAPI app
-    app = FastAPI(title="Samna Salta Bot")
-    logger = logging.getLogger(__name__)
     
     # Global application instance
     application: Application = None
 
-    @app.on_event("startup")
-    async def startup_event():
-        """Initialize the bot on startup"""
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        """Lifespan context manager for FastAPI app"""
         nonlocal application
         
+        # Startup
         try:
             application = setup_bot()
             
             # Initialize the application
             await application.initialize()
             await application.start()
+            
+            # Clean up any existing webhook first
+            await cleanup_webhook(application.bot)
             
             # Set webhook (webhook mode only)
             webhook_url = os.getenv("WEBHOOK_URL")
@@ -184,11 +201,10 @@ def run_webhook():
         except Exception as e:
             logger.error(f"Failed to start bot: {e}")
             raise
-
-    @app.on_event("shutdown")
-    async def shutdown_event():
-        """Cleanup on shutdown"""
-        nonlocal application
+        
+        yield
+        
+        # Shutdown
         if application:
             try:
                 await application.stop()
@@ -196,6 +212,10 @@ def run_webhook():
                 logger.info("Bot shutdown completed")
             except Exception as e:
                 logger.error(f"Error during shutdown: {e}")
+
+    # Initialize FastAPI app with lifespan
+    app = FastAPI(title="Samna Salta Bot", lifespan=lifespan)
+    logger = logging.getLogger(__name__)
 
     @app.get("/health")
     async def health_check(background_tasks: BackgroundTasks):

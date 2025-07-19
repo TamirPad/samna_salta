@@ -348,3 +348,64 @@ class SecurityLogger:
 # Global instances for easy access
 performance_logger = PerformanceLogger
 security_logger = SecurityLogger()
+
+
+def setup_logger(
+    log_level: str = "INFO",
+    log_file: Optional[str] = None,
+    log_format: Optional[str] = None,
+    max_bytes: int = 10 * 1024 * 1024,  # 10MB
+    backup_count: int = 5
+) -> logging.Logger:
+    """
+    Set up the main application logger
+    
+    Args:
+        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        log_file: Path to log file (optional)
+        log_format: Custom log format (optional)
+        max_bytes: Maximum size of log file before rotation
+        backup_count: Number of backup log files to keep
+    
+    Returns:
+        Configured logger instance
+    """
+    # Create logger
+    logger = logging.getLogger("samna_salta")
+    logger.setLevel(getattr(logging, log_level.upper()))
+    
+    # Clear existing handlers
+    logger.handlers.clear()
+    
+    # Create formatter
+    if log_format is None:
+        log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    formatter = logging.Formatter(log_format)
+    
+    # Console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    
+    # File handler (if specified)
+    if log_file:
+        # Ensure log directory exists
+        log_dir = os.path.dirname(log_file)
+        if log_dir and not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        
+        # Create rotating file handler
+        file_handler = logging.handlers.RotatingFileHandler(
+            log_file,
+            maxBytes=max_bytes,
+            backupCount=backup_count
+        )
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+    
+    # Configure specific loggers
+    _configure_specific_loggers()
+    
+    return logger

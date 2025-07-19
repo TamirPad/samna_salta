@@ -6,7 +6,7 @@ import logging
 from typing import Dict, Any, Optional
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, filters
+from telegram.ext import ContextTypes, filters, Application
 
 from src.container import get_container
 from src.utils.i18n import i18n
@@ -17,6 +17,51 @@ logger = logging.getLogger(__name__)
 
 def expecting_delivery_address_filter(update, context):
     return bool(context.user_data.get('expecting_delivery_address'))
+
+
+def register_cart_handlers(application: Application):
+    """Register cart handlers with the application"""
+    cart_handler = CartHandler()
+    
+    # Register callback query handlers
+    application.add_handler(
+        filters.CallbackQuery("add_to_cart_", prefix=True),
+        cart_handler.handle_add_to_cart
+    )
+    application.add_handler(
+        filters.CallbackQuery("view_cart"),
+        cart_handler.handle_view_cart
+    )
+    application.add_handler(
+        filters.CallbackQuery("clear_cart_confirm"),
+        cart_handler.handle_clear_cart_confirmation
+    )
+    application.add_handler(
+        filters.CallbackQuery("clear_cart"),
+        cart_handler.handle_clear_cart
+    )
+    application.add_handler(
+        filters.CallbackQuery("checkout"),
+        cart_handler.handle_checkout
+    )
+    application.add_handler(
+        filters.CallbackQuery("delivery_method_", prefix=True),
+        cart_handler.handle_delivery_method
+    )
+    application.add_handler(
+        filters.CallbackQuery("delivery_address_", prefix=True),
+        cart_handler.handle_delivery_address_choice
+    )
+    application.add_handler(
+        filters.CallbackQuery("confirm_order"),
+        cart_handler.handle_confirm_order
+    )
+    
+    # Register message handler for delivery address input
+    application.add_handler(
+        filters.TEXT & filters.ChatType.PRIVATE & filters.CREATE,
+        cart_handler.handle_delivery_address_input
+    )
 
 
 class CartHandler:

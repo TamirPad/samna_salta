@@ -109,14 +109,22 @@ def cached(ttl: Optional[int] = None):
 @cached(ttl=300)  # Cache for 5 minutes
 def is_hilbeh_available() -> bool:
     """Check if Hilbeh is available today"""
-    config = get_config()
-    today = datetime.now().strftime("%A").lower()
-    return today in config.hilbeh_available_days
+    try:
+        config = get_config()
+        today = datetime.now().strftime("%A").lower()
+        return today in config.hilbeh_available_days
+    except Exception:
+        # Return False on any error
+        return False
 
 @cached(ttl=3600)  # Cache for 1 hour
 def translate_product_name(product_name: str, options: Optional[dict] = None, user_id: Optional[int] = None) -> str:
     """Translate a product name from database format to localized display name"""
     from src.utils.i18n import i18n
+    
+    # Handle None or empty input
+    if not product_name:
+        return ""
     
     product_name_lower = product_name.lower()
     
@@ -131,7 +139,11 @@ def translate_product_name(product_name: str, options: Optional[dict] = None, us
             except:
                 # Fallback if translation key doesn't exist
                 return f"Kubaneh ({kubaneh_type.title()})"
-        return i18n.get_text("PRODUCT_KUBANEH_CLASSIC", user_id=user_id)
+        try:
+            return i18n.get_text("PRODUCT_KUBANEH_CLASSIC", user_id=user_id)
+        except:
+            # Fallback to original name if translation fails
+            return product_name
     
     # Handle Samneh with type options
     elif "samneh" in product_name_lower:
@@ -144,7 +156,11 @@ def translate_product_name(product_name: str, options: Optional[dict] = None, us
             except:
                 # Fallback if translation key doesn't exist
                 return f"Samneh ({samneh_type.title()})"
-        return i18n.get_text("PRODUCT_SAMNEH_SMOKED", user_id=user_id)
+        try:
+            return i18n.get_text("PRODUCT_SAMNEH_SMOKED", user_id=user_id)
+        except:
+            # Fallback to original name if translation fails
+            return product_name
     
     # Handle Red Bisbas with size options
     elif "red bisbas" in product_name_lower or "bisbas" in product_name_lower:
@@ -157,7 +173,11 @@ def translate_product_name(product_name: str, options: Optional[dict] = None, us
             except:
                 # Fallback if translation key doesn't exist
                 return f"Red Bisbas ({size.title()})"
-        return i18n.get_text("PRODUCT_RED_BISBAS", user_id=user_id)
+        try:
+            return i18n.get_text("PRODUCT_RED_BISBAS", user_id=user_id)
+        except:
+            # Fallback to original name if translation fails
+            return product_name
     
     # Handle Hilbeh with type options
     elif "hilbeh" in product_name_lower:
@@ -170,7 +190,11 @@ def translate_product_name(product_name: str, options: Optional[dict] = None, us
             except:
                 # Fallback if translation key doesn't exist
                 return f"Hilbeh ({hilbeh_type.title()})"
-        return i18n.get_text("PRODUCT_HILBEH", user_id=user_id)
+        try:
+            return i18n.get_text("PRODUCT_HILBEH", user_id=user_id)
+        except:
+            # Fallback to original name if translation fails
+            return product_name
     
     # Handle other products
     else:
@@ -183,10 +207,13 @@ def translate_product_name(product_name: str, options: Optional[dict] = None, us
             return product_name
 
 
-
 def translate_category_name(category_name: str, user_id: Optional[int] = None) -> str:
     """Translate category name from database format to localized display name"""
     from src.utils.i18n import i18n
+    
+    # Handle None or empty input
+    if not category_name:
+        return ""
     
     # Map database category names to translation keys
     category_mapping = {

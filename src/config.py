@@ -18,8 +18,8 @@ class Settings(BaseSettings):
     )
 
     # Bot configuration
-    bot_token: str = Field(description="Telegram bot token")
-    admin_chat_id: int = Field(description="Admin chat ID for notifications")
+    bot_token: str = Field(description="Telegram bot token", min_length=1)
+    admin_chat_id: int = Field(description="Admin chat ID for notifications", gt=0)
 
     # Database configuration
     database_url: str = Field(

@@ -401,8 +401,8 @@ class AdminService:
                 result.append({
                     "order_id": order.id,
                     "order_number": order.order_number,
-                    "customer_name": order.customer.full_name if order.customer else "Unknown",
-                    "customer_phone": order.customer.phone_number if order.customer else "Unknown",
+                    "customer_name": order.customer.name if order.customer else "Unknown",
+                    "customer_phone": order.customer.phone if order.customer else "Unknown",
                     "total": order.total,
                     "status": order.status,
                     "created_at": order.created_at
@@ -427,8 +427,8 @@ class AdminService:
                 result.append({
                     "order_id": order.id,
                     "order_number": order.order_number,
-                    "customer_name": order.customer.full_name if order.customer else "Unknown",
-                    "customer_phone": order.customer.phone_number if order.customer else "Unknown",
+                    "customer_name": order.customer.name if order.customer else "Unknown",
+                    "customer_phone": order.customer.phone if order.customer else "Unknown",
                     "total": order.total,
                     "status": order.status,
                     "created_at": order.created_at
@@ -451,8 +451,8 @@ class AdminService:
                 result.append({
                     "order_id": order.id,
                     "order_number": order.order_number,
-                    "customer_name": order.customer.full_name if order.customer else "Unknown",
-                    "customer_phone": order.customer.phone_number if order.customer else "Unknown",
+                    "customer_name": order.customer.name if order.customer else "Unknown",
+                    "customer_phone": order.customer.phone if order.customer else "Unknown",
                     "total": order.total,
                     "status": order.status,
                     "created_at": order.created_at
@@ -477,8 +477,8 @@ class AdminService:
             result = {
                 "order_id": order.id,
                 "order_number": order.order_number,
-                "customer_name": order.customer.full_name if order.customer else "Unknown",
-                "customer_phone": order.customer.phone_number if order.customer else "Unknown",
+                "customer_name": order.customer.name if order.customer else "Unknown",
+                "customer_phone": order.customer.phone if order.customer else "Unknown",
                 "total": order.total,
                 "status": order.status,
                 "created_at": order.created_at,
@@ -588,8 +588,8 @@ class AdminService:
                 result.append({
                     "order_id": order.id,
                     "order_number": order.order_number,
-                    "customer_name": order.customer.full_name if order.customer else "Unknown",
-                    "customer_phone": order.customer.phone_number if order.customer else "Unknown",
+                    "customer_name": order.customer.name if order.customer else "Unknown",
+                    "customer_phone": order.customer.phone if order.customer else "Unknown",
                     "total": order.total,
                     "status": order.status,
                     "created_at": order.created_at
@@ -612,8 +612,8 @@ class AdminService:
                 result.append({
                     "order_id": order.id,
                     "order_number": order.order_number,
-                    "customer_name": order.customer.full_name if order.customer else "Unknown",
-                    "customer_phone": order.customer.phone_number if order.customer else "Unknown",
+                    "customer_name": order.customer.name if order.customer else "Unknown",
+                    "customer_phone": order.customer.phone if order.customer else "Unknown",
                     "total": order.total,
                     "status": order.status,
                     "created_at": order.created_at
@@ -651,8 +651,8 @@ class AdminService:
                 result.append({
                     "customer_id": customer.id,
                     "telegram_id": customer.telegram_id,
-                    "full_name": customer.full_name,
-                    "phone_number": customer.phone_number,
+                    "full_name": customer.name,
+                    "phone_number": customer.phone,
                     "delivery_address": customer.delivery_address,
                     "language": customer.language,
                     "created_at": customer.created_at,

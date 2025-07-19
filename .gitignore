@@ -186,6 +186,10 @@ test_*.py
 *_REPORT.md
 bot_test.log
 
+# But allow test files in the tests/ directory
+!tests/*_test.py
+!tests/test_*.py
+
 # Temporary and cache files
 *.tmp
 *.bak
