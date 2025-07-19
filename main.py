@@ -99,6 +99,16 @@ def setup_bot():
     application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart_confirmation, pattern="^cart_clear_confirm"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart, pattern="^cart_clear_yes"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_checkout, pattern="^cart_checkout"))
+    
+    # Cart editing handlers
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_edit_cart_mode, pattern="^cart_edit_mode"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_decrease_quantity, pattern="^cart_decrease_"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_increase_quantity, pattern="^cart_increase_"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_remove_item, pattern="^cart_remove_"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_edit_quantity, pattern="^cart_edit_"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_item_info, pattern="^cart_info_"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_separator, pattern="^cart_separator"))
+    
     application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_address_choice, pattern="^delivery_address_"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_method, pattern="^delivery_"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_confirm_order, pattern="^confirm_order"))

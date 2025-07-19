@@ -223,8 +223,12 @@ def translate_product_name(product_name: str, options: Optional[dict] = None, us
         try:
             return i18n.get_text(product_key, user_id=user_id)
         except:
-            # Fallback to original name
-            return product_name
+            # Try to find a generic unknown product translation
+            try:
+                return i18n.get_text("PRODUCT_UNKNOWN", user_id=user_id)
+            except:
+                # Final fallback to original name
+                return product_name
 
 
 def translate_category_name(category_name: str, user_id: Optional[int] = None) -> str:

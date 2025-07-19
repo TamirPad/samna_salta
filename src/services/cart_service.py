@@ -171,6 +171,65 @@ class CartService:
             logger.error("Exception removing item from cart (ACID): %s", e)
             return False
 
+    def update_item_quantity(self, telegram_id: int, product_id: int, new_quantity: int) -> bool:
+        """Update item quantity in cart using ACID operations"""
+        try:
+            logger.info("Updating item quantity (ACID): telegram_id=%s, product_id=%s, quantity=%s", 
+                       telegram_id, product_id, new_quantity)
+            
+            if new_quantity <= 0:
+                # If quantity is 0 or negative, remove the item
+                return self.remove_item(telegram_id, product_id)
+            
+            # Get current cart items
+            current_items = self.get_items(telegram_id)
+            
+            # Find the item to update
+            updated_items = []
+            item_found = False
+            
+            for item in current_items:
+                if item.get("product_id") == product_id:
+                    # Update the quantity
+                    updated_item = item.copy()
+                    updated_item["quantity"] = new_quantity
+                    updated_item["total_price"] = item.get("unit_price", 0) * new_quantity
+                    updated_items.append(updated_item)
+                    item_found = True
+                else:
+                    updated_items.append(item)
+            
+            if not item_found:
+                logger.warning("Item not found in cart for update: telegram_id=%s, product_id=%s", 
+                             telegram_id, product_id)
+                return False
+            
+            # Update the cart with new items
+            success = self.update_cart(telegram_id, updated_items)
+            
+            if success:
+                logger.info("Successfully updated item quantity (ACID) for user %s", telegram_id)
+            else:
+                logger.error("Failed to update item quantity (ACID) for user %s", telegram_id)
+            
+            return success
+            
+        except Exception as e:
+            logger.error("Exception updating item quantity (ACID): %s", e)
+            return False
+
+    def get_item_by_id(self, telegram_id: int, product_id: int) -> Optional[Dict]:
+        """Get specific item from cart by product ID"""
+        try:
+            items = self.get_items(telegram_id)
+            for item in items:
+                if item.get("product_id") == product_id:
+                    return item
+            return None
+        except Exception as e:
+            logger.error("Exception getting item by ID: %s", e)
+            return None
+
     def get_customer(self, telegram_id: int) -> Optional[Customer]:
         """Get customer by telegram ID"""
         try:

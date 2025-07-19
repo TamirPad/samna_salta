@@ -3,7 +3,7 @@ Cart handler for managing shopping cart operations
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, filters, Application
@@ -43,6 +43,30 @@ def register_cart_handlers(application: Application):
     application.add_handler(
         filters.CallbackQuery("checkout"),
         cart_handler.handle_checkout
+    )
+    application.add_handler(
+        filters.CallbackQuery("cart_decrease_", prefix=True),
+        cart_handler.handle_decrease_quantity
+    )
+    application.add_handler(
+        filters.CallbackQuery("cart_increase_", prefix=True),
+        cart_handler.handle_increase_quantity
+    )
+    application.add_handler(
+        filters.CallbackQuery("cart_remove_", prefix=True),
+        cart_handler.handle_remove_item
+    )
+    application.add_handler(
+        filters.CallbackQuery("cart_edit_", prefix=True),
+        cart_handler.handle_edit_quantity
+    )
+    application.add_handler(
+        filters.CallbackQuery("cart_info_", prefix=True),
+        cart_handler.handle_item_info
+    )
+    application.add_handler(
+        filters.CallbackQuery("cart_separator"),
+        cart_handler.handle_separator
     )
     application.add_handler(
         filters.CallbackQuery("delivery_method_", prefix=True),
@@ -203,7 +227,7 @@ class CartHandler:
             await query.edit_message_text(
                 message,
                 parse_mode="HTML",
-                reply_markup=self._get_cart_actions_keyboard(user_id),
+                reply_markup=self._get_simplified_cart_keyboard(cart_items, user_id),
             )
 
         except Exception as e:
@@ -534,6 +558,234 @@ class CartHandler:
                 reply_markup=self._get_back_to_cart_keyboard(user_id)
             )
 
+    async def handle_decrease_quantity(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle decreasing item quantity in cart"""
+        try:
+            query = update.callback_query
+            await query.answer()
+
+            user_id = query.from_user.id
+            callback_data = query.data
+            
+            # Extract product ID from callback data
+            product_id = int(callback_data.split("_")[-1])
+            
+            self.logger.info("🛒 DECREASE QUANTITY: User %s, Product %s", user_id, product_id)
+            
+            # Get cart service
+            cart_service = self.container.get_cart_service()
+            
+            # Get current item
+            current_item = cart_service.get_item_by_id(user_id, product_id)
+            if not current_item:
+                await query.answer(i18n.get_text("CART_ITEM_NOT_FOUND", user_id=user_id))
+                return
+            
+            current_quantity = current_item.get("quantity", 1)
+            
+            # If quantity is already 1, remove the item instead
+            if current_quantity <= 1:
+                success = cart_service.remove_item(user_id, product_id)
+                if success:
+                    await query.answer(i18n.get_text("CART_ITEM_REMOVED", user_id=user_id))
+                    # Refresh cart view
+                    await self.handle_view_cart(update, context)
+                else:
+                    await query.answer(i18n.get_text("CART_REMOVE_ERROR", user_id=user_id))
+                return
+            
+            new_quantity = current_quantity - 1
+            
+            # Update quantity
+            success = cart_service.update_item_quantity(user_id, product_id, new_quantity)
+            
+            if success:
+                await query.answer(i18n.get_text("CART_QUANTITY_UPDATED", user_id=user_id))
+                # Refresh cart view
+                await self.handle_view_cart(update, context)
+            else:
+                await query.answer(i18n.get_text("CART_UPDATE_ERROR", user_id=user_id))
+                
+        except Exception as e:
+            self.logger.error("Exception in handle_decrease_quantity: %s", e)
+            await handle_error(update, e, "decreasing quantity")
+
+    async def handle_increase_quantity(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle increasing item quantity in cart"""
+        try:
+            query = update.callback_query
+            await query.answer()
+
+            user_id = query.from_user.id
+            callback_data = query.data
+            
+            # Extract product ID from callback data
+            product_id = int(callback_data.split("_")[-1])
+            
+            self.logger.info("🛒 INCREASE QUANTITY: User %s, Product %s", user_id, product_id)
+            
+            # Get cart service
+            cart_service = self.container.get_cart_service()
+            
+            # Get current item
+            current_item = cart_service.get_item_by_id(user_id, product_id)
+            if not current_item:
+                await query.answer(i18n.get_text("CART_ITEM_NOT_FOUND", user_id=user_id))
+                return
+            
+            current_quantity = current_item.get("quantity", 1)
+            new_quantity = current_quantity + 1
+            
+            # Update quantity
+            success = cart_service.update_item_quantity(user_id, product_id, new_quantity)
+            
+            if success:
+                await query.answer(i18n.get_text("CART_QUANTITY_UPDATED", user_id=user_id))
+                # Refresh cart view
+                await self.handle_view_cart(update, context)
+            else:
+                await query.answer(i18n.get_text("CART_UPDATE_ERROR", user_id=user_id))
+                
+        except Exception as e:
+            self.logger.error("Exception in handle_increase_quantity: %s", e)
+            await handle_error(update, e, "increasing quantity")
+
+    async def handle_remove_item(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle removing item from cart"""
+        try:
+            query = update.callback_query
+            await query.answer()
+
+            user_id = query.from_user.id
+            callback_data = query.data
+            
+            # Extract product ID from callback data
+            product_id = int(callback_data.split("_")[-1])
+            
+            self.logger.info("🛒 REMOVE ITEM: User %s, Product %s", user_id, product_id)
+            
+            # Get cart service
+            cart_service = self.container.get_cart_service()
+            
+            # Remove item
+            success = cart_service.remove_item(user_id, product_id)
+            
+            if success:
+                await query.answer(i18n.get_text("CART_ITEM_REMOVED", user_id=user_id))
+                # Refresh cart view
+                await self.handle_view_cart(update, context)
+            else:
+                await query.answer(i18n.get_text("CART_REMOVE_ERROR", user_id=user_id))
+                
+        except Exception as e:
+            self.logger.error("Exception in handle_remove_item: %s", e)
+            await handle_error(update, e, "removing item")
+
+    async def handle_edit_quantity(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle editing item quantity (placeholder for future quantity input)"""
+        try:
+            query = update.callback_query
+            await query.answer()
+
+            user_id = query.from_user.id
+            callback_data = query.data
+            
+            # Extract product ID from callback data
+            product_id = int(callback_data.split("_")[-1])
+            
+            self.logger.info("🛒 EDIT QUANTITY: User %s, Product %s", user_id, product_id)
+            
+            # For now, just show a message that this feature is coming soon
+            await query.answer(i18n.get_text("CART_EDIT_COMING_SOON", user_id=user_id))
+                
+        except Exception as e:
+            self.logger.error("Exception in handle_edit_quantity: %s", e)
+            await handle_error(update, e, "editing quantity")
+
+    async def handle_item_info(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle item info button (shows product details)"""
+        try:
+            query = update.callback_query
+            await query.answer()
+
+            user_id = query.from_user.id
+            callback_data = query.data
+            
+            # Extract product ID from callback data
+            product_id = int(callback_data.split("_")[-1])
+            
+            self.logger.info("🛒 ITEM INFO: User %s, Product %s", user_id, product_id)
+            
+            # Get cart service
+            cart_service = self.container.get_cart_service()
+            
+            # Get item details
+            item = cart_service.get_item_by_id(user_id, product_id)
+            if not item:
+                await query.answer(i18n.get_text("CART_ITEM_NOT_FOUND", user_id=user_id))
+                return
+            
+            # Show item details
+            from src.utils.helpers import translate_product_name
+            product_name = translate_product_name(item.get('product_name', 'Unknown Product'), item.get('options', {}), user_id)
+            
+            info_message = f"📦 <b>{product_name}</b>\n"
+            info_message += f"💰 מחיר: ₪{item.get('unit_price', 0):.2f}\n"
+            info_message += f"📊 כמות: {item.get('quantity', 1)}\n"
+            info_message += f"💵 סה״כ: ₪{item.get('unit_price', 0) * item.get('quantity', 1):.2f}"
+            
+            await query.answer(info_message, show_alert=True)
+                
+        except Exception as e:
+            self.logger.error("Exception in handle_item_info: %s", e)
+            await handle_error(update, e, "showing item info")
+
+    async def handle_edit_cart_mode(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle entering edit cart mode"""
+        try:
+            query = update.callback_query
+            await query.answer()
+
+            user_id = query.from_user.id
+            self.logger.info("✏️ EDIT CART MODE: User %s", user_id)
+
+            # Get cart service
+            cart_service = self.container.get_cart_service()
+            cart_items = cart_service.get_items(user_id)
+
+            if not cart_items:
+                await query.edit_message_text(
+                    i18n.get_text("CART_EMPTY_READY", user_id=user_id),
+                    parse_mode="HTML",
+                    reply_markup=self._get_empty_cart_keyboard(user_id),
+                )
+                return
+
+            # Calculate total
+            cart_total = cart_service.calculate_total(cart_items)
+
+            # Build simplified edit mode display
+            message = i18n.get_text("CART_EDIT_MODE_TITLE", user_id=user_id) + "\n\n"
+            message += i18n.get_text("CART_EDIT_MODE_INSTRUCTIONS", user_id=user_id)
+
+            await query.edit_message_text(
+                message,
+                parse_mode="HTML",
+                reply_markup=self._get_cart_items_keyboard_with_back(cart_items, user_id),
+            )
+
+        except Exception as e:
+            self.logger.error("Exception in handle_edit_cart_mode: %s", e)
+            await handle_error(update, e, "entering edit cart mode")
+
+    async def handle_separator(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle separator button (does nothing, just for visual separation)"""
+        try:
+            query = update.callback_query
+            await query.answer("")  # Silent answer for separator
+        except Exception as e:
+            self.logger.error("Exception in handle_separator: %s", e)
+
     def _parse_product_from_callback(self, callback_data: str) -> Optional[Dict[str, Any]]:
         """Parse product information from callback data"""
         try:
@@ -617,6 +869,138 @@ class CartHandler:
             ],
             [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main")],
         ]
+        return InlineKeyboardMarkup(keyboard)
+
+    def _get_cart_items_keyboard(self, cart_items: List[Dict], user_id: int = None) -> InlineKeyboardMarkup:
+        """Get keyboard for cart items with individual controls"""
+        keyboard = []
+        
+        # Add individual item controls
+        for i, item in enumerate(cart_items, 1):
+            product_id = item.get("product_id")
+            quantity = item.get("quantity", 1)
+            
+            # Get product name for better identification
+            from src.utils.helpers import translate_product_name
+            product_name = translate_product_name(item.get('product_name', 'Unknown Product'), item.get('options', {}), user_id)
+            short_name = product_name[:15] + "..." if len(product_name) > 15 else product_name
+            
+            # Item label row - shows which item these controls belong to
+            label_row = [
+                InlineKeyboardButton(f"📦 {short_name}", callback_data=f"cart_info_{product_id}")
+            ]
+            keyboard.append(label_row)
+            
+            # Item controls row
+            item_row = []
+            
+            # Decrease quantity button (always show, removes item when quantity = 1)
+            item_row.append(
+                InlineKeyboardButton("➖", callback_data=f"cart_decrease_{product_id}")
+            )
+            
+            # Quantity display with better formatting
+            item_row.append(
+                InlineKeyboardButton(f" {quantity} ", callback_data=f"cart_edit_{product_id}")
+            )
+            
+            # Increase quantity button
+            item_row.append(
+                InlineKeyboardButton("➕", callback_data=f"cart_increase_{product_id}")
+            )
+            
+            # Remove item button
+            item_row.append(
+                InlineKeyboardButton("🗑️", callback_data=f"cart_remove_{product_id}")
+            )
+            
+            keyboard.append(item_row)
+            
+            # Add separator between items (except for last item)
+            if i < len(cart_items):
+                keyboard.append([InlineKeyboardButton("─" * 20, callback_data="cart_separator")])
+        
+        # Add main cart actions
+        keyboard.append([
+            InlineKeyboardButton(i18n.get_text("CLEAR_CART", user_id=user_id), callback_data="cart_clear_confirm"),
+            InlineKeyboardButton(i18n.get_text("CHECKOUT", user_id=user_id), callback_data="cart_checkout"),
+        ])
+        
+        keyboard.append([InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main")])
+        
+        return InlineKeyboardMarkup(keyboard)
+
+    def _get_simplified_cart_keyboard(self, cart_items: List[Dict], user_id: int = None) -> InlineKeyboardMarkup:
+        """Get simplified cart keyboard with Edit Cart button"""
+        keyboard = [
+            [InlineKeyboardButton(i18n.get_text("EDIT_CART", user_id=user_id), callback_data="cart_edit_mode")],
+            [
+                InlineKeyboardButton(i18n.get_text("CLEAR_CART", user_id=user_id), callback_data="cart_clear_confirm"),
+                InlineKeyboardButton(i18n.get_text("CHECKOUT", user_id=user_id), callback_data="cart_checkout"),
+            ],
+            [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main")],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
+    def _get_cart_items_keyboard_with_back(self, cart_items: List[Dict], user_id: int = None) -> InlineKeyboardMarkup:
+        """Get keyboard for cart items with individual controls and back button"""
+        keyboard = []
+        
+        # Add individual item controls
+        for i, item in enumerate(cart_items, 1):
+            product_id = item.get("product_id")
+            quantity = item.get("quantity", 1)
+            
+            # Get product name for better identification
+            from src.utils.helpers import translate_product_name
+            product_name = translate_product_name(item.get('product_name', 'Unknown Product'), item.get('options', {}), user_id)
+            short_name = product_name[:15] + "..." if len(product_name) > 15 else product_name
+            
+            # Item label row - shows which item these controls belong to
+            label_row = [
+                InlineKeyboardButton(f"📦 {short_name}", callback_data=f"cart_info_{product_id}")
+            ]
+            keyboard.append(label_row)
+            
+            # Item controls row
+            item_row = []
+            
+            # Decrease quantity button (always show, removes item when quantity = 1)
+            item_row.append(
+                InlineKeyboardButton("➖", callback_data=f"cart_decrease_{product_id}")
+            )
+            
+            # Quantity display with better formatting
+            item_row.append(
+                InlineKeyboardButton(f" {quantity} ", callback_data=f"cart_edit_{product_id}")
+            )
+            
+            # Increase quantity button
+            item_row.append(
+                InlineKeyboardButton("➕", callback_data=f"cart_increase_{product_id}")
+            )
+            
+            # Remove item button
+            item_row.append(
+                InlineKeyboardButton("🗑️", callback_data=f"cart_remove_{product_id}")
+            )
+            
+            keyboard.append(item_row)
+            
+            # Add separator between items (except for last item)
+            if i < len(cart_items):
+                keyboard.append([InlineKeyboardButton("─" * 20, callback_data="cart_separator")])
+        
+        # Add back button and main cart actions
+        keyboard.append([InlineKeyboardButton(i18n.get_text("BACK_TO_CART_VIEW", user_id=user_id), callback_data="cart_view")])
+        
+        keyboard.append([
+            InlineKeyboardButton(i18n.get_text("CLEAR_CART", user_id=user_id), callback_data="cart_clear_confirm"),
+            InlineKeyboardButton(i18n.get_text("CHECKOUT", user_id=user_id), callback_data="cart_checkout"),
+        ])
+        
+        keyboard.append([InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main")])
+        
         return InlineKeyboardMarkup(keyboard)
 
     def _get_cart_actions_keyboard(self, user_id: int = None) -> InlineKeyboardMarkup:
