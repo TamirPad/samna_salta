@@ -345,3 +345,56 @@ class AnalyticsProductPerformance(Base):
 
     # Relationships
     product: Mapped[Optional["Product"]] = relationship("Product")
+
+
+class BusinessSettings(Base):
+    """Business settings model for storing editable business details"""
+
+    __tablename__ = "business_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    business_name: Mapped[str] = mapped_column(String(200), nullable=False, default="Samna Salta")
+    business_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    business_address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    business_phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    business_email: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    business_website: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    business_hours: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    delivery_charge: Mapped[float] = mapped_column(Float, nullable=False, default=5.00)
+    currency: Mapped[str] = mapped_column(String(10), nullable=False, default="ILS")
+    hilbeh_available_days: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON string
+    hilbeh_available_hours: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    welcome_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    about_us: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    contact_info: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=True
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
+
+    def __str__(self) -> str:
+        return f"<BusinessSettings(id={self.id}, name='{self.business_name}')>"
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary"""
+        return {
+            "id": self.id,
+            "business_name": self.business_name,
+            "business_description": self.business_description,
+            "business_address": self.business_address,
+            "business_phone": self.business_phone,
+            "business_email": self.business_email,
+            "business_website": self.business_website,
+            "business_hours": self.business_hours,
+            "delivery_charge": self.delivery_charge,
+            "currency": self.currency,
+            "hilbeh_available_days": self.hilbeh_available_days,
+            "hilbeh_available_hours": self.hilbeh_available_hours,
+            "welcome_message": self.welcome_message,
+            "about_us": self.about_us,
+            "contact_info": self.contact_info,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at
+        }

@@ -42,6 +42,7 @@ AWAITING_CATEGORY_NAME_EDIT = 11
 AWAITING_PRODUCT_EDIT_FIELD = 20
 AWAITING_PRODUCT_EDIT_VALUE = 21
 AWAITING_PRODUCT_EDIT_CONFIRM = 22
+AWAITING_BUSINESS_FIELD_INPUT = 23
 
 logger = logging.getLogger(__name__)
 
@@ -79,10 +80,10 @@ class AdminHandler:
     ) -> None:
         """Handle admin dashboard callbacks"""
         query = update.callback_query
-        await query.answer()
 
         user_id = update.effective_user.id
         if not await self._is_admin_user(user_id):
+            await query.answer()
             await query.message.reply_text(i18n.get_text("ADMIN_ACCESS_DENIED", user_id=user_id))
             return
 
@@ -117,6 +118,14 @@ class AdminHandler:
             order_id = int(parts[2])
             new_status = parts[3]
             await self._update_order_status(query, order_id, new_status, user_id)
+        elif data.startswith("admin_delete_order_"):
+            # Format: admin_delete_order_{order_id}
+            order_id = int(data.split("_")[-1])
+            await self._show_delete_order_confirmation(query, order_id)
+        elif data.startswith("admin_confirm_delete_order_"):
+            # Format: admin_confirm_delete_order_{order_id}
+            order_id = int(data.split("_")[-1])
+            await self._confirm_delete_order(query, order_id)
         elif data == "admin_menu_management":
             await self._show_menu_management_dashboard(query)
         elif data == "admin_products_management":
@@ -157,6 +166,13 @@ class AdminHandler:
         # elif data.startswith("admin_edit_product_category_"):
         elif data == "admin_category_management":
             await self._show_category_management(query)
+        elif data == "admin_business_settings":
+            await self._show_business_settings(query)
+        elif data == "admin_edit_business_settings":
+            await self._start_edit_business_settings(query)
+        elif data.startswith("admin_edit_business_"):
+            field = data.replace("admin_edit_business_", "")
+            await self._handle_business_settings_edit(query, field)
         elif data == "admin_view_categories":
             await self._show_all_categories(query)
         elif data == "admin_add_category":
@@ -179,13 +195,90 @@ class AdminHandler:
             category = data.replace("admin_category_", "")
             await self._show_products_in_category(query, category)
         elif data == "admin_business_info":
-            await self._show_business_info(query)
+            await self._show_business_settings(query)
         elif data == "admin_language_selection":
             await self._handle_admin_language_selection(query)
         elif data.startswith("admin_language_"):
             await self._handle_admin_language_change(query)
         elif data == "admin_back":
-            await self._show_admin_dashboard(update, None)
+            await self._show_admin_dashboard_from_callback(query)
+            await query.answer()
+        elif data == "admin_dashboard":
+            await self._show_admin_dashboard_from_callback(query)
+            await query.answer()
+
+    async def _show_admin_dashboard_from_callback(self, query: CallbackQuery) -> None:
+        """Show admin dashboard from callback query"""
+        try:
+            self.logger.info("📊 LOADING ADMIN DASHBOARD FROM CALLBACK")
+            
+            # Get user_id from query
+            user_id = query.from_user.id
+
+            # Get order statistics
+            pending_orders = await self.admin_service.get_pending_orders()
+            active_orders = await self.admin_service.get_active_orders()
+            completed_orders = await self.admin_service.get_completed_orders()
+            today_orders = await self.admin_service.get_today_orders()
+
+            self.logger.info(
+                "📊 STATS: %s pending, %s active, %s completed, %s today",
+                len(pending_orders),
+                len(active_orders),
+                len(completed_orders),
+                len(today_orders),
+            )
+
+            dashboard_text = (
+                i18n.get_text("ADMIN_DASHBOARD_TITLE", user_id=user_id) + "\n\n" +
+                i18n.get_text("ADMIN_ORDER_STATS", user_id=user_id) + "\n" +
+                i18n.get_text("ADMIN_PENDING_COUNT", user_id=user_id).format(count=len(pending_orders)) + "\n" +
+                i18n.get_text("ADMIN_ACTIVE_COUNT", user_id=user_id).format(count=len(active_orders)) + "\n" +
+                i18n.get_text("ADMIN_COMPLETED_COUNT", user_id=user_id).format(count=len(completed_orders)) + "\n" +
+                i18n.get_text("ADMIN_TOTAL_TODAY", user_id=user_id).format(count=len(today_orders)) + "\n\n" +
+                i18n.get_text("ADMIN_QUICK_ACTIONS", user_id=user_id)
+            )
+
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PENDING_ORDERS", user_id=user_id), callback_data="admin_pending_orders"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_ACTIVE_ORDERS", user_id=user_id), callback_data="admin_active_orders"
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_ALL_ORDERS", user_id=user_id), callback_data="admin_all_orders"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_COMPLETED_ORDERS", user_id=user_id), callback_data="admin_completed_orders"
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(i18n.get_text("ADMIN_ANALYTICS", user_id=user_id), callback_data="admin_analytics"),
+                    InlineKeyboardButton(i18n.get_text("ADMIN_CUSTOMERS", user_id=user_id), callback_data="admin_customers")
+                ],
+                [
+                    InlineKeyboardButton(i18n.get_text("ADMIN_MENU_MANAGEMENT", user_id=user_id), callback_data="admin_menu_management")
+                ],
+                [
+                    InlineKeyboardButton(i18n.get_text("ADMIN_BUSINESS_SETTINGS", user_id=user_id), callback_data="admin_business_settings")
+                ],
+            ]
+
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(
+                text=dashboard_text, parse_mode="HTML", reply_markup=reply_markup
+            )
+
+        except (BusinessLogicError, RuntimeError) as e:
+            self.logger.error("💥 DASHBOARD ERROR: %s", e, exc_info=True)
+            await query.answer(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+        except Exception as e:
+            self.logger.critical("💥 UNHANDLED DASHBOARD ERROR: %s", e, exc_info=True)
+            await query.answer(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
 
     async def _show_admin_dashboard(
         self, update: Update, _: ContextTypes.DEFAULT_TYPE | None
@@ -246,7 +339,7 @@ class AdminHandler:
                     InlineKeyboardButton(i18n.get_text("ADMIN_MENU_MANAGEMENT", user_id=user_id), callback_data="admin_menu_management")
                 ],
                 [
-                    InlineKeyboardButton(i18n.get_text("ADMIN_BUSINESS_INFO", user_id=user_id), callback_data="admin_business_info")
+                    InlineKeyboardButton(i18n.get_text("ADMIN_BUSINESS_SETTINGS", user_id=user_id), callback_data="admin_business_settings")
                 ],
             ]
 
@@ -1061,6 +1154,15 @@ class AdminHandler:
             ]
             for status in statuses
         ]
+        
+        # Add delete order button
+        keyboard.append([
+            InlineKeyboardButton(
+                i18n.get_text("ADMIN_DELETE_ORDER", user_id=user_id),
+                callback_data=f"admin_delete_order_{order_id}"
+            )
+        ])
+        
         keyboard.append(
             [InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back")]
         )
@@ -1097,6 +1199,80 @@ class AdminHandler:
         except (BusinessLogicError, ValueError) as e:
             self.logger.error("💥 STATUS UPDATE ERROR: %s", e, exc_info=True)
             await query.message.reply_text(i18n.get_text("ADMIN_STATUS_UPDATE_ERROR", user_id=admin_telegram_id).format(error=e))
+
+    async def _show_delete_order_confirmation(self, query: CallbackQuery, order_id: int) -> None:
+        """Show confirmation dialog for order deletion"""
+        try:
+            user_id = query.from_user.id
+            self.logger.info("🗑️ SHOWING DELETE CONFIRMATION for order #%s by admin %s", order_id, user_id)
+            
+            # Get order details for confirmation
+            order_info = await self.admin_service.get_order_by_id(order_id)
+            if not order_info:
+                await query.answer(i18n.get_text("ADMIN_ORDER_NOT_FOUND", user_id=user_id))
+                return
+            
+            # Create confirmation message
+            text = i18n.get_text("ADMIN_DELETE_ORDER_CONFIRMATION", user_id=user_id).format(
+                order_number=order_info.get("order_number", f"#{order_id}"),
+                customer_name=order_info.get("customer_name", "Unknown"),
+                total=order_info.get("total", 0),
+                status=order_info.get("status", "Unknown")
+            )
+            
+            # Create confirmation keyboard
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_CONFIRM_DELETE", user_id=user_id),
+                        callback_data=f"admin_confirm_delete_order_{order_id}"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text("CANCEL", user_id=user_id),
+                        callback_data=f"admin_order_{order_id}"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+        except Exception as e:
+            self.logger.error("💥 DELETE CONFIRMATION ERROR: %s", e, exc_info=True)
+            await query.answer(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
+    async def _confirm_delete_order(self, query: CallbackQuery, order_id: int) -> None:
+        """Confirm and execute order deletion"""
+        try:
+            user_id = query.from_user.id
+            self.logger.info("🗑️ CONFIRMING DELETE for order #%s by admin %s", order_id, user_id)
+            
+            # Perform the deletion
+            success = await self.admin_service.delete_order(order_id, user_id)
+            
+            if success:
+                # Show success message
+                text = i18n.get_text("ADMIN_ORDER_DELETED_SUCCESS", user_id=user_id).format(
+                    order_id=order_id
+                )
+                
+                keyboard = [
+                    [InlineKeyboardButton(
+                        i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id),
+                        callback_data="admin_back"
+                    )]
+                ]
+                
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+                
+                await query.answer(i18n.get_text("ADMIN_ORDER_DELETED", user_id=user_id))
+            else:
+                await query.answer(i18n.get_text("ADMIN_ORDER_DELETE_ERROR", user_id=user_id))
+                
+        except Exception as e:
+            self.logger.error("💥 ORDER DELETE ERROR: %s", e, exc_info=True)
+            await query.answer(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
 
     async def _start_status_update(self, query: CallbackQuery) -> int:
         """Start conversation to update an order's status."""
@@ -3082,47 +3258,7 @@ class AdminHandler:
         """Delete (deactivate) a product (deprecated, use _deactivate_product)"""
         await self._deactivate_product(query, product_id)
 
-    async def _show_business_info(self, query: CallbackQuery) -> None:
-        """Show business information for admin"""
-        try:
-            user_id = query.from_user.id
-            self.logger.info("🏢 SHOWING BUSINESS INFO for Admin %s", user_id)
 
-            # Get business details from config
-            from src.config import get_config
-            config = get_config()
-            
-            business_info_text = (
-                f"🏢 <b>{i18n.get_text('BUSINESS_INFO_TITLE', user_id=user_id)}</b>\n\n"
-                f"<b>{i18n.get_text('BUSINESS_NAME', user_id=user_id)}</b>: Samna Salta\n"
-                f"<b>{i18n.get_text('BUSINESS_TYPE', user_id=user_id)}</b>: Restaurant\n"
-                f"<b>{i18n.get_text('BUSINESS_CURRENCY', user_id=user_id)}</b>: {config.currency}\n"
-                f"<b>{i18n.get_text('BUSINESS_DELIVERY_CHARGE', user_id=user_id)}</b>: ₪{config.delivery_charge:.2f}\n"
-                f"<b>{i18n.get_text('BUSINESS_ENVIRONMENT', user_id=user_id)}</b>: {config.environment}\n\n"
-                f"{i18n.get_text('BUSINESS_INFO_DESCRIPTION', user_id=user_id)}"
-            )
-
-            await query.edit_message_text(
-                business_info_text,
-                reply_markup=self._get_business_info_keyboard(user_id),
-                parse_mode="HTML"
-            )
-
-        except Exception as e:
-            self.logger.error("💥 BUSINESS INFO ERROR: %s", e, exc_info=True)
-            await query.answer(i18n.get_text("BUSINESS_INFO_ERROR", user_id=user_id))
-
-    def _get_business_info_keyboard(self, user_id: int):
-        """Get business info keyboard with language selection"""
-        from src.utils.language_manager import language_manager
-        
-        current_lang = language_manager.get_user_language(user_id)
-        
-        keyboard = [
-            [InlineKeyboardButton(i18n.get_text("LANGUAGE_BUTTON", user_id=user_id), callback_data="admin_language_selection")],
-            [InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back")],
-        ]
-        return InlineKeyboardMarkup(keyboard)
 
     async def _handle_admin_language_selection(self, query: CallbackQuery) -> None:
         """Handle language selection from business info"""
@@ -3147,7 +3283,7 @@ class AdminHandler:
                 InlineKeyboardButton("🇺🇸 English", callback_data="admin_language_en"),
                 InlineKeyboardButton("🇮🇱 עברית", callback_data="admin_language_he")
             ],
-            [InlineKeyboardButton(i18n.get_text("BACK_TO_BUSINESS_INFO", user_id=None), callback_data="admin_business_info")]
+            [InlineKeyboardButton(i18n.get_text("BACK_TO_BUSINESS_SETTINGS", user_id=None), callback_data="admin_business_settings")]
         ]
         return InlineKeyboardMarkup(keyboard)
 
@@ -3164,9 +3300,9 @@ class AdminHandler:
                 language = data.split("_")[-1]  # admin_language_en -> en
                 language_manager.set_user_language(user_id, language)
                 
-                # Show success message in new language and return to business info
+                # Show success message in new language and return to business settings
                 await query.answer(i18n.get_text("LANGUAGE_CHANGED", user_id=user_id))
-                await self._show_business_info(query)
+                await self._show_business_settings(query)
                 
         except Exception as e:
             self.logger.error("Error handling admin language change: %s", e)
@@ -3336,6 +3472,293 @@ class AdminHandler:
         except Exception:
             return None
 
+    async def _show_business_settings(self, query: CallbackQuery) -> None:
+        """Show current business settings and info"""
+        try:
+            user_id = query.from_user.id
+            result = await self.admin_service.get_business_settings()
+            
+            if result["success"]:
+                settings = result["settings"]
+                
+                # Get config for additional info
+                from src.config import get_config
+                config = get_config()
+                
+                text = i18n.get_text("ADMIN_BUSINESS_SETTINGS_TITLE", user_id=user_id)
+                text += "\n\n"
+                
+                # Display current settings
+                text += f"🏪 <b>{i18n.get_text('ADMIN_BUSINESS_NAME', user_id=user_id)}:</b> {settings.get('business_name', 'N/A')}\n"
+                text += f"📝 <b>{i18n.get_text('ADMIN_BUSINESS_DESCRIPTION', user_id=user_id)}:</b> {settings.get('business_description', 'N/A')}\n"
+                text += f"📍 <b>{i18n.get_text('ADMIN_BUSINESS_ADDRESS', user_id=user_id)}:</b> {settings.get('business_address', 'N/A')}\n"
+                text += f"📞 <b>{i18n.get_text('ADMIN_BUSINESS_PHONE', user_id=user_id)}:</b> {settings.get('business_phone', 'N/A')}\n"
+                text += f"📧 <b>{i18n.get_text('ADMIN_BUSINESS_EMAIL', user_id=user_id)}:</b> {settings.get('business_email', 'N/A')}\n"
+                text += f"🌐 <b>{i18n.get_text('ADMIN_BUSINESS_WEBSITE', user_id=user_id)}:</b> {settings.get('business_website', 'N/A')}\n"
+                text += f"🕒 <b>{i18n.get_text('ADMIN_BUSINESS_HOURS', user_id=user_id)}:</b> {settings.get('business_hours', 'N/A')}\n"
+                text += f"🚚 <b>{i18n.get_text('ADMIN_DELIVERY_CHARGE', user_id=user_id)}:</b> {settings.get('delivery_charge', 0)} {settings.get('currency', 'ILS')}\n"
+                text += f"💰 <b>{i18n.get_text('ADMIN_CURRENCY', user_id=user_id)}:</b> {settings.get('currency', 'ILS')}\n"
+                text += f"🏢 <b>{i18n.get_text('BUSINESS_TYPE', user_id=user_id)}:</b> Restaurant\n"
+                text += f"🌍 <b>{i18n.get_text('BUSINESS_ENVIRONMENT', user_id=user_id)}:</b> {config.environment}\n"
+                
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            i18n.get_text("ADMIN_EDIT_BUSINESS_SETTINGS", user_id=user_id),
+                            callback_data="admin_edit_business_settings"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            i18n.get_text("LANGUAGE_BUTTON", user_id=user_id), 
+                            callback_data="admin_language_selection"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id),
+                            callback_data="admin_dashboard"
+                        )
+                    ]
+                ]
+                
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            else:
+                await query.edit_message_text(
+                    i18n.get_text("ADMIN_BUSINESS_SETTINGS_ERROR", user_id=user_id).format(error=result["error"])
+                )
+                
+        except Exception as e:
+            self.logger.error("Error showing business settings: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
+    async def _start_edit_business_settings(self, query: CallbackQuery) -> None:
+        """Start editing business settings"""
+        try:
+            user_id = query.from_user.id
+            
+            text = i18n.get_text("ADMIN_EDIT_BUSINESS_SETTINGS_TITLE", user_id=user_id)
+            text += "\n\n"
+            text += i18n.get_text("ADMIN_EDIT_BUSINESS_SETTINGS_INSTRUCTIONS", user_id=user_id)
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_EDIT_BUSINESS_NAME", user_id=user_id),
+                        callback_data="admin_edit_business_name"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_EDIT_BUSINESS_DESCRIPTION", user_id=user_id),
+                        callback_data="admin_edit_business_description"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_EDIT_BUSINESS_ADDRESS", user_id=user_id),
+                        callback_data="admin_edit_business_address"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_EDIT_BUSINESS_PHONE", user_id=user_id),
+                        callback_data="admin_edit_business_phone"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_EDIT_BUSINESS_EMAIL", user_id=user_id),
+                        callback_data="admin_edit_business_email"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_EDIT_BUSINESS_WEBSITE", user_id=user_id),
+                        callback_data="admin_edit_business_website"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_EDIT_BUSINESS_HOURS", user_id=user_id),
+                        callback_data="admin_edit_business_hours"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_EDIT_DELIVERY_CHARGE", user_id=user_id),
+                        callback_data="admin_edit_delivery_charge"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_EDIT_CURRENCY", user_id=user_id),
+                        callback_data="admin_edit_currency"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_BACK_TO_BUSINESS_SETTINGS", user_id=user_id),
+                        callback_data="admin_business_settings"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+        except Exception as e:
+            self.logger.error("Error starting business settings edit: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
+    async def _handle_business_settings_edit(self, query: CallbackQuery, field: str) -> None:
+        """Handle business settings field editing"""
+        try:
+            user_id = query.from_user.id
+            
+            # Store the field being edited
+            self.admin_conversations[user_id] = {
+                "state": "editing_business_field",
+                "field": field
+            }
+            
+            field_names = {
+                "business_name": i18n.get_text("ADMIN_BUSINESS_NAME", user_id=user_id),
+                "business_description": i18n.get_text("ADMIN_BUSINESS_DESCRIPTION", user_id=user_id),
+                "business_address": i18n.get_text("ADMIN_BUSINESS_ADDRESS", user_id=user_id),
+                "business_phone": i18n.get_text("ADMIN_BUSINESS_PHONE", user_id=user_id),
+                "business_email": i18n.get_text("ADMIN_BUSINESS_EMAIL", user_id=user_id),
+                "business_website": i18n.get_text("ADMIN_BUSINESS_WEBSITE", user_id=user_id),
+                "business_hours": i18n.get_text("ADMIN_BUSINESS_HOURS", user_id=user_id),
+                "delivery_charge": i18n.get_text("ADMIN_DELIVERY_CHARGE", user_id=user_id),
+                "currency": i18n.get_text("ADMIN_CURRENCY", user_id=user_id)
+            }
+            
+            field_name = field_names.get(field, field)
+            
+            text = i18n.get_text("ADMIN_EDIT_BUSINESS_FIELD_PROMPT", user_id=user_id).format(
+                field=field_name
+            )
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("CANCEL", user_id=user_id),
+                        callback_data="admin_edit_business_settings"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+        except Exception as e:
+            self.logger.error("Error handling business settings edit: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
+    async def _handle_business_settings_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """Handle business settings input from user"""
+        try:
+            user_id = update.effective_user.id
+            
+            if user_id not in self.admin_conversations:
+                await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+                return ConversationHandler.END
+            
+            conversation = self.admin_conversations[user_id]
+            field = conversation.get("field")
+            value = update.message.text.strip()
+            
+            # Validate input based on field
+            validation_result = self._validate_business_field(field, value, user_id)
+            if not validation_result["valid"]:
+                await update.message.reply_text(validation_result["error"])
+                return AWAITING_BUSINESS_FIELD_INPUT
+            
+            # Update business settings
+            result = await self.admin_service.update_business_settings(**{field: value})
+            
+            if result["success"]:
+                success_text = i18n.get_text("ADMIN_BUSINESS_SETTINGS_UPDATE_SUCCESS", user_id=user_id).format(
+                    field=field.replace("_", " ").title(),
+                    value=value
+                )
+                
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            i18n.get_text("ADMIN_CONTINUE_EDITING", user_id=user_id),
+                            callback_data="admin_edit_business_settings"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            i18n.get_text("ADMIN_BACK_TO_BUSINESS_SETTINGS", user_id=user_id),
+                            callback_data="admin_business_settings"
+                        )
+                    ]
+                ]
+                
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await update.message.reply_text(success_text, parse_mode="HTML", reply_markup=reply_markup)
+                
+                # Clear conversation state
+                del self.admin_conversations[user_id]
+                return ConversationHandler.END
+            else:
+                await update.message.reply_text(
+                    i18n.get_text("ADMIN_BUSINESS_SETTINGS_UPDATE_ERROR", user_id=user_id).format(error=result["error"])
+                )
+                return AWAITING_BUSINESS_FIELD_INPUT
+                
+        except Exception as e:
+            self.logger.error("Error handling business settings input: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    def _validate_business_field(self, field: str, value: str, user_id: int) -> dict:
+        """Validate business field input"""
+        if field == "business_name":
+            if len(value) < 2:
+                return {
+                    "valid": False,
+                    "error": i18n.get_text("ADMIN_BUSINESS_NAME_TOO_SHORT", user_id=user_id)
+                }
+        elif field == "business_description":
+            if len(value) < 10:
+                return {
+                    "valid": False,
+                    "error": i18n.get_text("ADMIN_BUSINESS_DESCRIPTION_TOO_SHORT", user_id=user_id)
+                }
+        elif field == "business_email":
+            import re
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            if not re.match(email_pattern, value):
+                return {
+                    "valid": False,
+                    "error": i18n.get_text("ADMIN_BUSINESS_EMAIL_INVALID", user_id=user_id)
+                }
+        elif field == "business_phone":
+            if len(value) < 7:
+                return {
+                    "valid": False,
+                    "error": i18n.get_text("ADMIN_BUSINESS_PHONE_TOO_SHORT", user_id=user_id)
+                }
+        elif field == "delivery_charge":
+            try:
+                charge = float(value)
+                if charge < 0:
+                    return {
+                        "valid": False,
+                        "error": i18n.get_text("ADMIN_DELIVERY_CHARGE_NEGATIVE", user_id=user_id)
+                    }
+            except ValueError:
+                return {
+                    "valid": False,
+                    "error": i18n.get_text("ADMIN_DELIVERY_CHARGE_INVALID", user_id=user_id)
+                }
+        elif field == "currency":
+            if len(value) < 2 or len(value) > 5:
+                return {
+                    "valid": False,
+                    "error": i18n.get_text("ADMIN_CURRENCY_INVALID", user_id=user_id)
+                }
+        
+        return {"valid": True}
+
 
 def register_admin_handlers(application: Application):
     """Register admin handlers"""
@@ -3481,6 +3904,32 @@ def register_admin_handlers(application: Application):
     handler.logger.info("🔧 Registering edit_product_conversation handler")
     application.add_handler(edit_product_handler)
     handler.logger.info("✅ edit_product_conversation handler registered successfully")
+
+    # Admin conversation handler for business settings
+    business_settings_handler = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(
+                lambda u, c: AWAITING_BUSINESS_FIELD_INPUT,
+                pattern="^admin_edit_business_"
+            )
+        ],
+        states={
+            AWAITING_BUSINESS_FIELD_INPUT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_business_settings_input)
+            ]
+        },
+        fallbacks=[
+            CallbackQueryHandler(lambda u, c: ConversationHandler.END, pattern="^admin_edit_business_settings$")
+        ],
+        name="business_settings_conversation",
+        persistent=False,
+        per_message=False,
+    )
+
+    # Add debug logging to the conversation handler
+    handler.logger.info("🔧 Registering business_settings_conversation handler")
+    application.add_handler(business_settings_handler)
+    handler.logger.info("✅ business_settings_conversation handler registered successfully")
 
     # Analytics callback handlers
     application.add_handler(

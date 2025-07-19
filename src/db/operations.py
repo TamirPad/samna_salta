@@ -32,6 +32,7 @@ from src.db.models import (
     CoreBusiness,
     AnalyticsDailySales,
     AnalyticsProductPerformance,
+    BusinessSettings,
 )
 from src.utils.logger import PerformanceLogger
 from src.utils.constants import (
@@ -51,6 +52,7 @@ from src.utils.error_handler import (
 import random
 import string
 from decimal import Decimal
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -1637,6 +1639,39 @@ def update_order_status(order_id: int, new_status: str) -> bool:
         logger.error("Failed to update order status: %s", e)
         return False
 
+
+@retry_on_database_error()
+def delete_order(order_id: int) -> bool:
+    """Delete an order and its associated items"""
+    try:
+        with get_db_manager().get_session_context() as session:
+            # First, get the order to log it before deletion
+            order = session.query(Order).filter(Order.id == order_id).first()
+            if not order:
+                logger.warning("Order %d not found for deletion", order_id)
+                return False
+            
+            # Log the deletion for audit purposes
+            logger.info(
+                "ORDER_DELETED: order_id=%d, customer_id=%d, total=%.2f, order_number=%s, status=%s",
+                order.id, order.customer_id, order.total, order.order_number, order.status
+            )
+            
+            # Delete order items first (foreign key constraint)
+            session.query(OrderItem).filter(OrderItem.order_id == order_id).delete()
+            
+            # Delete the order
+            session.query(Order).filter(Order.id == order_id).delete()
+            
+            session.commit()
+            
+            logger.info("Order %d and its items deleted successfully", order_id)
+            return True
+            
+    except Exception as e:
+        logger.error("Error deleting order %d: %s", order_id, e)
+        return False
+
 def generate_order_number() -> str:
     """Generate unique order number with timestamp and random component"""
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -1777,3 +1812,90 @@ def delete_category(name: str) -> bool:
         return False
     finally:
         session.close()
+
+
+@retry_on_database_error()
+def get_business_settings() -> Optional[BusinessSettings]:
+    """Get business settings (creates default if none exist)"""
+    session = get_db_session()
+    try:
+        settings = session.query(BusinessSettings).first()
+        if not settings:
+            # Create default settings
+            from src.config import get_config
+            config = get_config()
+            
+            settings = BusinessSettings(
+                business_name="Samna Salta",
+                business_description="Traditional Yemeni restaurant serving authentic dishes",
+                delivery_charge=config.delivery_charge,
+                currency=config.currency,
+                hilbeh_available_days=json.dumps(config.hilbeh_available_days),
+                hilbeh_available_hours=config.hilbeh_available_hours
+            )
+            session.add(settings)
+            session.commit()
+            session.refresh(settings)
+            logger.info("Created default business settings")
+        
+        return settings
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error("Failed to get business settings: %s", e)
+        return None
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def update_business_settings(**kwargs) -> bool:
+    """Update business settings"""
+    session = get_db_session()
+    try:
+        settings = session.query(BusinessSettings).first()
+        if not settings:
+            logger.warning("No business settings found to update")
+            return False
+        
+        # Update allowed fields
+        allowed_fields = [
+            'business_name', 'business_description', 'business_address',
+            'business_phone', 'business_email', 'business_website',
+            'business_hours', 'delivery_charge', 'currency',
+            'hilbeh_available_days', 'hilbeh_available_hours',
+            'welcome_message', 'about_us', 'contact_info'
+        ]
+        
+        for field, value in kwargs.items():
+            if field in allowed_fields:
+                if field == 'hilbeh_available_days' and isinstance(value, list):
+                    setattr(settings, field, json.dumps(value))
+                else:
+                    setattr(settings, field, value)
+        
+        settings.updated_at = datetime.utcnow()
+        session.commit()
+        logger.info("Updated business settings: %s", list(kwargs.keys()))
+        return True
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error("Failed to update business settings: %s", e)
+        return False
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def get_business_settings_dict() -> dict:
+    """Get business settings as dictionary"""
+    settings = get_business_settings()
+    if settings:
+        data = settings.to_dict()
+        # Parse JSON fields
+        if data.get('hilbeh_available_days'):
+            try:
+                data['hilbeh_available_days'] = json.loads(data['hilbeh_available_days'])
+            except json.JSONDecodeError:
+                data['hilbeh_available_days'] = []
+        return data
+    return {}

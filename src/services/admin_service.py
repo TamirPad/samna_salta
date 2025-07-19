@@ -548,6 +548,63 @@ class AdminService:
             logger.error("Error updating order status: %s", e)
             return False
 
+    async def delete_order(self, order_id: int, admin_telegram_id: int) -> bool:
+        """Delete an order by admin"""
+        try:
+            from src.db.operations import delete_order as db_delete_order
+            
+            # Get order details before deletion for logging
+            order_info = await self.get_order_by_id(order_id)
+            if not order_info:
+                logger.warning("Order %d not found for deletion by admin %d", order_id, admin_telegram_id)
+                return False
+            
+            # Perform the deletion
+            success = db_delete_order(order_id)
+            if success:
+                logger.info(
+                    "Order %d deleted by admin %d: order_number=%s, customer=%s, total=%.2f",
+                    order_id, admin_telegram_id, order_info.get("order_number"), 
+                    order_info.get("customer_name"), order_info.get("total", 0)
+                )
+                
+                # Send notification to customer about order cancellation
+                try:
+                    from src.container import get_container
+                    container = get_container()
+                    notification_service = container.get_notification_service()
+                    
+                    # Get customer telegram_id from order info
+                    from src.db.operations import get_all_orders
+                    orders = get_all_orders()
+                    order = next((o for o in orders if o.id == order_id), None)
+                    
+                    if order and order.customer:
+                        customer_telegram_id = order.customer.telegram_id
+                        order_number = order.order_number
+                        
+                        # Send notification to customer about order cancellation
+                        await notification_service.notify_order_cancelled(
+                            order_id=order_number,
+                            customer_chat_id=customer_telegram_id
+                        )
+                        
+                        logger.info("Customer notification sent: Order #%s cancelled for customer %d", 
+                                  order_number, customer_telegram_id)
+                    else:
+                        logger.warning("Could not find order or customer for cancellation notification: order_id=%d", order_id)
+                        
+                except Exception as e:
+                    logger.error("Failed to send customer cancellation notification: %s", e)
+                
+                return True
+            else:
+                logger.error("Failed to delete order %d by admin %d", order_id, admin_telegram_id)
+                return False
+        except Exception as e:
+            logger.error("Error deleting order %d: %s", order_id, e)
+            return False
+
     async def get_business_analytics(self) -> Dict:
         """Get enhanced business analytics for admin dashboard"""
         try:
@@ -1017,3 +1074,62 @@ class AdminService:
         except Exception as e:
             logger.error("Error deleting category '%s': %s", category, e)
             return {"success": False, "error": f"Failed to delete category: {str(e)}"}
+
+    async def get_business_settings(self) -> Dict:
+        """Get current business settings"""
+        try:
+            from src.db.operations import get_business_settings_dict
+            settings = get_business_settings_dict()
+            
+            if settings:
+                logger.info("Retrieved business settings successfully")
+                return {
+                    "success": True,
+                    "settings": settings
+                }
+            else:
+                return {"success": False, "error": "No business settings found"}
+                
+        except Exception as e:
+            logger.error("Error getting business settings: %s", e)
+            return {"success": False, "error": f"Failed to get business settings: {str(e)}"}
+
+    async def update_business_settings(self, **kwargs) -> Dict:
+        """Update business settings"""
+        try:
+            from src.db.operations import update_business_settings
+            
+            # Validate required fields
+            if "business_name" in kwargs and (not kwargs["business_name"] or len(kwargs["business_name"].strip()) < 2):
+                return {"success": False, "error": "Business name must be at least 2 characters long"}
+            
+            if "delivery_charge" in kwargs and kwargs["delivery_charge"] < 0:
+                return {"success": False, "error": "Delivery charge cannot be negative"}
+            
+            if "currency" in kwargs and len(kwargs["currency"].strip()) < 2:
+                return {"success": False, "error": "Currency must be at least 2 characters long"}
+            
+            # Clean up string inputs
+            for key, value in kwargs.items():
+                if isinstance(value, str):
+                    kwargs[key] = value.strip()
+            
+            # Update settings
+            success = update_business_settings(**kwargs)
+            
+            if success:
+                # Get updated settings
+                updated_settings = await self.get_business_settings()
+                logger.info("Successfully updated business settings: %s", list(kwargs.keys()))
+                return {
+                    "success": True,
+                    "message": f"Business settings updated successfully",
+                    "updated_fields": list(kwargs.keys()),
+                    "settings": updated_settings.get("settings", {})
+                }
+            else:
+                return {"success": False, "error": "Failed to update business settings"}
+                
+        except Exception as e:
+            logger.error("Error updating business settings: %s", e)
+            return {"success": False, "error": f"Failed to update business settings: {str(e)}"}
