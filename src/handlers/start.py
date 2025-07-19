@@ -813,6 +813,7 @@ def register_start_handlers(application: Application):
             handler.handle_unknown_command,
             handler.handle_unknown_message,
         ],
+        per_message=False,
     )
 
     application.add_handler(conv_handler)

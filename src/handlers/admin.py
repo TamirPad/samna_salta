@@ -2610,7 +2610,7 @@ def register_admin_handlers(application: Application):
         fallbacks=[
             CommandHandler("cancel", lambda u, c: ConversationHandler.END)
             ],
-        per_message=True,
+        per_message=False,
     )
 
     application.add_handler(conv_handler)
@@ -2643,7 +2643,7 @@ def register_admin_handlers(application: Application):
         ],
         name="add_product_conversation",
         persistent=False,
-        per_message=True,
+        per_message=False,
     )
     
     # Add debug logging to the conversation handler
@@ -2669,7 +2669,7 @@ def register_admin_handlers(application: Application):
         ],
         name="add_category_conversation",
         persistent=False,
-        per_message=True,
+        per_message=False,
     )
 
     # Add debug logging to the conversation handler
@@ -2693,7 +2693,7 @@ def register_admin_handlers(application: Application):
         ],
         name="edit_category_conversation",
         persistent=False,
-        per_message=True,
+        per_message=False,
     )
 
     application.add_handler(edit_category_handler)
