@@ -1253,7 +1253,6 @@ def create_order(
             
             order = Order(
                 customer_id=customer_id,
-                total_amount=total_amount,
                 subtotal=subtotal,
                 delivery_charge=delivery_charge,
                 total=total_amount,
@@ -1290,7 +1289,6 @@ def create_order_with_items(
             order = Order(
                 customer_id=customer_id,
                 order_number=order_number,
-                total_amount=total_amount,
                 subtotal=subtotal,
                 delivery_charge=delivery_charge,
                 total=total_amount,
