@@ -72,7 +72,9 @@
   "SAMNEH_SMOKED": "Smoked",
   "SAMNEH_NOT_SMOKED": "Not Smoked",
   "SIZE_SMALL": "Small",
+  "SIZE_MEDIUM": "Medium",
   "SIZE_LARGE": "Large",
+  "SIZE_XL": "Extra Large",
   "ADD_TO_CART": "➕ Add to Cart",
   "INFO": "ℹ️ Info",
   "HILBEH_UNAVAILABLE": "❌ Not Available Today",
@@ -481,6 +483,7 @@
   "SAMNEH_DESC": "🧈 <b>Samneh</b>\n\nChoose your preferred samneh type:\n\n• <b>Smoked</b> - Rich smoky flavor\n• <b>Not Smoked</b> - Pure and natural\n\n<i>Price: 15 ₪</i>",
   "RED_BISBAS_DESC": "🌶️ <b>Red Bisbas</b>\n\nTraditional Yemeni spicy sauce - perfect for adding heat to your dishes!\n\n<i>Price: 12 ₪</i>",
   "HILBEH_DESC_AVAILABLE": "🌿 <b>Hilbeh</b>\n\nTraditional Yemeni fenugreek sauce - a unique and tasty addition to your meal!\n\nAvailable today! ✅\n\n<i>Price: 18 ₪</i>",
+  "HILBEH_DESC": "🌿 <b>Hilbeh</b>\n\nTraditional Yemeni fenugreek sauce - a unique and tasty addition to your meal!\n\n<i>Price: 18 ₪</i>",
   "HAWAIJ_SOUP_DESC": "🥘 <b>Hawaij for Soup</b>\n\nPerfect Yemeni spice blend for soups and stews - adds authentic flavor!\n\n<i>Price: 8 ₪</i>",
   "HAWAIJ_COFFEE_DESC": "☕ <b>Hawaij for Coffee</b>\n\nYemeni spice blend for coffee - transforms your coffee experience!\n\n<i>Price: 8 ₪</i>",
   "WHITE_COFFEE_DESC": "Traditional Yemenite white coffee, made with cardamom and spices for a unique aromatic experience.",
@@ -529,6 +532,10 @@
   "KUBANEH_DISPLAY_NAME": "Kubaneh ({type})",
   "SAMNEH_DISPLAY_NAME": "Samneh ({type})",
   "RED_BISBAS_DISPLAY_NAME": "Red Bisbas ({size})",
+  "RED_BISBAS_SMALL": "Small",
+  "RED_BISBAS_MEDIUM": "Medium",
+  "RED_BISBAS_LARGE": "Large",
+  "RED_BISBAS_XL": "Extra Large",
   "HILBEH_DISPLAY_NAME": "Hilbeh ({type})",
   
   "KUBANEH_CLASSIC": "Classic",
@@ -661,5 +668,7 @@
   "ADMIN_QUICK_TOGGLE_SUCCESS": "✅ Product status changed to: {status}",
   "ADMIN_QUICK_TOGGLE_ERROR": "❌ Failed to toggle status: {error}",
   "ADMIN_QUICK_DELETE_SUCCESS": "✅ Product deleted successfully!",
-  "ADMIN_QUICK_DELETE_ERROR": "❌ Failed to delete product: {error}"
+  "ADMIN_QUICK_DELETE_ERROR": "❌ Failed to delete product: {error}",
+  "ADMIN_ORDER_NOT_FOUND": "❌ Order not found. Please try again.",
+  "ADMIN_CATEGORY_BACK_TO_MANAGEMENT": "⬅️ Back to Menu Management"
 } 
