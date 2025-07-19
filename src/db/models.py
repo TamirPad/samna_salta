@@ -229,8 +229,6 @@ class Order(Base):
         Integer, ForeignKey("customers.id"), nullable=True
     )
     status: Mapped[Optional[str]] = mapped_column(String(50), default="pending", nullable=True)
-    total_amount: Mapped[float] = mapped_column(Float, nullable=False, server_default="0.0")
-    delivery_fee: Mapped[Optional[float]] = mapped_column(Float, default=0, nullable=True)
     delivery_address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     delivery_instructions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     order_type: Mapped[Optional[str]] = mapped_column(String(20), default="delivery", nullable=True)
