@@ -9,7 +9,7 @@ import logging
 import time
 from datetime import datetime
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, Union, Generator
+from typing import Any, Callable, Dict, List, Optional, Union, Generator, Tuple
 from contextlib import contextmanager
 
 from sqlalchemy import Engine, create_engine, event, text
@@ -50,8 +50,126 @@ from src.utils.error_handler import (
 
 import random
 import string
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
+
+
+class ACIDTransactionManager:
+    """Manages ACID-compliant transactions with configurable isolation levels"""
+    
+    @staticmethod
+    @contextmanager
+    def atomic_transaction(
+        isolation_level: str = "READ_COMMITTED",
+        timeout: int = 30
+    ) -> Generator[Session, None, None]:
+        """
+        Atomic transaction with configurable isolation level
+        
+        Args:
+            isolation_level: Database isolation level (READ_COMMITTED, SERIALIZABLE, etc.)
+            timeout: Transaction timeout in seconds
+            
+        Yields:
+            Database session for transaction operations
+        """
+        session = get_db_session()
+        try:
+            # Check if we're using PostgreSQL (Supabase) or SQLite
+            engine = session.bind
+            if engine and hasattr(engine, 'url') and 'postgresql' in str(engine.url):
+                # PostgreSQL/Supabase: Set transaction isolation level
+                if isolation_level == "READ_COMMITTED":
+                    session.execute(text("SET TRANSACTION ISOLATION LEVEL READ COMMITTED"))
+                elif isolation_level == "SERIALIZABLE":
+                    session.execute(text("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE"))
+                elif isolation_level == "REPEATABLE_READ":
+                    session.execute(text("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ"))
+                elif isolation_level == "READ_UNCOMMITTED":
+                    session.execute(text("SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED"))
+                
+                session.execute(text(f"SET LOCAL lock_timeout = '{timeout}s'"))
+            else:
+                # SQLite: Use default isolation level (SERIALIZABLE)
+                logger.debug("Using SQLite with default SERIALIZABLE isolation level")
+            
+            yield session
+            session.commit()
+            logger.debug("Transaction committed successfully")
+            
+        except Exception as e:
+            session.rollback()
+            logger.error("Transaction failed and rolled back: %s", e)
+            raise
+        finally:
+            session.close()
+
+
+class OrderValidator:
+    """Business logic validation for orders"""
+    
+    VALID_STATUS_TRANSITIONS = {
+        'pending': ['confirmed', 'cancelled'],
+        'confirmed': ['preparing', 'cancelled'],
+        'preparing': ['ready', 'cancelled'],
+        'ready': ['delivered'],
+        'delivered': [],  # Terminal state
+        'cancelled': []   # Terminal state
+    }
+    
+    @staticmethod
+    def validate_order_status_transition(current_status: str, new_status: str) -> bool:
+        """Validate order status transitions"""
+        return new_status in OrderValidator.VALID_STATUS_TRANSITIONS.get(current_status, [])
+    
+    @staticmethod
+    def validate_order_totals(order: Order, items: List[OrderItem]) -> bool:
+        """Validate order totals match items"""
+        calculated_subtotal = sum(item.total_price for item in items)
+        calculated_total = calculated_subtotal + order.delivery_charge
+        return abs(calculated_total - order.total) < 0.01
+    
+    @staticmethod
+    def validate_cart_consistency(cart_items: List[Dict]) -> bool:
+        """Validate cart item consistency"""
+        for item in cart_items:
+            if item.get('quantity', 0) <= 0:
+                return False
+            if item.get('unit_price', 0) < 0:
+                return False
+            calculated_total = item.get('unit_price', 0) * item.get('quantity', 0)
+            if abs(calculated_total - item.get('total_price', 0)) > 0.01:
+                return False
+        return True
+
+
+class AuditLogger:
+    """Audit trail for critical operations"""
+    
+    @staticmethod
+    def log_order_creation(order: Order, user_id: int):
+        """Log order creation"""
+        logger.info(
+            "ORDER_CREATED: order_id=%d, customer_id=%d, total=%.2f, user_id=%d, order_number=%s",
+            order.id, order.customer_id, order.total, user_id, order.order_number
+        )
+    
+    @staticmethod
+    def log_status_change(order_id: int, old_status: str, new_status: str, user_id: int):
+        """Log order status change"""
+        logger.info(
+            "STATUS_CHANGED: order_id=%d, %s->%s, user_id=%d",
+            order_id, old_status, new_status, user_id
+        )
+    
+    @staticmethod
+    def log_cart_operation(operation: str, telegram_id: int, product_id: int, quantity: int):
+        """Log cart operations"""
+        logger.info(
+            "CART_OPERATION: %s, telegram_id=%d, product_id=%d, quantity=%d",
+            operation, telegram_id, product_id, quantity
+        )
 
 
 class DatabaseOptimizer:
@@ -953,20 +1071,41 @@ def get_or_create_cart(telegram_id: int) -> Cart:
 def add_to_cart(
     telegram_id: int, product_id: int, quantity: int = 1, options: dict | None = None
 ) -> bool:
-    """Add a product to the customer's cart"""
+    """
+    Atomic cart addition with proper locking and validation (ACID compliant)
+    
+    Args:
+        telegram_id: Customer's Telegram ID
+        product_id: Product ID to add
+        quantity: Quantity to add
+        options: Product options
+        
+    Returns:
+        True if successful, False otherwise
+    """
     try:
-        with get_db_manager().get_session_context() as session:
-            # Get or create customer
-            customer = session.query(Customer).filter(Customer.telegram_id == telegram_id).first()
+        with ACIDTransactionManager.atomic_transaction("SERIALIZABLE") as session:
+            # Lock customer record
+            customer = session.query(Customer).filter(
+                Customer.telegram_id == telegram_id
+            ).with_for_update().first()
+            
             if not customer:
-                logger.error("Customer %s not found for cart operation", telegram_id)
-                return False
-
-            # Get or create cart
+                # Create customer if not exists
+                customer = Customer(
+                    telegram_id=telegram_id,
+                    name="",  # Use 'name' not 'full_name'
+                    phone="",  # Use 'phone' not 'phone_number'
+                    language="en"
+                )
+                session.add(customer)
+                session.flush()
+            
+            # Lock cart record
             cart = session.query(Cart).filter(
                 Cart.customer_id == customer.id,
                 Cart.is_active == True
-            ).first()
+            ).with_for_update().first()
             
             if not cart:
                 cart = Cart(
@@ -976,24 +1115,27 @@ def add_to_cart(
                 )
                 session.add(cart)
                 session.flush()
-
-            # Get product
-            product = session.query(Product).filter(Product.id == product_id).first()
+            
+            # Lock product record
+            product = session.query(Product).filter(
+                Product.id == product_id,
+                Product.is_active == True
+            ).with_for_update().first()
+            
             if not product:
-                logger.error("Product %d not found for cart operation", product_id)
-                return False
-
+                raise ValueError(f"Product {product_id} not found or inactive")
+            
             # Check if item already exists in cart
             existing_item = session.query(CartItem).filter(
                 CartItem.cart_id == cart.id,
                 CartItem.product_id == product_id
-            ).first()
-
+            ).with_for_update().first()
+            
             if existing_item:
                 # Update quantity
                 existing_item.quantity += quantity
                 existing_item.updated_at = datetime.utcnow()
-                logger.info("Updated quantity for product %d in cart for customer %s", product_id, telegram_id)
+                AuditLogger.log_cart_operation("UPDATE", telegram_id, product_id, quantity)
             else:
                 # Create new cart item
                 cart_item = CartItem(
@@ -1005,21 +1147,28 @@ def add_to_cart(
                     special_instructions=""
                 )
                 session.add(cart_item)
-                logger.info("Added product %d to cart for customer %s", product_id, telegram_id)
-
-            session.commit()
+                AuditLogger.log_cart_operation("ADD", telegram_id, product_id, quantity)
+            
             return True
-
+            
     except Exception as e:
-        logger.error("Failed to add to cart: %s", e)
+        logger.error("Atomic cart operation failed: %s", e)
         return False
 
 
 @retry_on_database_error()
 def get_cart_items(telegram_id: int) -> list[dict]:
-    """Get all items in the customer's cart"""
+    """
+    Get all items in the customer's cart with ACID compliance
+    
+    Args:
+        telegram_id: Customer's Telegram ID
+        
+    Returns:
+        List of cart items with product information
+    """
     try:
-        with get_db_manager().get_session_context() as session:
+        with ACIDTransactionManager.atomic_transaction("READ_COMMITTED") as session:
             # Get customer by telegram_id
             customer = session.query(Customer).filter(Customer.telegram_id == telegram_id).first()
             if not customer:
@@ -1059,6 +1208,10 @@ def get_cart_items(telegram_id: int) -> list[dict]:
                     "product_image_url": product.image_url
                 }
                 items.append(item_data)
+
+            # Validate cart consistency
+            if not OrderValidator.validate_cart_consistency(items):
+                logger.warning("Cart consistency validation failed for customer %d", telegram_id)
 
             logger.info("Retrieved %d items from cart for customer %d", len(items), telegram_id)
             return items
@@ -1124,57 +1277,195 @@ def update_cart(
 
 @retry_on_database_error()
 def clear_cart(telegram_id: int) -> bool:
-    """Clear all items from a cart"""
-    session = get_db_session()
-    try:
-        customer = session.query(Customer).filter(Customer.telegram_id == telegram_id).first()
-        if not customer:
-            return False
+    """
+    Atomic cart clearing with proper locking (ACID compliant)
+    
+    Args:
+        telegram_id: Customer's Telegram ID
         
-        cart = session.query(Cart).filter(Cart.customer_id == customer.id).first()
-        if cart:
-            # Delete all cart items
-            session.query(CartItem).filter(CartItem.cart_id == cart.id).delete()
-            # Delete the cart itself
-            session.delete(cart)
-            session.commit()
-        return True
-    except SQLAlchemyError as e:
-        session.rollback()
-        logger.error("Failed to clear cart: %s", e)
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        with ACIDTransactionManager.atomic_transaction("SERIALIZABLE") as session:
+            # Lock customer record
+            customer = session.query(Customer).filter(
+                Customer.telegram_id == telegram_id
+            ).with_for_update().first()
+            
+            if not customer:
+                logger.warning("Customer %d not found for cart clearing", telegram_id)
+                return False
+            
+            # Lock cart record
+            cart = session.query(Cart).filter(
+                Cart.customer_id == customer.id,
+                Cart.is_active == True
+            ).with_for_update().first()
+            
+            if cart:
+                # Delete all cart items
+                deleted_items = session.query(CartItem).filter(
+                    CartItem.cart_id == cart.id
+                ).delete()
+                
+                # Delete the cart itself
+                session.delete(cart)
+                
+                AuditLogger.log_cart_operation("CLEAR", telegram_id, 0, deleted_items)
+                logger.info("Cleared cart for customer %d (deleted %d items)", telegram_id, deleted_items)
+            else:
+                logger.info("No active cart found for customer %d", telegram_id)
+            
+            return True
+            
+    except Exception as e:
+        logger.error("Atomic cart clearing failed: %s", e)
         return False
-    finally:
-        session.close()
 
 
 @retry_on_database_error()
 def remove_from_cart(telegram_id: int, product_id: int) -> bool:
-    """Remove item from cart"""
-    session = get_db_session()
-    try:
-        customer = session.query(Customer).filter(Customer.telegram_id == telegram_id).first()
-        if not customer:
-            return False
+    """
+    Atomic cart item removal with proper locking (ACID compliant)
+    
+    Args:
+        telegram_id: Customer's Telegram ID
+        product_id: Product ID to remove
         
-        cart = session.query(Cart).filter(Cart.customer_id == customer.id).first()
-        if not cart:
-            return False
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        with ACIDTransactionManager.atomic_transaction("SERIALIZABLE") as session:
+            # Lock customer record
+            customer = session.query(Customer).filter(
+                Customer.telegram_id == telegram_id
+            ).with_for_update().first()
+            
+            if not customer:
+                logger.warning("Customer %d not found for cart removal", telegram_id)
+                return False
+            
+            # Lock cart record
+            cart = session.query(Cart).filter(
+                Cart.customer_id == customer.id,
+                Cart.is_active == True
+            ).with_for_update().first()
+            
+            if not cart:
+                logger.warning("No active cart found for customer %d", telegram_id)
+                return False
 
-        # Remove items with the specified product_id
-        session.query(CartItem).filter(
-            CartItem.cart_id == cart.id,
-            CartItem.product_id == product_id
-        ).delete()
+            # Remove items with the specified product_id
+            deleted_items = session.query(CartItem).filter(
+                CartItem.cart_id == cart.id,
+                CartItem.product_id == product_id
+            ).delete()
 
-        session.commit()
-        return True
+            if deleted_items > 0:
+                AuditLogger.log_cart_operation("REMOVE", telegram_id, product_id, deleted_items)
+                logger.info("Removed %d items of product %d from cart for customer %d", 
+                           deleted_items, product_id, telegram_id)
+            else:
+                logger.info("No items of product %d found in cart for customer %d", 
+                           product_id, telegram_id)
 
-    except SQLAlchemyError as e:
-        session.rollback()
-        logger.error("Failed to remove from cart: %s", e)
+            return True
+
+    except Exception as e:
+        logger.error("Atomic cart removal failed: %s", e)
         return False
-    finally:
-        session.close()
+
+
+class ACIDComplianceChecker:
+    """ACID compliance checking utilities"""
+    
+    @staticmethod
+    def check_order_consistency(order_id: int) -> Tuple[bool, List[str]]:
+        """
+        Check order consistency
+        
+        Args:
+            order_id: Order ID to check
+            
+        Returns:
+            Tuple of (is_consistent, list_of_issues)
+        """
+        try:
+            with ACIDTransactionManager.atomic_transaction("READ_COMMITTED") as session:
+                order = session.query(Order).filter(Order.id == order_id).first()
+                if not order:
+                    return False, [f"Order {order_id} not found"]
+                
+                items = session.query(OrderItem).filter(OrderItem.order_id == order_id).all()
+                
+                issues = []
+                
+                # Check order totals
+                if not OrderValidator.validate_order_totals(order, items):
+                    issues.append("Order totals don't match items")
+                
+                # Check item consistency
+                for item in items:
+                    if item.quantity <= 0:
+                        issues.append(f"Item {item.id} has invalid quantity: {item.quantity}")
+                    if item.unit_price < 0:
+                        issues.append(f"Item {item.id} has invalid price: {item.unit_price}")
+                    calculated_total = item.unit_price * item.quantity
+                    if abs(calculated_total - item.total_price) > 0.01:
+                        issues.append(f"Item {item.id} total price mismatch: expected {calculated_total}, got {item.total_price}")
+                
+                return len(issues) == 0, issues
+                
+        except Exception as e:
+            logger.error("Error checking order consistency: %s", e)
+            return False, [f"Error checking consistency: {e}"]
+    
+    @staticmethod
+    def check_cart_consistency(telegram_id: int) -> Tuple[bool, List[str]]:
+        """
+        Check cart consistency
+        
+        Args:
+            telegram_id: Customer's Telegram ID
+            
+        Returns:
+            Tuple of (is_consistent, list_of_issues)
+        """
+        try:
+            with ACIDTransactionManager.atomic_transaction("READ_COMMITTED") as session:
+                customer = session.query(Customer).filter(Customer.telegram_id == telegram_id).first()
+                if not customer:
+                    return False, [f"Customer {telegram_id} not found"]
+                
+                cart = session.query(Cart).filter(
+                    Cart.customer_id == customer.id,
+                    Cart.is_active == True
+                ).first()
+                
+                if not cart:
+                    return True, []  # Empty cart is consistent
+                
+                items = session.query(CartItem).filter(CartItem.cart_id == cart.id).all()
+                
+                issues = []
+                
+                # Check item consistency
+                for item in items:
+                    if item.quantity <= 0:
+                        issues.append(f"Cart item {item.id} has invalid quantity: {item.quantity}")
+                    if item.unit_price < 0:
+                        issues.append(f"Cart item {item.id} has invalid price: {item.unit_price}")
+                    calculated_total = item.unit_price * item.quantity
+                    if abs(calculated_total - item.total_price) > 0.01:
+                        issues.append(f"Cart item {item.id} total price mismatch: expected {calculated_total}, got {item.total_price}")
+                
+                return len(issues) == 0, issues
+                
+        except Exception as e:
+            logger.error("Error checking cart consistency: %s", e)
+            return False, [f"Error checking consistency: {e}"]
 
 
 @retry_on_database_error()

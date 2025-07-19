@@ -196,6 +196,26 @@ def translate_product_name(product_name: str, options: Optional[dict] = None, us
             # Fallback to original name if translation fails
             return product_name
     
+    # Handle Hawaij products specifically
+    elif "hawaij soup spice" in product_name_lower:
+        try:
+            return i18n.get_text("PRODUCT_HAWAIJ_SOUP", user_id=user_id)
+        except:
+            return product_name
+    
+    elif "hawaij coffee spice" in product_name_lower:
+        try:
+            return i18n.get_text("PRODUCT_HAWAIJ_COFFEE", user_id=user_id)
+        except:
+            return product_name
+    
+    # Handle White Coffee
+    elif "white coffee" in product_name_lower:
+        try:
+            return i18n.get_text("PRODUCT_WHITE_COFFEE", user_id=user_id)
+        except:
+            return product_name
+    
     # Handle other products
     else:
         # Try to find a direct product translation

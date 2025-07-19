@@ -908,13 +908,13 @@ class AdminService:
                 return {"success": False, "error": "Product not found"}
             
             new_status = not product.is_active
-            result = update_product(product_id, is_active=new_status)
+            success = update_product(product_id, is_active=new_status)
             
-            if result["success"]:
+            if success:
                 logger.info("Toggled product %d status to %s", product_id, new_status)
                 return {"success": True, "new_status": new_status}
             else:
-                return {"success": False, "error": result["error"]}
+                return {"success": False, "error": "Failed to update product status"}
                 
         except Exception as e:
             logger.error("Error toggling product status: %s", e)

@@ -6,15 +6,18 @@ import logging
 from typing import List, Dict, Optional, Any
 
 from src.db.operations import (
-    add_to_cart,
-    get_cart_items,
     update_cart,
-    clear_cart,
-    remove_from_cart,
     get_customer_by_telegram_id,
     get_or_create_customer,
     get_cart_by_telegram_id,
     update_customer_delivery_address,
+)
+from src.db.operations import (
+    add_to_cart,
+    get_cart_items,
+    clear_cart,
+    remove_from_cart,
+    ACIDComplianceChecker
 )
 from src.db.models import Customer
 
@@ -84,28 +87,39 @@ class CartService:
     def add_item(
         self, telegram_id: int, product_id: int, quantity: int = 1, options: Optional[Dict] = None
     ) -> bool:
-        """Add item to cart"""
+        """Add item to cart using ACID operations"""
         try:
-            logger.info("Adding item to cart: telegram_id=%s, product_id=%s, quantity=%s", 
+            logger.info("Adding item to cart (ACID): telegram_id=%s, product_id=%s, quantity=%s", 
                        telegram_id, product_id, quantity)
+            
+            # Use atomic cart addition
             success = add_to_cart(telegram_id, product_id, quantity, options or {})
+            
             if success:
-                logger.info("Successfully added item to cart for user %s", telegram_id)
+                logger.info("Successfully added item to cart (ACID) for user %s", telegram_id)
+                
+                # Verify cart consistency after operation
+                is_consistent, issues = ACIDComplianceChecker.check_cart_consistency(telegram_id)
+                if not is_consistent:
+                    logger.warning("Cart consistency issues detected after add: %s", issues)
+                
             else:
-                logger.error("Failed to add item to cart for user %s", telegram_id)
+                logger.error("Failed to add item to cart (ACID) for user %s", telegram_id)
+            
             return success
+            
         except Exception as e:
-            logger.error("Exception adding item to cart: %s", e)
+            logger.error("Exception adding item to cart (ACID): %s", e)
             return False
 
     def get_items(self, telegram_id: int) -> List[Dict]:
-        """Get cart items for user"""
+        """Get cart items for user using ACID operations"""
         try:
             items = get_cart_items(telegram_id)
-            logger.info("Retrieved %d items from cart for user %s", len(items), telegram_id)
+            logger.info("Retrieved %d items from cart (ACID) for user %s", len(items), telegram_id)
             return items
         except Exception as e:
-            logger.error("Exception getting cart items: %s", e)
+            logger.error("Exception getting cart items (ACID): %s", e)
             return []
 
     def calculate_total(self, items: List[Dict]) -> float:
@@ -119,29 +133,42 @@ class CartService:
             return 0.0
 
     def clear_cart(self, telegram_id: int) -> bool:
-        """Clear all items from cart"""
+        """Clear all items from cart using ACID operations"""
         try:
+            logger.info("Clearing cart (ACID) for user %s", telegram_id)
+            
+            # Use atomic cart clearing
             success = clear_cart(telegram_id)
+            
             if success:
-                logger.info("Successfully cleared cart for user %s", telegram_id)
+                logger.info("Successfully cleared cart (ACID) for user %s", telegram_id)
             else:
-                logger.error("Failed to clear cart for user %s", telegram_id)
+                logger.error("Failed to clear cart (ACID) for user %s", telegram_id)
+            
             return success
+            
         except Exception as e:
-            logger.error("Exception clearing cart: %s", e)
+            logger.error("Exception clearing cart (ACID): %s", e)
             return False
 
     def remove_item(self, telegram_id: int, product_id: int) -> bool:
-        """Remove item from cart"""
+        """Remove item from cart using ACID operations"""
         try:
+            logger.info("Removing item from cart (ACID): telegram_id=%s, product_id=%s", 
+                       telegram_id, product_id)
+            
+            # Use atomic cart item removal
             success = remove_from_cart(telegram_id, product_id)
+            
             if success:
-                logger.info("Successfully removed item from cart for user %s", telegram_id)
+                logger.info("Successfully removed item from cart (ACID) for user %s", telegram_id)
             else:
-                logger.error("Failed to remove item from cart for user %s", telegram_id)
+                logger.error("Failed to remove item from cart (ACID) for user %s", telegram_id)
+            
             return success
+            
         except Exception as e:
-            logger.error("Exception removing item from cart: %s", e)
+            logger.error("Exception removing item from cart (ACID): %s", e)
             return False
 
     def get_customer(self, telegram_id: int) -> Optional[Customer]:
@@ -244,4 +271,28 @@ class CartService:
             return success
         except Exception as e:
             logger.error("Exception updating customer delivery address: %s", e)
-            return False 
+            return False
+
+    def check_cart_consistency(self, telegram_id: int) -> Dict[str, Any]:
+        """
+        Check cart consistency using ACID compliance checker
+        
+        Returns:
+            Dictionary with consistency status and any issues found
+        """
+        try:
+            is_consistent, issues = ACIDComplianceChecker.check_cart_consistency(telegram_id)
+            
+            return {
+                "consistent": is_consistent,
+                "issues": issues,
+                "telegram_id": telegram_id
+            }
+            
+        except Exception as e:
+            logger.error("Exception checking cart consistency: %s", e)
+            return {
+                "consistent": False,
+                "issues": [f"Error checking consistency: {e}"],
+                "telegram_id": telegram_id
+            } 

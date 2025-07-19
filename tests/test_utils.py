@@ -336,8 +336,8 @@ class TestLanguageManager:
     def test_language_manager_get_user_language_cached(self):
         """Test language manager caching functionality"""
         language_manager.clear_cache()
-        
-        with patch("src.utils.language_manager.get_customer_by_telegram_id") as mock_get_customer:
+    
+        with patch("src.db.operations.get_customer_by_telegram_id") as mock_get_customer:
             mock_get_customer.return_value = MagicMock(language="he")
             
             # First call should fetch from database
@@ -356,7 +356,7 @@ class TestLanguageManager:
         # Clear the cache first
         language_manager.clear_cache()
         
-        with patch("src.utils.language_manager.get_customer_by_telegram_id") as mock_get_customer:
+        with patch("src.db.operations.get_customer_by_telegram_id") as mock_get_customer:
             mock_get_customer.return_value = MagicMock(language="he")
             
             result = language_manager.get_user_language(123456789)
@@ -369,7 +369,7 @@ class TestLanguageManager:
         # Clear the cache first
         language_manager.clear_cache()
         
-        with patch("src.utils.language_manager.get_customer_by_telegram_id", return_value=None):
+        with patch("src.db.operations.get_customer_by_telegram_id", return_value=None):
             result = language_manager.get_user_language(123456789)
             
             assert result == "en"  # Should default to English
@@ -382,7 +382,7 @@ class TestLanguageManager:
         mock_customer = MagicMock()
         mock_customer.language = None
         
-        with patch("src.utils.language_manager.get_customer_by_telegram_id", return_value=mock_customer):
+        with patch("src.db.operations.get_customer_by_telegram_id", return_value=mock_customer):
             result = language_manager.get_user_language(123456789)
             
             assert result == "en"  # Should default to English
@@ -392,7 +392,7 @@ class TestLanguageManager:
         # Clear the cache first
         language_manager.clear_cache()
         
-        with patch("src.utils.language_manager.get_customer_by_telegram_id", side_effect=Exception("DB Error")):
+        with patch("src.db.operations.get_customer_by_telegram_id", side_effect=Exception("DB Error")):
             result = language_manager.get_user_language(123456789)
             
             assert result == "en"  # Should default to English
@@ -402,7 +402,7 @@ class TestLanguageManager:
         # Clear the cache first
         language_manager.clear_cache()
         
-        with patch("src.utils.language_manager.update_customer_language", return_value=True):
+        with patch("src.db.operations.update_customer_language", return_value=True):
             success = language_manager.set_user_language(123456789, "he")
             
             assert success is True
@@ -412,7 +412,7 @@ class TestLanguageManager:
         # Clear the cache first
         language_manager.clear_cache()
         
-        with patch("src.utils.language_manager.update_customer_language", return_value=False):
+        with patch("src.db.operations.update_customer_language", return_value=False):
             success = language_manager.set_user_language(123456789, "he")
             
             assert success is False
@@ -422,7 +422,7 @@ class TestLanguageManager:
         # Clear the cache first
         language_manager.clear_cache()
         
-        with patch("src.utils.language_manager.update_customer_language", side_effect=Exception("DB Error")):
+        with patch("src.db.operations.update_customer_language", side_effect=Exception("DB Error")):
             success = language_manager.set_user_language(123456789, "he")
             
             assert success is False
@@ -439,7 +439,7 @@ class TestLanguageManager:
         """Test language manager global instance"""
         language_manager.clear_cache()
         
-        with patch("src.utils.language_manager.get_customer_by_telegram_id") as mock_get_customer:
+        with patch("src.db.operations.get_customer_by_telegram_id") as mock_get_customer:
             mock_get_customer.return_value = MagicMock(language="he")
             
             result = language_manager.get_user_language(123456789)
