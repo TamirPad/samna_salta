@@ -47,7 +47,11 @@ class ImageHandler:
             
         # Add size parameters for supported services
         if "unsplash.com" in url:
-            if "?" in url:
+            # Check if URL already has size parameters
+            if "w=" in url and "h=" in url:
+                # URL already has size parameters, return as is
+                return url
+            elif "?" in url:
                 return f"{url}&w={width}&h={height}&fit=crop"
             else:
                 return f"{url}?w={width}&h={height}&fit=crop"

@@ -361,12 +361,12 @@ def reinitialize_products_with_categories():
     """Reinitialize products with proper category relationships"""
     session = get_db_session()
     try:
-        # First, create categories
+        # First, create categories with image URLs
         categories_data = [
-            {"name": "bread", "description": "Traditional breads", "display_order": 1},
-            {"name": "spread", "description": "Traditional spreads and condiments", "display_order": 2},
-            {"name": "spice", "description": "Traditional spice blends", "display_order": 3},
-            {"name": "beverage", "description": "Traditional beverages", "display_order": 4},
+            {"name": "bread", "description": "Traditional breads", "display_order": 1, "image_url": "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&h=600&fit=crop"},
+            {"name": "spread", "description": "Traditional spreads and condiments", "display_order": 2, "image_url": "https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=800&h=600&fit=crop"},
+            {"name": "spice", "description": "Traditional spice blends", "display_order": 3, "image_url": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop"},
+            {"name": "beverage", "description": "Traditional beverages", "display_order": 4, "image_url": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&h=600&fit=crop"},
         ]
         
         # Create categories and store them in a dict for easy lookup
@@ -461,12 +461,12 @@ def init_default_products():
             logger.info("Products already exist, skipping initialization")
             return
 
-        # First, create categories
+        # First, create categories with image URLs
         categories_data = [
-            {"name": "bread", "description": "Traditional breads", "display_order": 1},
-            {"name": "spread", "description": "Traditional spreads and condiments", "display_order": 2},
-            {"name": "spice", "description": "Traditional spice blends", "display_order": 3},
-            {"name": "beverage", "description": "Traditional beverages", "display_order": 4},
+            {"name": "bread", "description": "Traditional breads", "display_order": 1, "image_url": "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&h=600&fit=crop"},
+            {"name": "spread", "description": "Traditional spreads and condiments", "display_order": 2, "image_url": "https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=800&h=600&fit=crop"},
+            {"name": "spice", "description": "Traditional spice blends", "display_order": 3, "image_url": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop"},
+            {"name": "beverage", "description": "Traditional beverages", "display_order": 4, "image_url": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&h=600&fit=crop"},
         ]
         
         # Create categories and store them in a dict for easy lookup
@@ -481,49 +481,56 @@ def init_default_products():
                 session.flush()  # Get the ID
                 categories[cat_data["name"]] = category
 
-        # Default products configuration
+        # Default products configuration with image URLs
         products = [
             {
                 "name": "Kubaneh",
                 "category_id": categories["bread"].id,
                 "description": "Traditional Yemenite bread",
                 "price": 25.00,
+                "image_url": "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&h=600&fit=crop",
             },
             {
                 "name": "Samneh",
                 "category_id": categories["spread"].id,
                 "description": "Traditional clarified butter",
                 "price": 15.00,
+                "image_url": "https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=800&h=600&fit=crop",
             },
             {
                 "name": "Red Bisbas",
                 "category_id": categories["spice"].id,
                 "description": "Traditional Yemenite spice blend",
                 "price": 12.00,
+                "image_url": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop",
             },
             {
                 "name": "Hawaij soup spice",
                 "category_id": categories["spice"].id,
                 "description": "Traditional soup spice blend",
                 "price": 8.00,
+                "image_url": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop",
             },
             {
                 "name": "Hawaij coffee spice",
                 "category_id": categories["spice"].id,
                 "description": "Traditional coffee spice blend",
                 "price": 8.00,
+                "image_url": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop",
             },
             {
                 "name": "White coffee",
                 "category_id": categories["beverage"].id,
                 "description": "Traditional Yemenite white coffee",
                 "price": 10.00,
+                "image_url": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&h=600&fit=crop",
             },
             {
                 "name": "Hilbeh",
                 "category_id": categories["spread"].id,
                 "description": "Traditional fenugreek spread (available Wed-Fri only)",
                 "price": 18.00,
+                "image_url": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop",
             },
         ]
 
