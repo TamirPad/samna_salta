@@ -14,6 +14,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 import time
 
+from src.utils.i18n import i18n
+
 logger = logging.getLogger(__name__)
 
 
@@ -567,7 +569,7 @@ async def handle_error(update: Update, error: Exception, operation: str = "unkno
     """Handle errors and send user-friendly messages"""
     try:
         # Get user ID safely
-        user_id = "unknown"
+        user_id = None
         if hasattr(update, 'effective_user') and update.effective_user:
             user_id = update.effective_user.id
         elif hasattr(update, 'callback_query') and update.callback_query:
@@ -589,13 +591,27 @@ async def handle_error(update: Update, error: Exception, operation: str = "unkno
         
         if hasattr(update, 'callback_query') and update.callback_query:
             try:
-                await update.callback_query.edit_message_text(
-                    error_message,
-                    parse_mode="HTML",
-                    reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN"), callback_data="menu_main")
-                    ]])
-                )
+                # Check if the message has text content before editing
+                if (hasattr(update.callback_query, 'message') and 
+                    update.callback_query.message and 
+                    update.callback_query.message.text):
+                    await update.callback_query.edit_message_text(
+                        error_message,
+                        parse_mode="HTML",
+                        reply_markup=InlineKeyboardMarkup([[
+                            InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main")
+                        ]])
+                    )
+                else:
+                    # If no text content, send a new message
+                    if hasattr(update.callback_query, 'message') and update.callback_query.message:
+                        await update.callback_query.message.reply_text(
+                            error_message,
+                            parse_mode="HTML",
+                            reply_markup=InlineKeyboardMarkup([[
+                                InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main")
+                            ]])
+                        )
             except Exception as edit_error:
                 logger.error("Failed to edit message: %s", edit_error)
                 # Try to send a new message instead

@@ -71,6 +71,18 @@ class CartHandler:
         self.container = get_container()
         self.logger = logger
 
+    async def _safe_edit_message(self, query, text, **kwargs):
+        """Safely edit message text, falling back to reply if no text content"""
+        try:
+            if query.message and query.message.text:
+                await query.edit_message_text(text, **kwargs)
+            else:
+                # If no text content, send a new message
+                await query.message.reply_text(text, **kwargs)
+        except Exception as e:
+            self.logger.warning("Failed to edit message, sending new message: %s", e)
+            await query.message.reply_text(text, **kwargs)
+
     async def handle_add_to_cart(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle adding items to cart"""
         try:
@@ -126,14 +138,16 @@ class CartHandler:
                     cart_total=cart_total
                 )
 
-                await query.edit_message_text(
+                await self._safe_edit_message(
+                    query,
                     message,
                     parse_mode="HTML",
                     reply_markup=self._get_cart_success_keyboard(user_id),
                 )
             else:
                 self.logger.error("❌ ADD FAILED: User %s, Product: %s", user_id, product_info["display_name"])
-                await query.edit_message_text(
+                await self._safe_edit_message(
+                    query,
                     i18n.get_text("FAILED_ADD_TO_CART", user_id=user_id),
                     parse_mode="HTML",
                     reply_markup=self._get_back_to_menu_keyboard(user_id),
