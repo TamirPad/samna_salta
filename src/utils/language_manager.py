@@ -5,8 +5,6 @@ Language management utilities for user language preferences.
 import logging
 from typing import Dict, Optional
 
-from src.db.operations import get_customer_by_telegram_id, update_customer_language
-
 logger = logging.getLogger(__name__)
 
 class LanguageManager:
@@ -28,6 +26,7 @@ class LanguageManager:
         
         # Get from database
         try:
+            from src.db.operations import get_customer_by_telegram_id
             customer = get_customer_by_telegram_id(user_id)
             if customer and customer.language:
                 # Cache the result
@@ -44,6 +43,7 @@ class LanguageManager:
         if language in ["en", "he"]:
             try:
                 # Update in database
+                from src.db.operations import update_customer_language
                 success = update_customer_language(user_id, language)
                 if success:
                     # Update cache
