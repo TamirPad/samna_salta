@@ -799,7 +799,7 @@ class AdminService:
             logger.error("Error updating product ID %d: %s", product_id, e)
             return {"success": False, "error": f"Failed to update product: {str(e)}"}
 
-    async def delete_existing_product(self, product_id: int) -> Dict:
+    async def deactivate_product(self, product_id: int) -> Dict:
         """Soft delete a product (set is_active to False)"""
         try:
             # Validate product exists
@@ -808,20 +808,51 @@ class AdminService:
                 return {"success": False, "error": "Product not found"}
             
             # Soft delete product
-            success = delete_product(product_id)
+            from src.db.operations import deactivate_product
+            success = deactivate_product(product_id)
             
             if success:
-                logger.info("Successfully deleted product ID %d: %s", product_id, product.name)
+                logger.info("Successfully deactivated product ID %d: %s", product_id, product.name)
                 return {
                     "success": True,
                     "message": f"Product '{product.name}' has been deactivated"
                 }
             else:
-                return {"success": False, "error": "Failed to delete product"}
+                return {"success": False, "error": "Failed to deactivate product"}
                 
         except Exception as e:
-            logger.error("Error deleting product ID %d: %s", product_id, e)
+            logger.error("Error deactivating product ID %d: %s", product_id, e)
+            return {"success": False, "error": f"Failed to deactivate product: {str(e)}"}
+
+    async def hard_delete_product(self, product_id: int) -> Dict:
+        """Hard delete a product (remove from database)"""
+        try:
+            # Validate product exists
+            product = get_product_by_id(product_id)
+            if not product:
+                return {"success": False, "error": "Product not found"}
+            
+            # Hard delete product
+            from src.db.operations import hard_delete_product
+            success = hard_delete_product(product_id)
+            
+            if success:
+                logger.info("Successfully hard deleted product ID %d: %s", product_id, product.name)
+                return {
+                    "success": True,
+                    "message": f"Product '{product.name}' has been permanently deleted"
+                }
+            else:
+                return {"success": False, "error": "Failed to delete product. It may be referenced in orders or carts."}
+                
+        except Exception as e:
+            logger.error("Error hard deleting product ID %d: %s", product_id, e)
             return {"success": False, "error": f"Failed to delete product: {str(e)}"}
+
+    # Keep backward compatibility
+    async def delete_existing_product(self, product_id: int) -> Dict:
+        """Soft delete a product (set is_active to False) - deprecated, use deactivate_product"""
+        return await self.deactivate_product(product_id)
 
     async def get_product_categories_list(self) -> List[str]:
         """Get all unique product categories"""

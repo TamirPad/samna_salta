@@ -125,6 +125,25 @@ class AdminHandler:
         
         elif data.startswith("admin_quick_"):
             await self._handle_quick_action(query, data)
+        elif data.startswith("admin_product_deactivate_"):
+            product_id = int(data.split("_")[-1])
+            await self._show_deactivate_product_confirmation(query, product_id)
+        elif data.startswith("admin_product_hard_delete_"):
+            product_id = int(data.split("_")[-1])
+            await self._show_hard_delete_product_confirmation(query, product_id)
+        elif data.startswith("admin_product_yes_deactivate_"):
+            product_id = int(data.split("_")[-1])
+            await self._deactivate_product(query, product_id)
+        elif data.startswith("admin_product_yes_hard_delete_"):
+            product_id = int(data.split("_")[-1])
+            await self._hard_delete_product(query, product_id)
+        elif data in ["admin_product_no_deactivate", "admin_product_no_hard_delete"]:
+            # Go back to product details
+            product_id = int(query.data.split("_")[-2]) if query.data.split("_")[-2].isdigit() else None
+            if product_id:
+                await self._show_product_details(query, product_id)
+            else:
+                await self._show_all_products(query)
         elif data.startswith("admin_product_"):
             await self._handle_product_callback(query, data)
         elif data == "admin_category_management":
@@ -150,6 +169,12 @@ class AdminHandler:
         elif data.startswith("admin_category_"):
             category = data.replace("admin_category_", "")
             await self._show_products_in_category(query, category)
+        elif data == "admin_business_info":
+            await self._show_business_info(query)
+        elif data == "admin_language_selection":
+            await self._handle_admin_language_selection(query)
+        elif data.startswith("admin_language_"):
+            await self._handle_admin_language_change(query)
         elif data == "admin_back":
             await self._show_admin_dashboard(update, None)
 
@@ -210,6 +235,9 @@ class AdminHandler:
                 ],
                 [
                     InlineKeyboardButton(i18n.get_text("ADMIN_MENU_MANAGEMENT", user_id=user_id), callback_data="admin_menu_management")
+                ],
+                [
+                    InlineKeyboardButton(i18n.get_text("ADMIN_BUSINESS_INFO", user_id=user_id), callback_data="admin_business_info")
                 ],
             ]
 
@@ -2211,14 +2239,18 @@ class AdminHandler:
                         callback_data=f"admin_product_edit_{product_id}"
                     ),
                     InlineKeyboardButton(
-                        i18n.get_text("ADMIN_PRODUCT_DELETE", user_id=user_id),
-                        callback_data=f"admin_product_delete_{product_id}"
+                        i18n.get_text("ADMIN_PRODUCT_TOGGLE_STATUS", user_id=user_id),
+                        callback_data=f"admin_product_toggle_{product_id}"
                     )
                 ],
                 [
                     InlineKeyboardButton(
-                        i18n.get_text("ADMIN_PRODUCT_TOGGLE_STATUS", user_id=user_id),
-                        callback_data=f"admin_product_toggle_{product_id}"
+                        i18n.get_text("ADMIN_PRODUCT_DEACTIVATE", user_id=user_id),
+                        callback_data=f"admin_product_deactivate_{product_id}"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_HARD_DELETE", user_id=user_id),
+                        callback_data=f"admin_product_hard_delete_{product_id}"
                     )
                 ],
                 [
@@ -2317,8 +2349,8 @@ class AdminHandler:
             self.logger.error("Error showing remove confirmation: %s", e)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
 
-    async def _show_delete_product_confirmation(self, query: CallbackQuery, product_id: int) -> None:
-        """Show delete product confirmation"""
+    async def _show_deactivate_product_confirmation(self, query: CallbackQuery, product_id: int) -> None:
+        """Show deactivate product confirmation"""
         try:
             user_id = query.from_user.id
             products = await self.admin_service.get_all_products_for_admin()
@@ -2328,7 +2360,7 @@ class AdminHandler:
                 await query.message.reply_text(i18n.get_text("ADMIN_PRODUCT_NOT_FOUND", user_id=user_id))
                 return
             
-            text = i18n.get_text("ADMIN_DELETE_PRODUCT_CONFIRM", user_id=user_id).format(
+            text = i18n.get_text("ADMIN_DEACTIVATE_PRODUCT_CONFIRM", user_id=user_id).format(
                 name=product["name"],
                 category=product["category"],
                 price=product["price"]
@@ -2337,12 +2369,12 @@ class AdminHandler:
             keyboard = [
                 [
                     InlineKeyboardButton(
-                        i18n.get_text("ADMIN_PRODUCT_YES_DELETE", user_id=user_id),
-                        callback_data=f"admin_product_yes_delete_{product_id}"
+                        i18n.get_text("ADMIN_PRODUCT_YES_DEACTIVATE", user_id=user_id),
+                        callback_data=f"admin_product_yes_deactivate_{product_id}"
                     ),
                     InlineKeyboardButton(
-                        i18n.get_text("ADMIN_PRODUCT_NO_DELETE", user_id=user_id),
-                        callback_data="admin_product_no_delete"
+                        i18n.get_text("ADMIN_PRODUCT_NO_DEACTIVATE", user_id=user_id),
+                        callback_data="admin_product_no_deactivate"
                     )
                 ]
             ]
@@ -2351,8 +2383,55 @@ class AdminHandler:
             await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
             
         except Exception as e:
-            self.logger.error("Error showing delete confirmation: %s", e)
+            self.logger.error("Error showing deactivate confirmation: %s", e)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
+    async def _show_hard_delete_product_confirmation(self, query: CallbackQuery, product_id: int) -> None:
+        """Show hard delete product confirmation with warning"""
+        try:
+            user_id = query.from_user.id
+            self.logger.info("🔍 Showing hard delete confirmation for product ID %d", product_id)
+            
+            products = await self.admin_service.get_all_products_for_admin()
+            product = next((p for p in products if p["id"] == product_id), None)
+            
+            if not product:
+                self.logger.warning("Product ID %d not found", product_id)
+                await query.message.reply_text(i18n.get_text("ADMIN_PRODUCT_NOT_FOUND", user_id=user_id))
+                return
+            
+            self.logger.info("Found product: %s", product["name"])
+            
+            text = i18n.get_text("ADMIN_HARD_DELETE_PRODUCT_CONFIRM", user_id=user_id).format(
+                name=product["name"],
+                category=product["category"],
+                price=product["price"]
+            )
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_YES_HARD_DELETE", user_id=user_id),
+                        callback_data=f"admin_product_yes_hard_delete_{product_id}"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_PRODUCT_NO_HARD_DELETE", user_id=user_id),
+                        callback_data="admin_product_no_hard_delete"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            self.logger.info("Sending hard delete confirmation message")
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+        except Exception as e:
+            self.logger.error("Error showing hard delete confirmation: %s", e, exc_info=True)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
+    async def _show_delete_product_confirmation(self, query: CallbackQuery, product_id: int) -> None:
+        """Show delete product confirmation (deprecated, use _show_deactivate_product_confirmation)"""
+        await self._show_deactivate_product_confirmation(query, product_id)
 
     async def _toggle_product_status(self, query: CallbackQuery, product_id: int) -> None:
         """Toggle product active/inactive status"""
@@ -2400,23 +2479,136 @@ class AdminHandler:
             self.logger.error("Error removing product: %s", e)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
 
-    async def _delete_product(self, query: CallbackQuery, product_id: int) -> None:
-        """Delete (deactivate) a product"""
+    async def _deactivate_product(self, query: CallbackQuery, product_id: int) -> None:
+        """Deactivate a product (soft delete)"""
         try:
             user_id = query.from_user.id
-            result = await self.admin_service.delete_existing_product(product_id)
+            result = await self.admin_service.deactivate_product(product_id)
             
             if result["success"]:
                 await query.answer(result["message"])
                 await self._show_all_products(query)
             else:
                 await query.message.reply_text(
-                    i18n.get_text("ADMIN_DELETE_PRODUCT_ERROR", user_id=user_id).format(error=result["error"])
+                    i18n.get_text("ADMIN_DEACTIVATE_PRODUCT_ERROR", user_id=user_id).format(error=result["error"])
                 )
                 
         except Exception as e:
-            self.logger.error("Error deleting product: %s", e)
+            self.logger.error("Error deactivating product: %s", e)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
+    async def _hard_delete_product(self, query: CallbackQuery, product_id: int) -> None:
+        """Hard delete a product (permanent removal)"""
+        try:
+            user_id = query.from_user.id
+            result = await self.admin_service.hard_delete_product(product_id)
+            
+            if result["success"]:
+                await query.answer(result["message"])
+                await self._show_all_products(query)
+            else:
+                await query.message.reply_text(
+                    i18n.get_text("ADMIN_HARD_DELETE_PRODUCT_ERROR", user_id=user_id).format(error=result["error"])
+                )
+                
+        except Exception as e:
+            self.logger.error("Error hard deleting product: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
+    # Keep backward compatibility
+    async def _delete_product(self, query: CallbackQuery, product_id: int) -> None:
+        """Delete (deactivate) a product (deprecated, use _deactivate_product)"""
+        await self._deactivate_product(query, product_id)
+
+    async def _show_business_info(self, query: CallbackQuery) -> None:
+        """Show business information for admin"""
+        try:
+            user_id = query.from_user.id
+            self.logger.info("🏢 SHOWING BUSINESS INFO for Admin %s", user_id)
+
+            # Get business details from config
+            from src.config import get_config
+            config = get_config()
+            
+            business_info_text = (
+                f"🏢 <b>{i18n.get_text('BUSINESS_INFO_TITLE', user_id=user_id)}</b>\n\n"
+                f"<b>{i18n.get_text('BUSINESS_NAME', user_id=user_id)}</b>: Samna Salta\n"
+                f"<b>{i18n.get_text('BUSINESS_TYPE', user_id=user_id)}</b>: Restaurant\n"
+                f"<b>{i18n.get_text('BUSINESS_CURRENCY', user_id=user_id)}</b>: {config.currency}\n"
+                f"<b>{i18n.get_text('BUSINESS_DELIVERY_CHARGE', user_id=user_id)}</b>: ₪{config.delivery_charge:.2f}\n"
+                f"<b>{i18n.get_text('BUSINESS_ENVIRONMENT', user_id=user_id)}</b>: {config.environment}\n\n"
+                f"{i18n.get_text('BUSINESS_INFO_DESCRIPTION', user_id=user_id)}"
+            )
+
+            await query.edit_message_text(
+                business_info_text,
+                reply_markup=self._get_business_info_keyboard(user_id),
+                parse_mode="HTML"
+            )
+
+        except Exception as e:
+            self.logger.error("💥 BUSINESS INFO ERROR: %s", e, exc_info=True)
+            await query.answer(i18n.get_text("BUSINESS_INFO_ERROR", user_id=user_id))
+
+    def _get_business_info_keyboard(self, user_id: int):
+        """Get business info keyboard with language selection"""
+        from src.utils.language_manager import language_manager
+        
+        current_lang = language_manager.get_user_language(user_id)
+        
+        keyboard = [
+            [InlineKeyboardButton(i18n.get_text("LANGUAGE_BUTTON", user_id=user_id), callback_data="admin_language_selection")],
+            [InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back")],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
+    async def _handle_admin_language_selection(self, query: CallbackQuery) -> None:
+        """Handle language selection from business info"""
+        try:
+            user_id = query.from_user.id
+            
+            # Show language selection keyboard
+            await query.edit_message_text(
+                i18n.get_text("SELECT_LANGUAGE_PROMPT", user_id=user_id),
+                reply_markup=self._get_admin_language_selection_keyboard(),
+                parse_mode="HTML"
+            )
+                
+        except Exception as e:
+            self.logger.error("Error handling admin language selection: %s", e)
+            await query.answer(i18n.get_text("LANGUAGE_SELECTION_ERROR", user_id=user_id))
+
+    def _get_admin_language_selection_keyboard(self):
+        """Get language selection keyboard for admin"""
+        keyboard = [
+            [
+                InlineKeyboardButton("🇺🇸 English", callback_data="admin_language_en"),
+                InlineKeyboardButton("🇮🇱 עברית", callback_data="admin_language_he")
+            ],
+            [InlineKeyboardButton(i18n.get_text("BACK_TO_BUSINESS_INFO", user_id=None), callback_data="admin_business_info")]
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
+    async def _handle_admin_language_change(self, query: CallbackQuery) -> None:
+        """Handle language change for admin"""
+        try:
+            user_id = query.from_user.id
+            data = query.data
+            
+            if data.startswith("admin_language_"):
+                # Handle language change
+                from src.utils.language_manager import language_manager
+                
+                language = data.split("_")[-1]  # admin_language_en -> en
+                language_manager.set_user_language(user_id, language)
+                
+                # Show success message in new language and return to business info
+                await query.answer(i18n.get_text("LANGUAGE_CHANGED", user_id=user_id))
+                await self._show_business_info(query)
+                
+        except Exception as e:
+            self.logger.error("Error handling admin language change: %s", e)
+            await query.answer(i18n.get_text("LANGUAGE_CHANGE_ERROR", user_id=user_id))
 
     async def _show_remove_products_list(self, query: CallbackQuery) -> None:
         """Show list of products for removal"""

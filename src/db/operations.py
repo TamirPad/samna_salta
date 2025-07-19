@@ -781,7 +781,7 @@ def update_product(product_id: int, **kwargs) -> bool:
 
 
 @retry_on_database_error()
-def delete_product(product_id: int) -> bool:
+def deactivate_product(product_id: int) -> bool:
     """Soft delete product by setting is_active to False"""
     session = get_db_session()
     try:
@@ -793,14 +793,58 @@ def delete_product(product_id: int) -> bool:
         product.is_active = False
         product.updated_at = datetime.utcnow()
         session.commit()
-        logger.info("Soft deleted product ID %d: %s", product_id, product.name)
+        logger.info("Deactivated product ID %d: %s", product_id, product.name)
         return True
     except SQLAlchemyError as e:
         session.rollback()
-        logger.error("Failed to delete product ID %d: %s", product_id, e)
+        logger.error("Failed to deactivate product ID %d: %s", product_id, e)
         return False
     finally:
         session.close()
+
+
+@retry_on_database_error()
+def hard_delete_product(product_id: int) -> bool:
+    """Hard delete product by removing it from the database"""
+    session = get_db_session()
+    try:
+        product = session.query(Product).filter(Product.id == product_id).first()
+        if not product:
+            logger.warning("Product with ID %d not found", product_id)
+            return False
+        
+        # Check if product is referenced in any orders
+        from src.db.models import OrderItem
+        order_items = session.query(OrderItem).filter(OrderItem.product_id == product_id).first()
+        if order_items:
+            logger.warning("Cannot delete product ID %d: referenced in orders", product_id)
+            return False
+        
+        # Check if product is in any active carts
+        from src.db.models import CartItem
+        cart_items = session.query(CartItem).filter(CartItem.product_id == product_id).first()
+        if cart_items:
+            logger.warning("Cannot delete product ID %d: referenced in carts", product_id)
+            return False
+        
+        product_name = product.name
+        session.delete(product)
+        session.commit()
+        logger.info("Hard deleted product ID %d: %s", product_id, product_name)
+        return True
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error("Failed to hard delete product ID %d: %s", product_id, e)
+        return False
+    finally:
+        session.close()
+
+
+# Keep the old function name for backward compatibility
+@retry_on_database_error()
+def delete_product(product_id: int) -> bool:
+    """Soft delete product by setting is_active to False (deprecated, use deactivate_product)"""
+    return deactivate_product(product_id)
 
 
 @retry_on_database_error()
