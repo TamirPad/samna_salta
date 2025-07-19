@@ -38,6 +38,11 @@ from src.states import (
 AWAITING_CATEGORY_NAME = 10
 AWAITING_CATEGORY_NAME_EDIT = 11
 
+# Product edit wizard states
+AWAITING_PRODUCT_EDIT_FIELD = 20
+AWAITING_PRODUCT_EDIT_VALUE = 21
+AWAITING_PRODUCT_EDIT_CONFIRM = 22
+
 logger = logging.getLogger(__name__)
 
 
@@ -146,6 +151,10 @@ class AdminHandler:
                 await self._show_all_products(query)
         elif data.startswith("admin_product_"):
             await self._handle_product_callback(query, data)
+        # Edit product callbacks are now handled by the conversation handler
+        # elif data.startswith("admin_edit_product_field_"):
+        # elif data.startswith("admin_edit_product_confirm_"):
+        # elif data.startswith("admin_edit_product_category_"):
         elif data == "admin_category_management":
             await self._show_category_management(query)
         elif data == "admin_view_categories":
@@ -2168,8 +2177,9 @@ class AdminHandler:
                 product_id = int(data.split("_")[-1])
                 await self._show_product_details(query, product_id)
             elif data.startswith("admin_product_edit_"):
-                product_id = int(data.split("_")[-1])
-                return await self._start_edit_product(query, product_id)
+                # This is now handled by the conversation handler
+                # The conversation handler will call _start_edit_product with proper parameters
+                pass
             elif data.startswith("admin_product_delete_"):
                 product_id = int(data.split("_")[-1])
                 await self._show_delete_product_confirmation(query, product_id)
@@ -2268,10 +2278,18 @@ class AdminHandler:
             self.logger.error("Error showing product details: %s", e)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
 
-    async def _start_edit_product(self, query: CallbackQuery, product_id: int):
-        """Start the edit product conversation"""
+    async def _start_edit_product(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """Start the edit product wizard conversation"""
         try:
+            # Extract query from update
+            query = update.callback_query
             user_id = query.from_user.id
+            
+            self.logger.info("🎯 Starting edit product wizard for user %s, callback: %s", user_id, query.data)
+            
+            # Extract product_id from callback data: admin_product_edit_{product_id}
+            product_id = int(query.data.split("_")[-1])
+            
             products = await self.admin_service.get_all_products_for_admin()
             product = next((p for p in products if p["id"] == product_id), None)
             
@@ -2279,22 +2297,111 @@ class AdminHandler:
                 await query.message.reply_text(i18n.get_text("ADMIN_PRODUCT_NOT_FOUND", user_id=user_id))
                 return ConversationHandler.END
             
+            # Store product info in context for editing
+            context.user_data["editing_product"] = product
+            context.user_data["editing_product_id"] = product_id
+            
+            self.logger.info("📝 Showing edit options for product: %s (ID: %s)", product["name"], product_id)
+            
+            # Show edit options
+            await self._show_edit_product_options(query, product)
+            
+            return AWAITING_PRODUCT_EDIT_FIELD
+            
+        except Exception as e:
+            self.logger.error("Error starting edit product: %s", e)
+            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _start_edit_product_with_context(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Start the edit product wizard conversation (with context)"""
+        try:
+            # Extract query from update
+            query = update.callback_query
+            user_id = query.from_user.id
+            
+            self.logger.info("🎯 Starting edit product wizard for user %s, callback: %s", user_id, query.data)
+            
+            # Extract product_id from callback data: admin_product_edit_{product_id}
+            product_id = int(query.data.split("_")[-1])
+            
+            products = await self.admin_service.get_all_products_for_admin()
+            product = next((p for p in products if p["id"] == product_id), None)
+            
+            if not product:
+                await query.message.reply_text(i18n.get_text("ADMIN_PRODUCT_NOT_FOUND", user_id=user_id))
+                return ConversationHandler.END
+            
+            # Store product info in context for editing
+            context.user_data["editing_product"] = product
+            context.user_data["editing_product_id"] = product_id
+            
+            self.logger.info("📝 Showing edit options for product: %s (ID: %s)", product["name"], product_id)
+            
+            # Show edit options
+            await self._show_edit_product_options(query, product)
+            
+            return AWAITING_PRODUCT_EDIT_FIELD
+            
+        except Exception as e:
+            self.logger.error("Error starting edit product: %s", e)
+            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _show_edit_product_options(self, query: CallbackQuery, product: Dict) -> None:
+        """Show product edit options"""
+        try:
+            user_id = query.from_user.id
+            
+            # Translate category name
+            from src.utils.i18n import translate_category_name
+            translated_category = translate_category_name(product["category"], user_id=user_id)
+            
             text = (
-                i18n.get_text("ADMIN_EDIT_PRODUCT_TITLE", user_id=user_id) + "\n\n" +
-                i18n.get_text("ADMIN_EDIT_PRODUCT_INSTRUCTIONS", user_id=user_id) + "\n\n" +
-                f"<b>Current Product:</b>\n" +
-                f"Name: {product['name']}\n" +
-                f"Description: {product['description']}\n" +
-                f"Category: {product['category']}\n" +
-                f"Price: ₪{product['price']:.2f}\n" +
-                f"Status: {'active' if product['is_active'] else 'inactive'}"
+                i18n.get_text("ADMIN_EDIT_PRODUCT_WIZARD_TITLE", user_id=user_id) + "\n\n" +
+                i18n.get_text("ADMIN_EDIT_PRODUCT_CURRENT_VALUES", user_id=user_id) + "\n" +
+                i18n.get_text("ADMIN_PRODUCT_NAME", user_id=user_id).format(name=product["name"]) + "\n" +
+                i18n.get_text("ADMIN_PRODUCT_DESCRIPTION", user_id=user_id).format(description=product["description"]) + "\n" +
+                i18n.get_text("ADMIN_PRODUCT_CATEGORY", user_id=user_id).format(category=translated_category) + "\n" +
+                i18n.get_text("ADMIN_PRODUCT_PRICE", user_id=user_id).format(price=product["price"]) + "\n\n" +
+                i18n.get_text("ADMIN_EDIT_PRODUCT_SELECT_FIELD", user_id=user_id)
             )
             
             keyboard = [
                 [
                     InlineKeyboardButton(
+                        i18n.get_text("ADMIN_EDIT_PRODUCT_FIELD_NAME", user_id=user_id),
+                        callback_data=f"admin_edit_product_field_name_{product['id']}"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_EDIT_PRODUCT_FIELD_DESCRIPTION", user_id=user_id),
+                        callback_data=f"admin_edit_product_field_description_{product['id']}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_EDIT_PRODUCT_FIELD_CATEGORY", user_id=user_id),
+                        callback_data=f"admin_edit_product_field_category_{product['id']}"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_EDIT_PRODUCT_FIELD_PRICE", user_id=user_id),
+                        callback_data=f"admin_edit_product_field_price_{product['id']}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_EDIT_PRODUCT_FIELD_STATUS", user_id=user_id),
+                        callback_data=f"admin_edit_product_field_status_{product['id']}"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_EDIT_PRODUCT_FIELD_IMAGE", user_id=user_id),
+                        callback_data=f"admin_edit_product_field_image_url_{product['id']}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
                         i18n.get_text("CANCEL", user_id=user_id),
-                        callback_data=f"admin_product_details_{product_id}"
+                        callback_data="admin_product_back_to_list"
                     )
                 ]
             ]
@@ -2302,15 +2409,470 @@ class AdminHandler:
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
             
-            # Store product_id in context for the conversation
-            context = query.data.split("_")[-1] if "_" in query.data else str(product_id)
+        except Exception as e:
+            self.logger.error("Error showing edit product options: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
+
+    async def _handle_edit_product_field_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """Handle edit product field selection"""
+        try:
+            # Extract query from update
+            query = update.callback_query
+            user_id = query.from_user.id
+            data = query.data
             
-            return AWAITING_PRODUCT_UPDATE
+            # Parse field from callback data: admin_edit_product_field_{field}_{product_id}
+            parts = data.split("_")
+            
+            # Handle special case for image_url field which has 7 parts: admin_edit_product_field_image_url_{product_id}
+            if len(parts) == 7 and parts[4] == "image" and parts[5] == "url":
+                field = "image_url"
+                product_id = int(parts[6])
+            else:
+                field = parts[4]  # name, description, category, price, status
+                product_id = int(parts[5])
+            
+            # Store field info in context
+            context.user_data["editing_field"] = field
+            context.user_data["editing_product_id"] = product_id
+            
+            # Get current product info and store in context
+            products = await self.admin_service.get_all_products_for_admin()
+            product = next((p for p in products if p["id"] == product_id), None)
+            
+            if not product:
+                await query.message.reply_text(i18n.get_text("ADMIN_PRODUCT_NOT_FOUND", user_id=user_id))
+                return ConversationHandler.END
+            
+            # Store product info in context for editing
+            context.user_data["editing_product"] = product
+            
+            # Show field-specific input prompt
+            await self._show_field_input_prompt(query, product, field)
+            
+            return AWAITING_PRODUCT_EDIT_VALUE
             
         except Exception as e:
-            self.logger.error("Error starting edit product: %s", e)
-            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            self.logger.error("Error handling edit product field selection: %s", e)
+            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
             return ConversationHandler.END
+
+    async def _show_field_input_prompt(self, query: CallbackQuery, product: Dict, field: str) -> None:
+        """Show field-specific input prompt"""
+        try:
+            user_id = query.from_user.id
+            
+            # Get current value
+            current_value = product.get(field, "")
+            
+            # Special handling for category field - show category buttons
+            if field == "category":
+                await self._show_category_selection(query, product, current_value)
+                return
+            
+            # Get field-specific prompt for other fields
+            if field == "name":
+                text = i18n.get_text("ADMIN_EDIT_PRODUCT_NAME_PROMPT", user_id=user_id).format(
+                    current=current_value
+                )
+            elif field == "description":
+                text = i18n.get_text("ADMIN_EDIT_PRODUCT_DESCRIPTION_PROMPT", user_id=user_id).format(
+                    current=current_value
+                )
+            elif field == "price":
+                text = i18n.get_text("ADMIN_EDIT_PRODUCT_PRICE_PROMPT", user_id=user_id).format(
+                    current=current_value
+                )
+            elif field == "status":
+                text = i18n.get_text("ADMIN_EDIT_PRODUCT_STATUS_PROMPT", user_id=user_id).format(
+                    current="Active" if product.get("is_active", True) else "Inactive"
+                )
+            elif field == "image_url":
+                text = i18n.get_text("ADMIN_EDIT_PRODUCT_IMAGE_PROMPT", user_id=user_id).format(
+                    current=current_value if current_value else "No image set"
+                )
+            else:
+                text = i18n.get_text("ADMIN_EDIT_PRODUCT_GENERIC_PROMPT", user_id=user_id).format(
+                    field=field, current=current_value
+                )
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("CANCEL", user_id=user_id),
+                        callback_data="admin_edit_product_cancel"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+        except Exception as e:
+            self.logger.error("Error showing field input prompt: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
+
+    async def _show_category_selection(self, query: CallbackQuery, product: Dict, current_category: str) -> None:
+        """Show category selection buttons"""
+        try:
+            user_id = query.from_user.id
+            
+            # Get all available categories
+            categories = await self.admin_service.get_product_categories_list()
+            
+            if not categories:
+                await query.edit_message_text(
+                    i18n.get_text("ADMIN_NO_CATEGORIES", user_id=user_id),
+                    parse_mode="HTML"
+                )
+                return
+            
+            text = i18n.get_text("ADMIN_EDIT_PRODUCT_CATEGORY_SELECTION", user_id=user_id).format(
+                current=current_category
+            )
+            
+            # Create category buttons (2 per row)
+            keyboard = []
+            row = []
+            for category in categories:
+                # Use consistent emoji - all categories get 📂, current gets highlighted with ✅
+                if category == current_category:
+                    button_text = f"✅ {category}"
+                else:
+                    button_text = f"📂 {category}"
+                
+                row.append(InlineKeyboardButton(
+                    button_text,
+                    callback_data=f"admin_edit_product_category_{category}"
+                ))
+                
+                if len(row) == 2:
+                    keyboard.append(row)
+                    row = []
+            
+            # Add remaining buttons
+            if row:
+                keyboard.append(row)
+            
+            # Add cancel button
+            keyboard.append([
+                InlineKeyboardButton(
+                    i18n.get_text("CANCEL", user_id=user_id),
+                    callback_data="admin_edit_product_cancel"
+                )
+            ])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+        except Exception as e:
+            self.logger.error("Error showing category selection: %s", e)
+            await query.edit_message_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
+
+    async def _handle_category_selection_for_edit(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """Handle category selection for edit product wizard"""
+        try:
+            query = update.callback_query
+            user_id = query.from_user.id
+            
+            # Extract category from callback data
+            data = query.data
+            selected_category = data.replace("admin_edit_product_category_", "")
+            self.logger.info("🎯 Category selected for edit: %s by user %s", selected_category, user_id)
+            
+            # Store the selected category in context
+            context.user_data["new_value"] = selected_category
+            
+            # Show confirmation screen
+            await self._show_edit_confirmation(update, context)
+            
+            return AWAITING_PRODUCT_EDIT_CONFIRM
+            
+        except Exception as e:
+            self.logger.error("Error handling category selection for edit: %s", e)
+            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _handle_edit_product_value_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """Handle edit product value input"""
+        try:
+            user_id = update.effective_user.id
+            new_value = update.message.text.strip()
+            field = context.user_data.get("editing_field")
+            product_id = context.user_data.get("editing_product_id")
+            
+            if not field or not product_id:
+                await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+                return ConversationHandler.END
+            
+            # Validate input based on field
+            validation_result = await self._validate_edit_input(field, new_value, user_id)
+            if not validation_result["valid"]:
+                await update.message.reply_text(validation_result["error"])
+                return AWAITING_PRODUCT_EDIT_VALUE
+            
+            # Store new value in context
+            context.user_data["new_value"] = new_value
+            
+            # Show confirmation screen
+            await self._show_edit_confirmation(update, context)
+            
+            return AWAITING_PRODUCT_EDIT_CONFIRM
+            
+        except Exception as e:
+            self.logger.error("Error handling edit product value input: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _validate_edit_input(self, field: str, value: str, user_id: int) -> Dict:
+        """Validate edit input based on field"""
+        try:
+            if field == "name":
+                if len(value) < 2:
+                    return {
+                        "valid": False,
+                        "error": i18n.get_text("ADMIN_EDIT_PRODUCT_NAME_TOO_SHORT", user_id=user_id)
+                    }
+            elif field == "description":
+                if len(value) < 5:
+                    return {
+                        "valid": False,
+                        "error": i18n.get_text("ADMIN_EDIT_PRODUCT_DESCRIPTION_TOO_SHORT", user_id=user_id)
+                    }
+            elif field == "category":
+                if len(value) < 2:
+                    return {
+                        "valid": False,
+                        "error": i18n.get_text("ADMIN_EDIT_PRODUCT_CATEGORY_TOO_SHORT", user_id=user_id)
+                    }
+            elif field == "price":
+                try:
+                    price = float(value)
+                    if price <= 0:
+                        return {
+                            "valid": False,
+                            "error": i18n.get_text("ADMIN_EDIT_PRODUCT_PRICE_TOO_LOW", user_id=user_id)
+                        }
+                except ValueError:
+                    return {
+                        "valid": False,
+                        "error": i18n.get_text("ADMIN_EDIT_PRODUCT_PRICE_INVALID", user_id=user_id)
+                    }
+            elif field == "status":
+                if value.lower() not in ["active", "inactive", "true", "false", "1", "0"]:
+                    return {
+                        "valid": False,
+                        "error": i18n.get_text("ADMIN_EDIT_PRODUCT_STATUS_INVALID", user_id=user_id)
+                    }
+            elif field == "image_url":
+                # Allow empty image URL (to remove image)
+                if value.strip() == "":
+                    return {"valid": True}
+                # Basic URL validation
+                if not value.startswith(("http://", "https://")):
+                    return {
+                        "valid": False,
+                        "error": i18n.get_text("ADMIN_EDIT_PRODUCT_IMAGE_INVALID", user_id=user_id)
+                    }
+            
+            return {"valid": True}
+            
+        except Exception as e:
+            self.logger.error("Error validating edit input: %s", e)
+            return {
+                "valid": False,
+                "error": i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id)
+            }
+
+    async def _show_edit_confirmation(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Show edit confirmation screen"""
+        try:
+            user_id = update.effective_user.id
+            field = context.user_data.get("editing_field")
+            new_value = context.user_data.get("new_value")
+            product_id = context.user_data.get("editing_product_id")
+            
+            # Get current product info
+            products = await self.admin_service.get_all_products_for_admin()
+            product = next((p for p in products if p["id"] == product_id), None)
+            
+            if not product:
+                # Handle both message and callback_query cases
+                if update.callback_query:
+                    await update.callback_query.edit_message_text(i18n.get_text("ADMIN_PRODUCT_NOT_FOUND", user_id=user_id))
+                else:
+                    await update.message.reply_text(i18n.get_text("ADMIN_PRODUCT_NOT_FOUND", user_id=user_id))
+                return
+            
+            # Get current value
+            current_value = product.get(field, "")
+            if field == "status":
+                current_value = "Active" if product.get("is_active", True) else "Inactive"
+            
+            # Format new value for display
+            display_new_value = new_value
+            if field == "price":
+                try:
+                    display_new_value = f"₪{float(new_value):.2f}"
+                except:
+                    display_new_value = new_value
+            elif field == "status":
+                if new_value.lower() in ["active", "true", "1"]:
+                    display_new_value = "Active"
+                else:
+                    display_new_value = "Inactive"
+            
+            text = i18n.get_text("ADMIN_EDIT_PRODUCT_CONFIRM_TITLE", user_id=user_id) + "\n\n" + \
+                   i18n.get_text("ADMIN_EDIT_PRODUCT_CONFIRM_DETAILS", user_id=user_id).format(
+                       field=i18n.get_text(f"ADMIN_EDIT_PRODUCT_FIELD_{field.upper()}", user_id=user_id),
+                       current=current_value,
+                       new=display_new_value
+                   )
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_EDIT_PRODUCT_CONFIRM_YES", user_id=user_id),
+                        callback_data="admin_edit_product_confirm_yes"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_EDIT_PRODUCT_CONFIRM_NO", user_id=user_id),
+                        callback_data="admin_edit_product_confirm_no"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            # Handle both message and callback_query cases
+            if update.callback_query:
+                await update.callback_query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            else:
+                await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+        except Exception as e:
+            self.logger.error("Error showing edit confirmation: %s", e)
+            # Handle both message and callback_query cases for error
+            if update.callback_query:
+                await update.callback_query.edit_message_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            else:
+                await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
+    async def _handle_edit_confirmation(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """Handle edit confirmation"""
+        try:
+            # Extract query from update
+            query = update.callback_query
+            user_id = query.from_user.id
+            data = query.data
+            
+            self.logger.info("🎯 Handling edit confirmation: %s for user %s", data, user_id)
+            self.logger.info("📝 Context data: %s", context.user_data)
+            
+            if data == "admin_edit_product_confirm_yes":
+                # Apply the edit
+                result = await self._apply_product_edit(context)
+                
+                self.logger.info("📊 Edit result: %s", result)
+                
+                if result["success"]:
+                    # Get field name for display
+                    editing_field = context.user_data.get('editing_field', '')
+                    field_display_name = editing_field.capitalize()
+                    
+                    # Try to get localized field name, fallback to capitalized field name
+                    try:
+                        field_display_name = i18n.get_text(f"ADMIN_EDIT_PRODUCT_FIELD_{editing_field.upper()}", user_id=user_id)
+                    except Exception as e:
+                        self.logger.warning("Could not get localized field name for %s: %s", editing_field, e)
+                    
+                    success_text = i18n.get_text("ADMIN_EDIT_PRODUCT_WIZARD_SUCCESS", user_id=user_id).format(
+                        field=field_display_name,
+                        value=context.user_data.get("new_value", "")
+                    )
+                    
+                    keyboard = [
+                        [
+                            InlineKeyboardButton(
+                                i18n.get_text("ADMIN_EDIT_PRODUCT_CONTINUE_EDITING", user_id=user_id),
+                                callback_data=f"admin_product_details_{context.user_data.get('editing_product_id')}"
+                            )
+                        ],
+                        [
+                            InlineKeyboardButton(
+                                i18n.get_text("ADMIN_PRODUCT_BACK_TO_LIST", user_id=user_id),
+                                callback_data="admin_product_back_to_list"
+                            )
+                        ]
+                    ]
+                    
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    await query.edit_message_text(success_text, parse_mode="HTML", reply_markup=reply_markup)
+                else:
+                    await query.edit_message_text(
+                        i18n.get_text("ADMIN_EDIT_PRODUCT_ERROR", user_id=user_id).format(error=result["error"])
+                    )
+                
+                # Clear context
+                context.user_data.clear()
+                return ConversationHandler.END
+                
+            elif data == "admin_edit_product_confirm_no":
+                # Go back to edit options
+                product_id = context.user_data.get("editing_product_id")
+                products = await self.admin_service.get_all_products_for_admin()
+                product = next((p for p in products if p["id"] == product_id), None)
+                
+                if product:
+                    await self._show_edit_product_options(query, product)
+                    return AWAITING_PRODUCT_EDIT_FIELD
+                else:
+                    await query.edit_message_text(i18n.get_text("ADMIN_PRODUCT_NOT_FOUND", user_id=user_id))
+                    return ConversationHandler.END
+            
+        except Exception as e:
+            self.logger.error("Error handling edit confirmation: %s", e)
+            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _apply_product_edit(self, context: ContextTypes.DEFAULT_TYPE) -> Dict:
+        """Apply the product edit"""
+        try:
+            field = context.user_data.get("editing_field")
+            new_value = context.user_data.get("new_value")
+            product_id = context.user_data.get("editing_product_id")
+            
+            self.logger.info("🔧 Applying product edit: field=%s, value=%s, product_id=%s", field, new_value, product_id)
+            
+            # Prepare update data
+            update_data = {}
+            
+            if field == "name":
+                update_data["name"] = new_value
+            elif field == "description":
+                update_data["description"] = new_value
+            elif field == "category":
+                update_data["category"] = new_value
+            elif field == "price":
+                update_data["price"] = float(new_value)
+            elif field == "status":
+                update_data["is_active"] = new_value.lower() in ["active", "true", "1"]
+            elif field == "image_url":
+                update_data["image_url"] = new_value.strip() if new_value.strip() else None
+            
+            self.logger.info("📝 Update data: %s", update_data)
+            
+            # Apply the update
+            result = await self.admin_service.update_existing_product(product_id, **update_data)
+            
+            self.logger.info("📊 Update result: %s", result)
+            
+            return result
+            
+        except Exception as e:
+            self.logger.error("Error applying product edit: %s", e)
+            return {"success": False, "error": str(e)}
 
     async def _show_remove_product_confirmation(self, query: CallbackQuery, product_id: int) -> None:
         """Show remove product confirmation"""
@@ -2784,7 +3346,7 @@ def register_admin_handlers(application: Application):
 
     # Admin callback handlers (excluding conversation patterns)
     application.add_handler(
-        CallbackQueryHandler(handler.handle_admin_callback, pattern="^admin_(?!add_product_category_|add_product_confirm_|add_product$|add_category$|edit_category_name_)")
+        CallbackQueryHandler(handler.handle_admin_callback, pattern="^admin_(?!add_product_category_|add_product_confirm_|add_product$|add_category$|edit_category_name_|edit_product_field_|edit_product_confirm_|edit_product_category_|product_edit_)")
     )
 
     # Admin conversation handler for status updates
@@ -2887,6 +3449,38 @@ def register_admin_handlers(application: Application):
     )
 
     application.add_handler(edit_category_handler)
+
+    # Admin conversation handler for editing products (wizard)
+    edit_product_handler = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(handler._start_edit_product, pattern="^admin_product_edit_")
+        ],
+        states={
+            AWAITING_PRODUCT_EDIT_FIELD: [
+                CallbackQueryHandler(handler._handle_edit_product_field_selection, pattern="^admin_edit_product_field_")
+            ],
+            AWAITING_PRODUCT_EDIT_VALUE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_edit_product_value_input),
+                CallbackQueryHandler(handler._handle_category_selection_for_edit, pattern="^admin_edit_product_category_")
+            ],
+            AWAITING_PRODUCT_EDIT_CONFIRM: [
+                CallbackQueryHandler(handler._handle_edit_confirmation, pattern="^admin_edit_product_confirm_")
+            ],
+        },
+        fallbacks=[
+            CommandHandler("cancel", lambda u, c: ConversationHandler.END),
+            CallbackQueryHandler(lambda u, c: ConversationHandler.END, pattern="^admin_product_back_to_list$"),
+            CallbackQueryHandler(lambda u, c: ConversationHandler.END, pattern="^admin_edit_product_cancel$")
+        ],
+        name="edit_product_conversation",
+        persistent=False,
+        per_message=False,
+    )
+
+    # Add debug logging to the conversation handler
+    handler.logger.info("🔧 Registering edit_product_conversation handler")
+    application.add_handler(edit_product_handler)
+    handler.logger.info("✅ edit_product_conversation handler registered successfully")
 
     # Analytics callback handlers
     application.add_handler(
