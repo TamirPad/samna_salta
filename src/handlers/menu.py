@@ -22,6 +22,8 @@ from src.keyboards.menu_keyboards import (
 from src.utils.i18n import i18n
 from src.utils.helpers import translate_category_name
 from src.utils.constants import ErrorMessages
+from src.utils.language_manager import language_manager
+from src.db.operations import get_localized_name, get_localized_description, get_localized_category_name
 
 logger = logging.getLogger(__name__)
 
@@ -128,9 +130,10 @@ class MenuHandler:
 
 
     async def _quick_add_to_cart(self, query: CallbackQuery, product_id: int):
-        """Quick add product to cart without showing details"""
+        """Quick add product to cart without showing details with multilingual support"""
         try:
             user_id = query.from_user.id
+            user_language = language_manager.get_user_language(user_id)
             
             # Get product details
             from src.db.operations import get_product_by_id
@@ -140,13 +143,16 @@ class MenuHandler:
                 await query.answer(i18n.get_text("PRODUCT_NOT_FOUND", user_id=user_id), show_alert=True)
                 return
             
+            # Get localized product name
+            localized_name = get_localized_name(product, user_language)
+            
             # Add to cart
             cart_service = self.container.get_cart_service()
             success = cart_service.add_item(user_id, product_id, 1)
             
             if success:
                 await query.answer(
-                    i18n.get_text("QUICK_ADD_SUCCESS", user_id=user_id).format(name=product.name),
+                    i18n.get_text("QUICK_ADD_SUCCESS", user_id=user_id).format(name=localized_name),
                     show_alert=False
                 )
             else:
@@ -168,15 +174,25 @@ class MenuHandler:
         await self._safe_edit_message(query, text, reply_markup, "HTML")
 
     async def _show_category_menu(self, query: CallbackQuery, category: str):
-        """Show products in a specific category"""
+        """Show products in a specific category with multilingual support"""
         try:
             user_id = query.from_user.id
-            from src.db.operations import get_products_by_category
+            user_language = language_manager.get_user_language(user_id)
+            
+            from src.db.operations import get_products_by_category, get_category_by_name
+            from src.db.models import MenuCategory
             
             products = get_products_by_category(category)
             
+            # Get localized category name
+            category_obj = get_category_by_name(category)
+            if category_obj:
+                category_display_name = get_localized_category_name(category_obj, user_language)
+            else:
+                category_display_name = translate_category_name(category, user_id)
+            
             if not products:
-                text = i18n.get_text("CATEGORY_EMPTY", user_id=user_id).format(category=translate_category_name(category, user_id))
+                text = i18n.get_text("CATEGORY_EMPTY", user_id=user_id).format(category=category_display_name)
                 keyboard = [
                     [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")]
                 ]
@@ -185,7 +201,7 @@ class MenuHandler:
                 return
             
             text = i18n.get_text("CATEGORY_TITLE", user_id=user_id).format(
-                category=translate_category_name(category, user_id), count=len(products)
+                category=category_display_name, count=len(products)
             )
             reply_markup = get_category_menu_keyboard(category, user_id)
             await self._safe_edit_message(query, text, reply_markup, "HTML")

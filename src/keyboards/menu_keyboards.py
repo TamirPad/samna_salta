@@ -8,7 +8,8 @@ from src.utils.helpers import is_hilbeh_available
 from src.utils.i18n import i18n
 from src.utils.helpers import translate_category_name
 from src.keyboards.order_keyboards import get_delivery_method_keyboard
-from src.db.operations import get_all_products, get_products_by_category
+from src.db.operations import get_all_products, get_products_by_category, get_localized_name
+from src.utils.language_manager import language_manager
 
 
 def get_dynamic_main_menu_keyboard(user_id: int = None):
@@ -66,7 +67,7 @@ def get_dynamic_main_menu_keyboard(user_id: int = None):
 
 
 def get_category_menu_keyboard(category: str, user_id: int = None):
-    """Get menu keyboard for a specific category."""
+    """Get menu keyboard for a specific category with multilingual support."""
     try:
         products = get_products_by_category(category)
         
@@ -79,11 +80,17 @@ def get_category_menu_keyboard(category: str, user_id: int = None):
         
         keyboard = []
         
+        # Get user language for localization
+        user_language = language_manager.get_user_language(user_id) if user_id else "en"
+        
         # Add product buttons (max 2 per row) - clicking these shows product details
         row = []
         for product in products:
+            # Get localized product name
+            localized_name = get_localized_name(product, user_language)
+            
             # Product button - clicking this shows product details
-            button_text = f"{product.name}\n₪{product.price:.2f}"
+            button_text = f"{localized_name}\n₪{product.price:.2f}"
             callback_data = f"product_{product.id}"
             
             row.append(InlineKeyboardButton(button_text, callback_data=callback_data))

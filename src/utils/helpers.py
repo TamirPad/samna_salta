@@ -232,19 +232,34 @@ def translate_product_name(product_name: str, options: Optional[dict] = None, us
 
 
 def translate_category_name(category_name: str, user_id: Optional[int] = None) -> str:
-    """Translate category name from database format to localized display name"""
+    """Translate category name from database format to localized display name using multilingual system"""
     from src.utils.i18n import i18n
+    from src.db.operations import get_category_by_name, get_localized_category_name
+    from src.utils.language_manager import language_manager
     
     # Handle None or empty input
     if not category_name:
         return ""
     
-    # Map database category names to translation keys
+    # First, try to get the category from database with multilingual support
+    try:
+        category_obj = get_category_by_name(category_name)
+        if category_obj:
+            user_language = language_manager.get_user_language(user_id) if user_id else "en"
+            localized_name = get_localized_category_name(category_obj, user_language)
+            if localized_name:
+                return localized_name
+    except Exception as e:
+        # Log error but continue with fallback
+        logger.debug(f"Error getting localized category name for '{category_name}': {e}")
+    
+    # Fallback to old mapping system for backward compatibility
     category_mapping = {
         "bread": "CATEGORY_BREAD",
         "spice": "CATEGORY_SPICE", 
         "spread": "CATEGORY_SPREAD",
         "beverage": "CATEGORY_BEVERAGE",
+        "desserts": "CATEGORY_DESSERTS",
         "other": "CATEGORY_OTHER"
     }
     

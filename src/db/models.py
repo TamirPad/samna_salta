@@ -84,6 +84,12 @@ class MenuCategory(Base):
     updated_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), onupdate=func.now(), nullable=True
     )
+    
+    # Multilingual support
+    name_en: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    name_he: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    description_en: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description_he: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Relationships
     products: Mapped[List["Product"]] = relationship("Product", back_populates="category_rel")
@@ -92,6 +98,22 @@ class MenuCategory(Base):
     def display_name(self) -> str:
         """Get display name for the category"""
         return self.name.title()
+
+    def get_localized_name(self, language: str = "en") -> str:
+        """Get localized name for the category"""
+        if language == "he" and self.name_he:
+            return self.name_he
+        elif language == "en" and self.name_en:
+            return self.name_en
+        return self.name  # Fallback to default name
+
+    def get_localized_description(self, language: str = "en") -> str:
+        """Get localized description for the category"""
+        if language == "he" and self.description_he:
+            return self.description_he
+        elif language == "en" and self.description_en:
+            return self.description_en
+        return self.description or ""  # Fallback to default description
 
     def __str__(self) -> str:
         return f"<MenuCategory(id={self.id}, name='{self.name}')>"
@@ -120,6 +142,12 @@ class Product(Base):
     updated_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), onupdate=func.now(), nullable=True
     )
+    
+    # Multilingual support
+    name_en: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    name_he: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    description_en: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description_he: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Relationships
     category_rel: Mapped[Optional["MenuCategory"]] = relationship("MenuCategory", back_populates="products")
@@ -143,6 +171,22 @@ class Product(Base):
         # This is a read-only property for backward compatibility
         # To set category, use category_rel relationship directly
         pass
+
+    def get_localized_name(self, language: str = "en") -> str:
+        """Get localized name for the product"""
+        if language == "he" and self.name_he:
+            return self.name_he
+        elif language == "en" and self.name_en:
+            return self.name_en
+        return self.name  # Fallback to default name
+
+    def get_localized_description(self, language: str = "en") -> str:
+        """Get localized description for the product"""
+        if language == "he" and self.description_he:
+            return self.description_he
+        elif language == "en" and self.description_en:
+            return self.description_en
+        return self.description or ""  # Fallback to default description
 
     def __str__(self) -> str:
         return f"<Product(id={self.id}, name='{self.name}')>"

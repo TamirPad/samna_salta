@@ -242,6 +242,12 @@
   "ANALYTICS_PRODUCT_SUMMARY": "📊 Summary:",
   "ANALYTICS_CUSTOMER_BEHAVIOR": "📊 Customer Behavior:",
   
+  "ADMIN_MULTILINGUAL_NAME_PROMPT": "🌐 <b>Enter Product/Category Name</b>\n\nPlease enter the name in your preferred language. The system will automatically detect the language and store it appropriately.",
+  "ADMIN_MULTILINGUAL_DESCRIPTION_PROMPT": "🌐 <b>Enter Product/Category Description</b>\n\nPlease enter the description in your preferred language. The system will automatically detect the language and store it appropriately.",
+  "ADMIN_MULTILINGUAL_GENERIC_PROMPT": "🌐 <b>Enter Content</b>\n\nPlease enter the content in your preferred language. The system will automatically detect the language and store it appropriately.",
+  "ADMIN_MULTILINGUAL_HEBREW_INSTRUCTIONS": "💡 <b>Instructions:</b>\n• You can enter content in Hebrew or English\n• The system will automatically detect the language\n• Content will be displayed to users in their preferred language\n• You can add translations later through the admin interface",
+  "ADMIN_MULTILINGUAL_ENGLISH_INSTRUCTIONS": "💡 <b>Instructions:</b>\n• You can enter content in Hebrew or English\n• The system will automatically detect the language\n• Content will be displayed to users in their preferred language\n• You can add translations later through the admin interface",
+  
   "ADMIN_MENU_MANAGEMENT": "🍽️ Menu Management",
   "ADMIN_MENU_MANAGEMENT_TITLE": "🍽️ <b>Menu Management</b>",
   "ADMIN_MENU_MANAGEMENT_SUMMARY": "📊 <b>Menu Overview:</b>\n📋 Total Products: {total}\n✅ Active Products: {active}\n❌ Inactive Products: {inactive}\n📂 Categories: {categories}",
@@ -417,6 +423,7 @@
   "CATEGORY_BREAD": "Bread",
   "CATEGORY_SPICE": "Spice",
   "CATEGORY_BEVERAGE": "Beverage",
+  "CATEGORY_DESSERTS": "Desserts",
   "CATEGORY_OTHER": "Other",
   "CATEGORY_SPREAD": "Spread",
   "ADMIN_CATEGORY_ADD_NEW": "➕ Add New Category",
@@ -541,6 +548,9 @@
   "ORDER_DETAILS_HEADER": "📋 <b>Order Details:</b>",
   "ORDER_NUMBER_FIELD": "🔢 Order Number:",
   "STATUS_FIELD": "Status:",
+  
+
+
   "DATE_FIELD": "📅 Date:",
   "CUSTOMER_INFO_HEADER": "👤 <b>Customer Info:</b>",
   "NAME_FIELD": "👨‍💼 Name:",

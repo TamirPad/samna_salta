@@ -339,6 +339,12 @@
   "ANALYTICS_PRODUCT_SUMMARY": "📊 סיכום:",
   "ANALYTICS_CUSTOMER_BEHAVIOR": "📊 התנהגות לקוחות:",
   "ANALYTICS_TOP_CUSTOMERS": "🏆 5 הלקוחות המובילים לפי הוצאות:",
+  
+  "ADMIN_MULTILINGUAL_NAME_PROMPT": "🌐 <b>הכנס שם מוצר/קטגוריה</b>\n\nאנא הכנס את השם בשפה המועדפת שלך. המערכת תזהה אוטומטית את השפה ותשמור אותה בהתאם.",
+  "ADMIN_MULTILINGUAL_DESCRIPTION_PROMPT": "🌐 <b>הכנס תיאור מוצר/קטגוריה</b>\n\nאנא הכנס את התיאור בשפה המועדפת שלך. המערכת תזהה אוטומטית את השפה ותשמור אותה בהתאם.",
+  "ADMIN_MULTILINGUAL_GENERIC_PROMPT": "🌐 <b>הכנס תוכן</b>\n\nאנא הכנס את התוכן בשפה המועדפת שלך. המערכת תזהה אוטומטית את השפה ותשמור אותה בהתאם.",
+  "ADMIN_MULTILINGUAL_HEBREW_INSTRUCTIONS": "💡 <b>הוראות:</b>\n• אתה יכול להכניס תוכן בעברית או באנגלית\n• המערכת תזהה אוטומטית את השפה\n• התוכן יוצג למשתמשים בשפה המועדפת שלהם\n• תוכל להוסיף תרגומים מאוחר יותר דרך ממשק המנהל",
+  "ADMIN_MULTILINGUAL_ENGLISH_INSTRUCTIONS": "💡 <b>Instructions:</b>\n• You can enter content in Hebrew or English\n• The system will automatically detect the language\n• Content will be displayed to users in their preferred language\n• You can add translations later through the admin interface",
   "ANALYTICS_CUSTOMER_METRICS": "📊 מדדי לקוחות:",
   "ANALYTICS_TREND_ANALYSIS": "📊 ניתוח מגמות:",
   "ANALYTICS_RECENT_TRENDS": "📅 פעילות אחרונה (3 ימים אחרונים):",
@@ -470,9 +476,10 @@
   "ADMIN_CATEGORY_MANAGEMENT_BACK": "⬅️ חזור לניהול תפריט",
   "ADMIN_CATEGORY_BUTTON_FORMAT": "📂 {name} ({count} מוצרים)",
   
-  "CATEGORY_BREAD": "לחם",
+  "CATEGORY_BREAD": "מאפים",
   "CATEGORY_SPICE": "תבלין",
   "CATEGORY_BEVERAGE": "משקה",
+  "CATEGORY_DESSERTS": "קינוחים",
   "CATEGORY_OTHER": "אחר",
   "CATEGORY_SPREAD": "ממרח",
   "ADMIN_ADD_CATEGORY": "➕ הוסף קטגוריה",
@@ -541,6 +548,9 @@
   "ADMIN_BACK_TO_CUSTOMERS": "⬅️ חזור ללקוחות",
   "CUSTOMER_DETAILS_ERROR": "❌ שגיאה בטעינת פרטי לקוח.",
   
+
+
+  
   "ADMIN_MENU_MANAGEMENT": "🍽️ ניהול תפריט",
   "ADMIN_MENU_MANAGEMENT_TITLE": "🍽️ <b>ניהול תפריט</b>",
   "ADMIN_MENU_MANAGEMENT_SUMMARY": "📊 <b>סקירת תפריט:</b>\n📋 סה\"כ מוצרים: {total}\n✅ מוצרים פעילים: {active}\n❌ מוצרים בלתי פעילים: {inactive}\n📂 קטגוריות: {categories}",
@@ -587,7 +597,7 @@
   "ADMIN_ADD_PRODUCT_DESCRIPTION_TOO_SHORT": "❌ תיאור המוצר קצר מדי. אנא הכנס תיאור עם לפחות 5 תווים.",
   "ADMIN_ADD_PRODUCT_PRICE_INVALID": "❌ פורמט מחיר לא תקין. אנא הכנס מספר תקין (למשל, 25.00).",
   "ADMIN_ADD_PRODUCT_PRICE_TOO_LOW": "❌ המחיר חייב להיות לפחות ₪0.01. אנא הכנס מחיר תקין.",
-  "ADMIN_ADD_PRODUCT_CATEGORY_BREAD": "🍞 לחם",
+  "ADMIN_ADD_PRODUCT_CATEGORY_BREAD": "🍞 מאפים",
   "ADMIN_ADD_PRODUCT_CATEGORY_SPICE": "🌶️ תבלין",
   "ADMIN_ADD_PRODUCT_CATEGORY_SPREAD": "🧈 ממרח",
   "ADMIN_ADD_PRODUCT_CATEGORY_BEVERAGE": "☕ משקה",
@@ -765,11 +775,7 @@
   "ADMIN_QUICK_DELETE_SUCCESS": "✅ המוצר נמחק בהצלחה!",
   "ADMIN_QUICK_DELETE_ERROR": "❌ נכשל במחיקת מוצר: {error}",
   
-  "CATEGORY_BREAD": "🍞 לחם",
-  "CATEGORY_SPICE": "🌶️ תבלין",
-  "CATEGORY_SPREAD": "🧈 ממרח",
-  "CATEGORY_BEVERAGE": "☕ משקה",
-  "CATEGORY_OTHER": "📦 אחר",
+
   
   "STATUS_PENDING": "⏳ ממתין",
   "STATUS_CONFIRMED": "✅ אושר",

@@ -57,6 +57,50 @@ import json
 logger = logging.getLogger(__name__)
 
 
+def get_localized_name(product: Product, language: str = "en") -> str:
+    """Get localized name for a product based on user language preference"""
+    if language == "he" and product.name_he:
+        return product.name_he
+    elif language == "en" and product.name_en:
+        return product.name_en
+    else:
+        # Fallback to original name field
+        return product.name
+
+
+def get_localized_description(product: Product, language: str = "en") -> str:
+    """Get localized description for a product based on user language preference"""
+    if language == "he" and product.description_he:
+        return product.description_he
+    elif language == "en" and product.description_en:
+        return product.description_en
+    else:
+        # Fallback to original description field
+        return product.description or ""
+
+
+def get_localized_category_name(category: MenuCategory, language: str = "en") -> str:
+    """Get localized name for a category based on user language preference"""
+    if language == "he" and category.name_he:
+        return category.name_he
+    elif language == "en" and category.name_en:
+        return category.name_en
+    else:
+        # Fallback to original name field
+        return category.name
+
+
+def get_localized_category_description(category: MenuCategory, language: str = "en") -> str:
+    """Get localized description for a category based on user language preference"""
+    if language == "he" and category.description_he:
+        return category.description_he
+    elif language == "en" and category.description_en:
+        return category.description_en
+    else:
+        # Fallback to original description field
+        return category.description or ""
+
+
 class ACIDTransactionManager:
     """Manages ACID-compliant transactions with configurable isolation levels"""
     
@@ -715,7 +759,7 @@ def get_all_products() -> list[Product]:
 
 @retry_on_database_error()
 def get_all_products_admin() -> list[dict]:
-    """Get all products (including inactive) for admin management"""
+    """Get all products (including inactive) for admin management with multilingual support"""
     session = get_db_session()
     try:
         products = session.query(Product, MenuCategory.name.label('category_name')).join(MenuCategory).order_by(MenuCategory.name, Product.name).all()
@@ -726,6 +770,10 @@ def get_all_products_admin() -> list[dict]:
                 "id": product.id,
                 "name": product.name,
                 "description": product.description,
+                "name_en": product.name_en,
+                "name_he": product.name_he,
+                "description_en": product.description_en,
+                "description_he": product.description_he,
                 "category": category_name,
                 "price": product.price,
                 "is_active": product.is_active,
@@ -760,7 +808,7 @@ def get_product_by_id(product_id: int) -> Optional[Product]:
 
 @retry_on_database_error()
 def get_product_dict_by_id(product_id: int) -> Optional[Dict]:
-    """Get product by ID as a dictionary with category name resolved"""
+    """Get product by ID as a dictionary with category name resolved and multilingual support"""
     session = get_db_session()
     try:
         product = session.query(Product).options(joinedload(Product.category_rel)).filter(Product.id == product_id).first()
@@ -771,6 +819,10 @@ def get_product_dict_by_id(product_id: int) -> Optional[Dict]:
             "id": product.id,
             "name": product.name,
             "description": product.description,
+            "name_en": product.name_en,
+            "name_he": product.name_he,
+            "description_en": product.description_en,
+            "description_he": product.description_he,
             "category": product.category_rel.name if product.category_rel else "Uncategorized",
             "price": product.price,
             "is_active": product.is_active,
@@ -782,7 +834,17 @@ def get_product_dict_by_id(product_id: int) -> Optional[Dict]:
 
 
 @retry_on_database_error()
-def create_product(name: str, description: str, category: str, price: float, image_url: Optional[str] = None) -> Optional[Product]:
+def create_product(
+    name: str, 
+    description: str, 
+    category: str, 
+    price: float, 
+    image_url: Optional[str] = None,
+    name_en: Optional[str] = None,
+    name_he: Optional[str] = None,
+    description_en: Optional[str] = None,
+    description_he: Optional[str] = None
+) -> Optional[Product]:
     """Create a new product"""
     session = get_db_session()
     try:
@@ -804,7 +866,11 @@ def create_product(name: str, description: str, category: str, price: float, ima
             category_id=category_obj.id,
             price=price,
             is_active=True,
-            image_url=image_url
+            image_url=image_url,
+            name_en=name_en,
+            name_he=name_he,
+            description_en=description_en,
+            description_he=description_he
         )
         session.add(product)
         session.commit()
@@ -830,7 +896,7 @@ def update_product(product_id: int, **kwargs) -> bool:
             return False
         
         # Update allowed fields
-        allowed_fields = ['name', 'description', 'price', 'is_active', 'image_url']
+        allowed_fields = ['name', 'description', 'price', 'is_active', 'image_url', 'name_en', 'name_he', 'description_en', 'description_he']
         for field, value in kwargs.items():
             if field in allowed_fields:
                 setattr(product, field, value)
@@ -956,6 +1022,16 @@ def get_all_categories() -> list[str]:
             MenuCategory.is_active == True
         ).order_by(MenuCategory.display_order, MenuCategory.name).all()
         return [cat.name for cat in categories]
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def get_category_by_name(name: str) -> Optional[MenuCategory]:
+    """Get category by name"""
+    session = get_db_session()
+    try:
+        return session.query(MenuCategory).filter(MenuCategory.name == name).first()
     finally:
         session.close()
 
@@ -1704,7 +1780,16 @@ def get_database_status() -> dict:
     return status
 
 @retry_on_database_error()
-def create_category(name: str, description: str = None, display_order: int = None, image_url: str = None) -> Optional[MenuCategory]:
+def create_category(
+    name: str, 
+    description: str = None, 
+    display_order: int = None, 
+    image_url: str = None,
+    name_en: Optional[str] = None,
+    name_he: Optional[str] = None,
+    description_en: Optional[str] = None,
+    description_he: Optional[str] = None
+) -> Optional[MenuCategory]:
     """Create a new menu category"""
     session = get_db_session()
     try:
@@ -1714,13 +1799,17 @@ def create_category(name: str, description: str = None, display_order: int = Non
             logger.warning("Category '%s' already exists", name)
             return None
         
-        # Create new category
+        # Create new category with multilingual support
         category_data = {
             "name": name.strip(),
             "description": description.strip() if description else None,
             "display_order": display_order,
             "image_url": image_url,
-            "is_active": True
+            "is_active": True,
+            "name_en": name_en,
+            "name_he": name_he,
+            "description_en": description_en,
+            "description_he": description_he
         }
         
         category = MenuCategory(**category_data)

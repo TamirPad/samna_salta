@@ -20,6 +20,8 @@ from telegram.ext import (
 from src.container import get_container
 from src.utils.error_handler import BusinessLogicError, error_handler
 from src.utils.i18n import i18n
+from src.utils.multilingual_content import MultilingualContentManager
+from src.utils.language_manager import language_manager
 
 # Conversation states
 AWAITING_ORDER_ID, AWAITING_STATUS_UPDATE, AWAITING_PRODUCT_DETAILS, AWAITING_PRODUCT_UPDATE, AWAITING_PRODUCT_DELETE_CONFIRM = range(5)
@@ -102,7 +104,7 @@ class AdminHandler:
         elif data == "admin_customers":
             await self._show_customers(query)
         elif data == "admin_update_status":
-            return await self._start_status_update(query)
+            await self._start_status_update(query)
         elif data == "admin_analytics":
             await self._show_analytics(query)
         elif data.startswith("analytics_"):
@@ -134,7 +136,7 @@ class AdminHandler:
         elif data == "admin_view_products":
             await self._show_all_products(query)
         elif data == "admin_add_product":
-            return await self._start_add_product(query)
+            await self._start_add_product(query)
         elif data == "admin_remove_products":
             await self._show_remove_products_list(query)
         
@@ -172,13 +174,13 @@ class AdminHandler:
         elif data == "admin_view_categories":
             await self._show_all_categories(query)
         elif data == "admin_add_category":
-            return await self._start_add_category(query)
+            await self._start_add_category(query)
         elif data.startswith("admin_edit_category_"):
             category = data.replace("admin_edit_category_", "")
             await self._show_edit_category(query, category)
         elif data.startswith("admin_edit_category_name_"):
             category = data.replace("admin_edit_category_name_", "")
-            return await self._start_edit_category_name(query, category)
+            await self._start_edit_category_name(update, _)
         elif data.startswith("admin_delete_category_confirm_"):
             # Extract category name from "admin_delete_category_confirm_CATEGORY_NAME"
             # The category name is everything after "admin_delete_category_confirm_"
@@ -1804,15 +1806,25 @@ class AdminHandler:
             return ConversationHandler.END
 
     async def _handle_category_name_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle category name input"""
+        """Handle category name input with multilingual support"""
         try:
             user_id = update.effective_user.id
             category_name = update.message.text.strip()
+            
             if len(category_name) < 2:
                 await update.message.reply_text(
                     i18n.get_text("ADMIN_CATEGORY_NAME_TOO_SHORT", user_id=user_id)
                 )
                 return AWAITING_CATEGORY_NAME
+            
+            # Initialize multilingual content manager
+            ml_manager = MultilingualContentManager()
+            
+            # Detect language and prepare multilingual content
+            detected_lang = ml_manager.detect_language(category_name)
+            name_en = category_name if detected_lang == "en" else None
+            name_he = category_name if detected_lang == "he" else None
+            
             # Check if category already exists
             existing_categories = await self.admin_service.get_product_categories_list()
             if category_name.lower() in [cat.lower() for cat in existing_categories]:
@@ -1820,17 +1832,30 @@ class AdminHandler:
                     i18n.get_text("ADMIN_CATEGORY_ALREADY_EXISTS", user_id=user_id).format(category=category_name)
                 )
                 return AWAITING_CATEGORY_NAME
-            # Create the category
-            result = await self.admin_service.create_category(category_name)
+            
+            # Create the category with multilingual support
+            result = await self.admin_service.create_category_multilingual(
+                name=category_name,
+                name_en=name_en,
+                name_he=name_he
+            )
+            
             if result["success"]:
-                # Show the updated category list
-                class FakeQuery:
-                    def __init__(self, message, from_user):
-                        self.message = message
-                        self.from_user = from_user
-                        self.edit_message_text = message.reply_text
-                fake_query = FakeQuery(update.message, update.effective_user)
-                await self._show_all_categories(fake_query)
+                success_text = i18n.get_text("ADMIN_CATEGORY_ADD_SUCCESS", user_id=user_id).format(
+                    category=category_name,
+                    language=detected_lang.upper()
+                )
+                
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            i18n.get_text("ADMIN_CATEGORY_BACK_TO_LIST", user_id=user_id),
+                            callback_data="admin_view_categories"
+                        )
+                    ]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await update.message.reply_text(success_text, reply_markup=reply_markup)
                 return ConversationHandler.END
             else:
                 await update.message.reply_text(
@@ -1842,10 +1867,15 @@ class AdminHandler:
             await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
             return ConversationHandler.END
 
-    async def _start_edit_category_name(self, query: CallbackQuery, category: str) -> int:
+    async def _start_edit_category_name(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         """Start the edit category name conversation"""
         try:
+            query = update.callback_query
             user_id = query.from_user.id
+            
+            # Extract category name from callback data
+            category = query.data.replace("admin_edit_category_name_", "")
+            
             text = i18n.get_text("ADMIN_CATEGORY_EDIT_NAME_PROMPT", user_id=user_id).format(category=category)
             
             keyboard = [
@@ -1861,14 +1891,14 @@ class AdminHandler:
             await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
             
             # Store the old category name in context
-            user_id = query.from_user.id
             context.user_data["old_category_name"] = category
             
             return AWAITING_CATEGORY_NAME_EDIT
             
         except Exception as e:
             self.logger.error("Error starting edit category name: %s", e)
-            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            if update.callback_query and update.callback_query.message:
+                await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
             return ConversationHandler.END
 
     async def _handle_category_name_edit_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

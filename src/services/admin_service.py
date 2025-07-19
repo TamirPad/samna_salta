@@ -20,6 +20,7 @@ from src.db.operations import (
     get_product_by_id
 )
 from src.db.models import Order
+from src.utils.multilingual_content import MultilingualContentManager
 
 logger = logging.getLogger(__name__)
 
@@ -760,8 +761,11 @@ class AdminService:
             return []
 
     async def create_new_product(self, name: str, description: str, category: str, price: float, image_url: Optional[str] = None) -> Dict:
-        """Create a new product"""
+        """Create a new product with multilingual support"""
         try:
+            # Initialize multilingual content manager
+            ml_manager = MultilingualContentManager()
+            
             # Validate inputs
             if not name or len(name.strip()) < 2:
                 return {"success": False, "error": "Product name must be at least 2 characters long"}
@@ -778,13 +782,26 @@ class AdminService:
                 if not validate_image_url(image_url):
                     return {"success": False, "error": "Invalid image URL format"}
             
-            # Create product
+            # Detect language and prepare multilingual content
+            detected_lang = ml_manager.detect_language(name)
+            name_en = name.strip() if detected_lang == "en" else None
+            name_he = name.strip() if detected_lang == "he" else None
+            
+            detected_desc_lang = ml_manager.detect_language(description)
+            description_en = description.strip() if detected_desc_lang == "en" else None
+            description_he = description.strip() if detected_desc_lang == "he" else None
+            
+            # Create product with multilingual support
             product = create_product(
                 name=name.strip(),
                 description=description.strip(),
                 category=category.strip(),
                 price=price,
-                image_url=image_url
+                image_url=image_url,
+                name_en=name_en,
+                name_he=name_he,
+                description_en=description_en,
+                description_he=description_he
             )
             
             if product:
@@ -809,8 +826,11 @@ class AdminService:
             return {"success": False, "error": f"Failed to create product: {str(e)}"}
 
     async def update_existing_product(self, product_id: int, **kwargs) -> Dict:
-        """Update an existing product"""
+        """Update an existing product with multilingual support"""
         try:
+            # Initialize multilingual content manager
+            ml_manager = MultilingualContentManager()
+            
             # Validate product exists
             product = get_product_by_id(product_id)
             if not product:
@@ -826,11 +846,25 @@ class AdminService:
             if "category" in kwargs and (not kwargs["category"] or len(kwargs["category"].strip()) < 2):
                 return {"success": False, "error": "Category must be at least 2 characters long"}
             
-            # Clean up string inputs
+            # Clean up string inputs and handle multilingual content
             if "name" in kwargs:
-                kwargs["name"] = kwargs["name"].strip()
+                name = kwargs["name"].strip()
+                detected_lang = ml_manager.detect_language(name)
+                if detected_lang == "en":
+                    kwargs["name_en"] = name
+                elif detected_lang == "he":
+                    kwargs["name_he"] = name
+                kwargs["name"] = name
+                
             if "description" in kwargs:
-                kwargs["description"] = kwargs["description"].strip()
+                description = kwargs["description"].strip()
+                detected_desc_lang = ml_manager.detect_language(description)
+                if detected_desc_lang == "en":
+                    kwargs["description_en"] = description
+                elif detected_desc_lang == "he":
+                    kwargs["description_he"] = description
+                kwargs["description"] = description
+                
             if "category" in kwargs:
                 kwargs["category"] = kwargs["category"].strip()
             
@@ -1012,6 +1046,47 @@ class AdminService:
             logger.error("Error creating category: %s", e)
             return {"success": False, "error": f"Failed to create category: {str(e)}"}
 
+    async def create_category_multilingual(self, name: str, name_en: str = None, name_he: str = None, description: str = None) -> Dict:
+        """Create a new category with multilingual support"""
+        try:
+            # Validate input
+            if not name or len(name.strip()) < 2:
+                return {"success": False, "error": "Category name must be at least 2 characters long"}
+            
+            # Check if category already exists
+            existing_categories = get_product_categories()
+            if name.lower() in [cat.lower() for cat in existing_categories]:
+                return {"success": False, "error": f"Category '{name}' already exists"}
+            
+            # Create category with multilingual support
+            from src.db.operations import create_category
+            category = create_category(
+                name=name.strip(),
+                description=description or f"Category for {name}",
+                display_order=len(existing_categories) + 1,
+                name_en=name_en,
+                name_he=name_he
+            )
+            
+            if category:
+                logger.info("Successfully created multilingual category: %s", name)
+                return {
+                    "success": True,
+                    "category": {
+                        "name": category.name,
+                        "name_en": category.name_en,
+                        "name_he": category.name_he,
+                        "description": category.description
+                    },
+                    "message": f"Category '{name}' created successfully with multilingual support"
+                }
+            else:
+                return {"success": False, "error": "Failed to create category"}
+                
+        except Exception as e:
+            logger.error("Error creating multilingual category: %s", e)
+            return {"success": False, "error": f"Failed to create category: {str(e)}"}
+
     async def update_category(self, old_category: str, new_category: str) -> Dict:
         """Update a category name"""
         try:
@@ -1024,21 +1099,33 @@ class AdminService:
             if new_category.lower() in [cat.lower() for cat in existing_categories if cat != old_category]:
                 return {"success": False, "error": f"Category '{new_category}' already exists"}
             
-            # Get all products in the old category
-            products = get_products_by_category(old_category)
+            # Get all products in the old category (including inactive ones)
+            from src.db.operations import get_all_products_by_category
+            products = get_all_products_by_category(old_category)
             
             if not products:
                 return {"success": False, "error": f"No products found in category '{old_category}'"}
             
-            # Update all products in the category
-            updated_count = 0
-            for product in products:
-                success = update_product(product.id, category=new_category.strip())
-                if success:
-                    updated_count += 1
+            # Update the category name directly in the MenuCategory table
+            from src.db.operations import get_db_session
+            from src.db.models import MenuCategory
             
-            if updated_count > 0:
-                # Clear cache after updating products
+            session = get_db_session()
+            try:
+                # Find the category to update
+                category_obj = session.query(MenuCategory).filter(MenuCategory.name == old_category).first()
+                if not category_obj:
+                    return {"success": False, "error": f"Category '{old_category}' not found"}
+                
+                # Update the category name
+                category_obj.name = new_category.strip()
+                category_obj.updated_at = datetime.utcnow()
+                session.commit()
+                
+                logger.info("Successfully updated category from '%s' to '%s' (%d products)", 
+                          old_category, new_category, len(products))
+                
+                # Clear cache after updating category
                 try:
                     from src.utils.helpers import SimpleCache
                     cache = SimpleCache()
@@ -1047,17 +1134,20 @@ class AdminService:
                 except Exception as cache_error:
                     logger.warning("Failed to clear cache after updating category: %s", cache_error)
                 
-                logger.info("Successfully updated category from '%s' to '%s' (%d products)", 
-                          old_category, new_category, updated_count)
                 return {
                     "success": True,
                     "old_category": old_category,
                     "new_category": new_category.strip(),
-                    "updated_products": updated_count,
-                    "message": f"Category updated from '{old_category}' to '{new_category}' ({updated_count} products)"
+                    "updated_products": len(products),
+                    "message": f"Category updated from '{old_category}' to '{new_category}' ({len(products)} products)"
                 }
-            else:
-                return {"success": False, "error": "Failed to update any products"}
+                
+            except Exception as e:
+                session.rollback()
+                logger.error("Database error updating category: %s", e)
+                return {"success": False, "error": f"Database error: {str(e)}"}
+            finally:
+                session.close()
                 
         except Exception as e:
             logger.error("Error updating category from '%s' to '%s': %s", old_category, new_category, e)
