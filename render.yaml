@@ -4,12 +4,12 @@ services:
     env: python
     plan: free
     buildCommand: ./render-build.sh
-    startCommand: .venv/bin/python main.py
+    startCommand: python main.py
     healthCheckPath: /health
-    preDeployCommand: mkdir -p data
+    preDeployCommand: mkdir -p data logs
     envVars:
       - key: PYTHON_VERSION
-        value: 3.13.4
+        value: 3.11.7
       - key: POETRY_VERSION
         value: 1.7.1
       - key: BOT_TOKEN
@@ -33,4 +33,8 @@ services:
       - key: WEBHOOK_URL
         sync: false
       - key: WEBHOOK_MODE
-        value: "true" 
+        value: "true"
+      - key: PORT
+        value: "8000"
+      - key: RENDER_EXTERNAL_URL
+        sync: false 

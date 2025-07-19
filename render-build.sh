@@ -2,16 +2,28 @@
 # exit on error
 set -o errexit
 
+echo "🚀 Starting build process..."
+
 # Use Poetry's in-project virtualenv so runtime path is predictable
 poetry config virtualenvs.in-project true
 
 # Install dependencies according to lockfile
-poetry install --no-interaction --no-ansi
+echo "📦 Installing dependencies..."
+poetry install --no-interaction --no-ansi --only=main
 
-# Ensure runtime data directory exists
-mkdir -p data
+# Ensure runtime directories exist
+echo "📁 Creating runtime directories..."
+mkdir -p data logs
 
-# Note: Deployment test removed to avoid build issues
-# Run manually if needed: python test_deployment.py
+# Set proper permissions
+chmod +x main.py
 
-echo "Build completed successfully!" 
+# Verify Python version
+echo "🐍 Python version:"
+python --version
+
+# Verify installation
+echo "✅ Dependencies installed:"
+poetry show --tree
+
+echo "🎉 Build completed successfully!" 

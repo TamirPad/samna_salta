@@ -265,11 +265,28 @@ def main():
     print(f"Webhook Mode: {os.getenv('WEBHOOK_MODE', 'false')}")
     print(f"Port: {os.getenv('PORT', '8000')}")
     
-    # Check if we should run in webhook mode
-    if os.getenv("WEBHOOK_MODE", "false").lower() == "true":
-        run_webhook()
-    else:
-        run_polling()
+    # Ensure required environment variables are set
+    required_vars = ['BOT_TOKEN', 'ADMIN_CHAT_ID']
+    missing_vars = [var for var in required_vars if not os.getenv(var)]
+    
+    if missing_vars:
+        print(f"❌ Missing required environment variables: {missing_vars}")
+        print("Please set these variables in your Render environment settings.")
+        return
+    
+    try:
+        # Check if we should run in webhook mode
+        if os.getenv("WEBHOOK_MODE", "false").lower() == "true":
+            run_webhook()
+        else:
+            run_polling()
+    except Exception as e:
+        print(f"❌ Failed to start bot: {e}")
+        import traceback
+        traceback.print_exc()
+        return 1
+    
+    return 0
 
 if __name__ == "__main__":
     main() 

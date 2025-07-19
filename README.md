@@ -162,18 +162,27 @@ curl https://your-app.onrender.com/health
 
 ## 🚀 Deployment to Render
 
-1. Fork this repository to your GitHub account
-2. Connect to [Render.com](https://render.com) and create a Web Service
-3. Connect your forked repository
-4. Set environment variables:
+### Quick Deployment
+1. **Fork** this repository to your GitHub account
+2. **Connect** to [Render.com](https://render.com) and create a Web Service
+3. **Configure** the service:
+   - Build Command: `./render-build.sh`
+   - Start Command: `python main.py`
+   - Health Check Path: `/health`
+4. **Set Environment Variables**:
    - `BOT_TOKEN`: Your bot token from @BotFather
    - `ADMIN_CHAT_ID`: Your Telegram chat ID
-   - `WEBHOOK_URL`: Your Render app URL (e.g., https://your-app.onrender.com)
-5. Deploy - Render automatically handles the rest!
-6. After deployment, set up the webhook:
-   ```bash
-   python scripts/setup_webhook.py set
-   ```
+   - `WEBHOOK_MODE`: `true`
+5. **Deploy** - Render automatically handles the rest!
+
+### Detailed Deployment Guide
+For comprehensive deployment instructions, troubleshooting, and optimization tips, see [DEPLOYMENT.md](DEPLOYMENT.md).
+
+### Post-Deployment
+After successful deployment:
+1. Test the bot by sending `/start` to your bot
+2. Check the health endpoint: `https://your-app.onrender.com/health`
+3. Monitor logs in Render Dashboard for any issues
 
 ## ⚙️ Configuration
 
