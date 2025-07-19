@@ -21,10 +21,7 @@ from src.utils.error_handler import (
     ValidationError,
     error_handler,
 )
-from src.keyboards.menu_keyboards import (
-    get_delivery_method_keyboard,
-    get_main_menu_keyboard,
-)
+
 from src.states import (
     END,
     ONBOARDING_DELIVERY_ADDRESS,
@@ -34,7 +31,7 @@ from src.states import (
     ONBOARDING_PHONE,
 )
 from src.utils.i18n import i18n
-from src.utils.constants import ErrorMessages
+
 
 logger = logging.getLogger(__name__)
 

@@ -14,16 +14,14 @@ from src.keyboards.menu_keyboards import (
     get_direct_add_keyboard,
     get_hilbeh_menu_keyboard,
     get_kubaneh_menu_keyboard,
-    get_main_menu_keyboard,
     get_red_bisbas_menu_keyboard,
     get_samneh_menu_keyboard,
     get_dynamic_main_menu_keyboard,
     get_category_menu_keyboard,
-
 )
 from src.utils.i18n import i18n
 from src.utils.helpers import translate_category_name
-from src.utils.constants import CallbackPatterns, ErrorMessages
+from src.utils.constants import ErrorMessages
 
 logger = logging.getLogger(__name__)
 

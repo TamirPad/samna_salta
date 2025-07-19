@@ -104,11 +104,7 @@ def cached(ttl: Optional[int] = None):
         return wrapper
     return decorator
 
-# Original helper functions
-
-def format_price(price: float, currency: str = "ILS") -> str:
-    """Format price with currency"""
-    return f"{price:.2f} {currency}"
+# Helper functions
 
 @cached(ttl=300)  # Cache for 5 minutes
 def is_hilbeh_available() -> bool:
@@ -116,48 +112,6 @@ def is_hilbeh_available() -> bool:
     config = get_config()
     today = datetime.now().strftime("%A").lower()
     return today in config.hilbeh_available_days
-
-def parse_time_range(time_range: str) -> tuple[dt_time, dt_time]:
-    """Parse time range string (e.g., '09:00-18:00')"""
-    start_str, end_str = time_range.split("-")
-    start_time = datetime.strptime(start_str, "%H:%M").time()
-    end_time = datetime.strptime(end_str, "%H:%M").time()
-    return start_time, end_time
-
-@cached(ttl=60)  # Cache for 1 minute
-def is_within_business_hours() -> bool:
-    """Check if current time is within business hours"""
-    config = get_config()
-    start_time, end_time = parse_time_range(config.hilbeh_available_hours)
-    current_time = datetime.now().time()
-    return start_time <= current_time <= end_time
-
-def sanitize_phone_number(phone: str) -> str:
-    """Sanitize phone number to standard format"""
-    # Remove all non-digit characters
-    digits_only = "".join(filter(str.isdigit, phone))
-
-    # Handle Israeli phone numbers
-    if digits_only.startswith("972"):
-        return f"+{digits_only}"
-    if digits_only.startswith("0"):
-        return f"+972{digits_only[1:]}"
-    if len(digits_only) == 9:
-        return f"+972{digits_only}"
-    return f"+{digits_only}"
-
-def validate_phone_number(phone: str) -> bool:
-    """Validate phone number format"""
-    sanitized = sanitize_phone_number(phone)
-
-    # Check basic Israeli format
-    if not sanitized.startswith("+972") or len(sanitized) != 13:
-        return False
-
-    # Check for valid Israeli mobile prefixes
-    mobile_part = sanitized[4:6]
-    israeli_mobile_prefixes = ["50", "52", "53", "54", "55", "57", "58"]
-    return mobile_part in israeli_mobile_prefixes
 
 @cached(ttl=3600)  # Cache for 1 hour
 def translate_product_name(product_name: str, options: Optional[dict] = None, user_id: Optional[int] = None) -> str:
@@ -228,39 +182,7 @@ def translate_product_name(product_name: str, options: Optional[dict] = None, us
             # Fallback to original name
             return product_name
 
-def format_order_number(order_id: int) -> str:
-    """Format order number for display"""
-    return f"ORD-{order_id:06d}"
 
-def format_datetime(dt: datetime) -> str:
-    """Format datetime for display"""
-    return dt.strftime("%Y-%m-%d %H:%M:%S")
-
-def format_date(dt: datetime) -> str:
-    """Format date for display"""
-    return dt.strftime("%Y-%m-%d")
-
-def format_time(dt: datetime) -> str:
-    """Format time for display"""
-    return dt.strftime("%H:%M")
-
-def calculate_total(items: list[dict]) -> float:
-    """Calculate total price from items list"""
-    return sum(item.get("total_price", 0) for item in items)
-
-def calculate_subtotal(items: list[dict]) -> float:
-    """Calculate subtotal from items list"""
-    return sum(item.get("unit_price", 0) * item.get("quantity", 1) for item in items)
-
-def calculate_delivery_charge(subtotal: float, delivery_method: str) -> float:
-    """Calculate delivery charge based on subtotal and method"""
-    if delivery_method.lower() == "delivery":
-        return 5.0  # Fixed delivery charge
-    return 0.0
-
-def calculate_final_total(subtotal: float, delivery_charge: float) -> float:
-    """Calculate final total including delivery charge"""
-    return subtotal + delivery_charge
 
 def translate_category_name(category_name: str, user_id: Optional[int] = None) -> str:
     """Translate category name from database format to localized display name"""
