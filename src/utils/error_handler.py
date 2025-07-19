@@ -599,7 +599,7 @@ async def handle_error(update: Update, error: Exception, operation: str = "unkno
                         error_message,
                         parse_mode="HTML",
                         reply_markup=InlineKeyboardMarkup([[
-                            InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main")
+                            InlineKeyboardButton("⬅️ Back to Main", callback_data="menu_main")
                         ]])
                     )
                 else:
@@ -609,7 +609,7 @@ async def handle_error(update: Update, error: Exception, operation: str = "unkno
                             error_message,
                             parse_mode="HTML",
                             reply_markup=InlineKeyboardMarkup([[
-                                InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main")
+                                InlineKeyboardButton("⬅️ Back to Main", callback_data="menu_main")
                             ]])
                         )
             except Exception as edit_error:

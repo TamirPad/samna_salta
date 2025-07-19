@@ -8,7 +8,7 @@ Properly defined models with correct Base class and type annotations.
 from datetime import datetime
 from typing import Any, List, Optional, Type
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, BigInteger, String, Text
 from sqlalchemy.orm import (
     DeclarativeMeta,
     Mapped,
@@ -32,7 +32,7 @@ class Customer(Base):
     __tablename__ = "customers"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    telegram_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
+    telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     language: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)

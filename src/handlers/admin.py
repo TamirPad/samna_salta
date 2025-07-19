@@ -1861,7 +1861,7 @@ class AdminHandler:
             await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
             
             # Store the old category name in context
-            context = query.from_user.id
+            user_id = query.from_user.id
             context.user_data["old_category_name"] = category
             
             return AWAITING_CATEGORY_NAME_EDIT
@@ -3831,6 +3831,30 @@ class AdminHandler:
         
         return {"valid": True}
 
+    async def _reset_conversation(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """Reset conversation state and clear user data"""
+        try:
+            user_id = update.effective_user.id if update.effective_user else None
+            
+            # Clear conversation data
+            if context and hasattr(context, 'user_data'):
+                context.user_data.clear()
+            
+            # Log the reset
+            self.logger.info(f"🔄 Conversation reset for user {user_id}")
+            
+            # Send confirmation message
+            if update.callback_query:
+                await update.callback_query.answer("✅ Conversation reset")
+            elif update.message:
+                await update.message.reply_text("✅ Conversation reset")
+            
+            return ConversationHandler.END
+            
+        except Exception as e:
+            self.logger.error(f"Error resetting conversation: {e}")
+            return ConversationHandler.END
+
 
 def register_admin_handlers(application: Application):
     """Register admin handlers"""
@@ -3838,6 +3862,9 @@ def register_admin_handlers(application: Application):
 
     # Admin command handler
     application.add_handler(CommandHandler("admin", handler.handle_admin_command))
+    
+    # Emergency conversation reset command
+    application.add_handler(CommandHandler("reset", handler._reset_conversation))
 
     # Admin callback handlers (excluding conversation patterns)
     application.add_handler(
@@ -3885,8 +3912,10 @@ def register_admin_handlers(application: Application):
             ],
         },
         fallbacks=[
-            CommandHandler("cancel", lambda u, c: ConversationHandler.END),
-            CallbackQueryHandler(lambda u, c: ConversationHandler.END, pattern="^admin_menu_management$")
+            CommandHandler("cancel", handler._reset_conversation),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_menu_management$"),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_products_management$"),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_dashboard$")
         ],
         name="add_product_conversation",
         persistent=False,
@@ -3911,8 +3940,10 @@ def register_admin_handlers(application: Application):
             ],
         },
         fallbacks=[
-            CommandHandler("cancel", lambda u, c: ConversationHandler.END),
-            CallbackQueryHandler(lambda u, c: ConversationHandler.END, pattern="^admin_category_management$")
+            CommandHandler("cancel", handler._reset_conversation),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_category_management$"),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_menu_management$"),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_dashboard$")
         ],
         name="add_category_conversation",
         persistent=False,
@@ -3935,8 +3966,10 @@ def register_admin_handlers(application: Application):
             ],
         },
         fallbacks=[
-            CommandHandler("cancel", lambda u, c: ConversationHandler.END),
-            CallbackQueryHandler(lambda u, c: ConversationHandler.END, pattern="^admin_category_management$")
+            CommandHandler("cancel", handler._reset_conversation),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_category_management$"),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_menu_management$"),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_dashboard$")
         ],
         name="edit_category_conversation",
         persistent=False,
