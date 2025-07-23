@@ -446,6 +446,12 @@ class OnboardingHandler:
                     f"<b>{i18n.get_text('ADDRESS_FIELD', user_id=user_id)}</b> {customer.delivery_address or i18n.get_text('NOT_SET', user_id=user_id)}\n\n"
                     f"{i18n.get_text('CONTACT_SUPPORT_FOR_UPDATES', user_id=user_id)}"
                 )
+                
+                # Add business contact information
+                from src.utils.helpers import get_business_info_for_customers
+                business_info = get_business_info_for_customers(user_id, compact=True)
+                if business_info:
+                    info_text += f"\n\n{i18n.get_text('BUSINESS_CONTACT_INFO', user_id=user_id)}\n{business_info}"
             else:
                 info_text = i18n.get_text("USER_INFO_NOT_FOUND", user_id=user_id)
 

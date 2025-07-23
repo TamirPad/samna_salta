@@ -689,5 +689,8 @@
   "ADMIN_BUSINESS_PHONE_TOO_SHORT": "❌ Business phone must be at least 7 characters long. Please try again:",
   "ADMIN_DELIVERY_CHARGE_NEGATIVE": "❌ Delivery charge cannot be negative. Please try again:",
   "ADMIN_DELIVERY_CHARGE_INVALID": "❌ Please enter a valid number for delivery charge. Please try again:",
-  "ADMIN_CURRENCY_INVALID": "❌ Currency must be 2-5 characters long. Please try again:"
+  "ADMIN_CURRENCY_INVALID": "❌ Currency must be 2-5 characters long. Please try again:",
+  "BUSINESS_INFO_HEADER": "ℹ️ <b>About Us</b>",
+  "BUSINESS_CONTACT_INFO": "📞 <b>Contact Information</b>",
+  "BUSINESS_LOCATION_INFO": "📍 <b>Location & Hours</b>"
 } 

@@ -1198,6 +1198,13 @@ class AdminService:
         try:
             from src.db.operations import update_business_settings
             
+            # Convert numeric fields
+            if "delivery_charge" in kwargs:
+                try:
+                    kwargs["delivery_charge"] = float(kwargs["delivery_charge"])
+                except (ValueError, TypeError):
+                    return {"success": False, "error": "Invalid delivery charge format"}
+            
             # Validate required fields
             if "business_name" in kwargs and (not kwargs["business_name"] or len(kwargs["business_name"].strip()) < 2):
                 return {"success": False, "error": "Business name must be at least 2 characters long"}

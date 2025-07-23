@@ -744,5 +744,8 @@
   "ADMIN_BUSINESS_PHONE_TOO_SHORT": "❌ טלפון העסק חייב להיות לפחות 7 תווים. אנא נסה שוב:",
   "ADMIN_DELIVERY_CHARGE_NEGATIVE": "❌ עלות משלוח לא יכולה להיות שלילית. אנא נסה שוב:",
   "ADMIN_DELIVERY_CHARGE_INVALID": "❌ אנא הכנס מספר תקין לעלות משלוח. אנא נסה שוב:",
-  "ADMIN_CURRENCY_INVALID": "❌ מטבע חייב להיות 2-5 תווים. אנא נסה שוב:"
+  "ADMIN_CURRENCY_INVALID": "❌ מטבע חייב להיות 2-5 תווים. אנא נסה שוב:",
+  "BUSINESS_INFO_HEADER": "ℹ️ <b>אודותינו</b>",
+  "BUSINESS_CONTACT_INFO": "📞 <b>פרטי יצירת קשר</b>",
+  "BUSINESS_LOCATION_INFO": "📍 <b>מיקום ושעות פעילות</b>"
 } 

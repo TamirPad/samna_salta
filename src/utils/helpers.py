@@ -287,7 +287,14 @@ def get_dynamic_welcome_message(user_id: Optional[int] = None) -> str:
         welcome_template = i18n.get_text("WELCOME_NEW_USER", user_id=user_id)
         
         # Format the template with the business name
-        return welcome_template.format(business_name=business_name)
+        welcome_message = welcome_template.format(business_name=business_name)
+        
+        # Add business information if available
+        business_info = get_business_info_for_customers(user_id)
+        if business_info:
+            welcome_message += f"\n\n{business_info}"
+        
+        return welcome_message
         
     except Exception as e:
         # Fallback to default welcome message if there's an error
@@ -312,7 +319,14 @@ def get_dynamic_welcome_for_returning_users(user_id: Optional[int] = None) -> st
         welcome_template = i18n.get_text("WELCOME", user_id=user_id)
         
         # Format the template with the business name
-        return welcome_template.format(business_name=business_name)
+        welcome_message = welcome_template.format(business_name=business_name)
+        
+        # Add business information if available (shorter version for returning users)
+        business_info = get_business_info_for_customers(user_id, compact=True)
+        if business_info:
+            welcome_message += f"\n\n{business_info}"
+        
+        return welcome_message
         
     except Exception as e:
         # Fallback to default welcome message if there's an error
@@ -321,3 +335,54 @@ def get_dynamic_welcome_for_returning_users(user_id: Optional[int] = None) -> st
             return i18n.get_text("WELCOME", user_id=user_id).format(business_name="Samna Salta")
         except:
             return "Welcome to Samna Salta!"
+
+@cached(ttl=300)  # Cache for 5 minutes
+def get_business_info_for_customers(user_id: Optional[int] = None, compact: bool = False) -> str:
+    """Get formatted business information for display to customers"""
+    from src.utils.i18n import i18n
+    from src.db.operations import get_business_settings_dict
+    
+    try:
+        # Get business settings
+        settings = get_business_settings_dict()
+        
+        if not settings:
+            return ""
+        
+        # Build business info text
+        info_parts = []
+        
+        # Business description
+        if settings.get('business_description'):
+            info_parts.append(f"📝 {settings['business_description']}")
+        
+        # Contact information
+        contact_parts = []
+        if settings.get('business_phone'):
+            contact_parts.append(f"📞 {settings['business_phone']}")
+        if settings.get('business_email'):
+            contact_parts.append(f"📧 {settings['business_email']}")
+        
+        if contact_parts:
+            if compact:
+                info_parts.append(" • ".join(contact_parts))
+            else:
+                info_parts.extend(contact_parts)
+        
+        # Address (only in full version)
+        if not compact and settings.get('business_address'):
+            info_parts.append(f"📍 {settings['business_address']}")
+        
+        # Business hours (only in full version)
+        if not compact and settings.get('business_hours'):
+            info_parts.append(f"🕒 {settings['business_hours']}")
+        
+        # Website (only in full version)
+        if not compact and settings.get('business_website'):
+            info_parts.append(f"🌐 {settings['business_website']}")
+        
+        return "\n".join(info_parts) if info_parts else ""
+        
+    except Exception as e:
+        logger.error(f"Error getting business info for customers: {e}")
+        return ""

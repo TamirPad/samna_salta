@@ -170,6 +170,8 @@ class AdminHandler:
             await self._show_business_settings(query)
         elif data == "admin_edit_business_settings":
             await self._start_edit_business_settings(query)
+        elif data.startswith("admin_edit_business_") or data == "admin_edit_currency" or data == "admin_edit_delivery_charge":
+            await self._handle_business_settings_edit(update, None)
 
         elif data == "admin_view_categories":
             await self._show_all_categories(query)
@@ -3632,6 +3634,8 @@ class AdminHandler:
             
             if callback_data == "admin_edit_currency":
                 field = "currency"
+            elif callback_data == "admin_edit_delivery_charge":
+                field = "delivery_charge"
             elif callback_data.startswith("admin_edit_business_"):
                 # Extract the full field name (e.g., "admin_edit_business_name" -> "business_name")
                 field = callback_data.replace("admin_edit_", "")
@@ -3769,20 +3773,20 @@ class AdminHandler:
             # Log the fallback first
             self.logger.info("Business conversation fallback triggered for user %d", user_id)
             
-            # If it's a callback query, handle it appropriately
+            # Always answer the callback query first
             if update.callback_query:
+                await update.callback_query.answer("✅ Conversation cancelled")
+                
                 callback_data = update.callback_query.data
                 
-                # If it's the edit business settings callback, show the edit selection screen
-                if callback_data == "admin_edit_business_settings":
-                    await self._start_edit_business_settings(update.callback_query)
-                elif callback_data == "admin_business_settings":
+                # If it's the business settings callback, show the business settings screen
+                if callback_data == "admin_business_settings":
                     await self._show_business_settings(update.callback_query)
                 elif callback_data == "admin_dashboard":
                     await self._show_admin_dashboard_from_callback(update.callback_query)
                 else:
-                    # For other callbacks, just answer them
-                    await update.callback_query.answer()
+                    # For any other callback during fallback, go back to business settings
+                    await self._show_business_settings(update.callback_query)
             
             # Clear conversation state AFTER handling the callback
             self._clear_business_conversation(user_id)
@@ -3791,6 +3795,12 @@ class AdminHandler:
             
         except Exception as e:
             self.logger.error("Error in business conversation fallback: %s", e)
+            # Always answer callback query even on error
+            if update.callback_query:
+                try:
+                    await update.callback_query.answer("❌ Error occurred")
+                except:
+                    pass
             return ConversationHandler.END
 
     def _validate_business_field(self, field: str, value: str, user_id: int) -> dict:
@@ -3905,7 +3915,7 @@ def register_admin_handlers(application: Application):
 
     # Admin callback handlers (excluding conversation patterns but including fallback handlers)
     application.add_handler(
-        CallbackQueryHandler(handler.handle_admin_callback, pattern="^admin_(?!add_product_category_|add_product_confirm_|edit_category_name_|edit_product_field_|edit_product_confirm_|edit_product_category_|product_edit_|edit_business_name|edit_business_description|edit_business_address|edit_business_phone|edit_business_email|edit_business_website|edit_business_hours|edit_currency|edit_delivery_charge)")
+        CallbackQueryHandler(handler.handle_admin_callback, pattern="^admin_(?!add_product_category_|add_product_confirm_|edit_category_name_|edit_product_field_|edit_product_confirm_|edit_product_category_|product_edit_|edit_business_name$|edit_business_description$|edit_business_address$|edit_business_phone$|edit_business_email$|edit_business_website$|edit_business_hours$|edit_currency$|edit_delivery_charge$)")
     )
 
     # Admin conversation handler for status updates
@@ -4058,10 +4068,6 @@ def register_admin_handlers(application: Application):
             ]
         },
         fallbacks=[
-            CallbackQueryHandler(handler._handle_business_conversation_fallback, pattern="^admin_edit_business_settings$"),
-            CallbackQueryHandler(handler._handle_business_conversation_fallback, pattern="^admin_business_settings$"),
-            CallbackQueryHandler(handler._handle_business_conversation_fallback, pattern="^admin_dashboard$"),
-            CallbackQueryHandler(handler._handle_business_conversation_fallback, pattern="^admin_edit_business_.*$"),
             CommandHandler("cancel", handler._handle_business_conversation_fallback)
         ],
         name="business_settings_conversation",
