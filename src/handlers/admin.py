@@ -136,7 +136,7 @@ class AdminHandler:
         elif data == "admin_view_products":
             await self._show_all_products(query)
         elif data == "admin_add_product":
-            await self._start_add_product(query)
+            await self._start_add_product(update, None)
         elif data == "admin_remove_products":
             await self._show_remove_products_list(query)
         
@@ -174,7 +174,7 @@ class AdminHandler:
         elif data == "admin_view_categories":
             await self._show_all_categories(query)
         elif data == "admin_add_category":
-            await self._start_add_category(query)
+            await self._start_add_category(update, None)
         elif data.startswith("admin_edit_category_"):
             category = data.replace("admin_edit_category_", "")
             await self._show_edit_category(query, category)
@@ -1784,6 +1784,11 @@ class AdminHandler:
             query = update.callback_query
             user_id = query.from_user.id
             self.logger.info(f"🔧 Starting add category conversation for user {user_id}")
+            
+            # Clear any existing conversation data
+            if context and hasattr(context, 'user_data'):
+                context.user_data.clear()
+            
             text = i18n.get_text("ADMIN_CATEGORY_ADD_PROMPT", user_id=user_id)
             
             keyboard = [
@@ -2036,13 +2041,18 @@ class AdminHandler:
             user_id = query.from_user.id
             self.logger.info(f"🚀 Starting step-by-step product creation for user {user_id}")
             self.logger.info(f"🚀 Setting conversation state to AWAITING_PRODUCT_NAME ({AWAITING_PRODUCT_NAME})")
+            
+            # Clear any existing conversation data
+            if context and hasattr(context, 'user_data'):
+                context.user_data.clear()
+            
             text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_NAME", user_id=user_id)
             
             keyboard = [
                 [
                     InlineKeyboardButton(
                         i18n.get_text("CANCEL", user_id=user_id),
-                        callback_data="admin_menu_management"
+                        callback_data="admin_products_management"
                     )
                 ]
             ]
@@ -2123,7 +2133,7 @@ class AdminHandler:
                 [
                     InlineKeyboardButton(
                         i18n.get_text("CANCEL", user_id=user_id),
-                        callback_data="admin_menu_management"
+                        callback_data="admin_products_management"
                     )
                 ]
             ]
@@ -2239,7 +2249,7 @@ class AdminHandler:
                 [
                     InlineKeyboardButton(
                         i18n.get_text("CANCEL", user_id=user_id),
-                        callback_data="admin_menu_management"
+                        callback_data="admin_products_management"
                     )
                 ]
             ]
@@ -2342,7 +2352,7 @@ class AdminHandler:
                         [
                             InlineKeyboardButton(
                                 i18n.get_text("ADMIN_PRODUCT_BACK_TO_MANAGEMENT", user_id=user_id),
-                                callback_data="admin_menu_management"
+                                callback_data="admin_products_management"
                             )
                         ]
                     ]
@@ -3436,34 +3446,6 @@ class AdminHandler:
             self.logger.error("Error handling quick action: %s", e)
             await query.answer(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id), show_alert=True)
 
-    async def _start_add_product(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Start the step-by-step add product conversation"""
-        try:
-            query = update.callback_query
-            user_id = query.from_user.id
-            self.logger.info(f"🚀 Starting step-by-step product creation for user {user_id}")
-            self.logger.info(f"🚀 Setting conversation state to AWAITING_PRODUCT_NAME ({AWAITING_PRODUCT_NAME})")
-            text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_NAME", user_id=user_id)
-            
-            keyboard = [
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("CANCEL", user_id=user_id),
-                        callback_data="admin_menu_management"
-                    )
-                ]
-            ]
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
-            
-            return AWAITING_PRODUCT_NAME
-            
-        except Exception as e:
-            self.logger.error("Error starting add product: %s", e)
-            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=update.callback_query.from_user.id))
-            return ConversationHandler.END
-
     def _parse_product_input(self, text: str) -> Optional[Dict]:
         """Parse product details from text input"""
         try:
@@ -3873,16 +3855,41 @@ class AdminHandler:
             # Log the reset
             self.logger.info(f"🔄 Conversation reset for user {user_id}")
             
-            # Send confirmation message
+            # Send confirmation message and show appropriate menu
             if update.callback_query:
-                await update.callback_query.answer("✅ Conversation reset")
+                # Always answer the callback query first to prevent retries
+                await update.callback_query.answer("✅ Conversation cancelled")
+                
+                # Show the appropriate menu based on the callback data
+                data = update.callback_query.data
+                try:
+                    if data == "admin_menu_management":
+                        await self._show_menu_management_dashboard(update.callback_query)
+                    elif data == "admin_products_management":
+                        await self._show_products_management(update.callback_query)
+                    elif data == "admin_category_management":
+                        await self._show_category_management(update.callback_query)
+                    elif data == "admin_dashboard":
+                        await self._show_admin_dashboard_from_callback(update.callback_query)
+                    else:
+                        # Default fallback to admin dashboard
+                        await self._show_admin_dashboard_from_callback(update.callback_query)
+                except Exception as menu_error:
+                    self.logger.error(f"Error showing menu after conversation reset: {menu_error}")
+                    # If menu showing fails, at least we answered the callback
             elif update.message:
-                await update.message.reply_text("✅ Conversation reset")
+                await update.message.reply_text("✅ Conversation cancelled")
             
             return ConversationHandler.END
             
         except Exception as e:
             self.logger.error(f"Error resetting conversation: {e}")
+            # Even if there's an error, try to answer the callback query to prevent retries
+            if update.callback_query:
+                try:
+                    await update.callback_query.answer("❌ Error occurred")
+                except:
+                    pass
             return ConversationHandler.END
 
 
@@ -3896,9 +3903,9 @@ def register_admin_handlers(application: Application):
     # Emergency conversation reset command
     application.add_handler(CommandHandler("reset", handler._reset_conversation))
 
-    # Admin callback handlers (excluding conversation patterns)
+    # Admin callback handlers (excluding conversation patterns but including fallback handlers)
     application.add_handler(
-        CallbackQueryHandler(handler.handle_admin_callback, pattern="^admin_(?!add_product_category_|add_product_confirm_|add_product$|add_category$|edit_category_name_|edit_product_field_|edit_product_confirm_|edit_product_category_|product_edit_|edit_business_name|edit_business_description|edit_business_address|edit_business_phone|edit_business_email|edit_business_website|edit_business_hours|edit_currency|edit_delivery_charge)")
+        CallbackQueryHandler(handler.handle_admin_callback, pattern="^admin_(?!add_product_category_|add_product_confirm_|edit_category_name_|edit_product_field_|edit_product_confirm_|edit_product_category_|product_edit_|edit_business_name|edit_business_description|edit_business_address|edit_business_phone|edit_business_email|edit_business_website|edit_business_hours|edit_currency|edit_delivery_charge)")
     )
 
     # Admin conversation handler for status updates
@@ -3943,9 +3950,8 @@ def register_admin_handlers(application: Application):
         },
         fallbacks=[
             CommandHandler("cancel", handler._reset_conversation),
-            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_menu_management$"),
-            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_products_management$"),
-            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_dashboard$")
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_dashboard$"),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_back$")
         ],
         name="add_product_conversation",
         persistent=False,
@@ -3971,9 +3977,8 @@ def register_admin_handlers(application: Application):
         },
         fallbacks=[
             CommandHandler("cancel", handler._reset_conversation),
-            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_category_management$"),
-            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_menu_management$"),
-            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_dashboard$")
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_dashboard$"),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_back$")
         ],
         name="add_category_conversation",
         persistent=False,
@@ -3997,9 +4002,8 @@ def register_admin_handlers(application: Application):
         },
         fallbacks=[
             CommandHandler("cancel", handler._reset_conversation),
-            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_category_management$"),
-            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_menu_management$"),
-            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_dashboard$")
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_dashboard$"),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_back$")
         ],
         name="edit_category_conversation",
         persistent=False,
