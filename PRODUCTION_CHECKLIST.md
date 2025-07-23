@@ -61,8 +61,6 @@
 - [ ] Test error handling
 
 ### Performance Tests
-- [ ] Generate test data: `python scripts/generate_test_data.py`
-- [ ] Run performance tests: `python scripts/performance_test.py`
 - [ ] Load test with multiple users
 - [ ] Test database performance
 - [ ] Monitor memory usage
@@ -109,8 +107,6 @@ samna_salta/
 ├── src/                    # Main application code
 ├── scripts/               # Essential scripts only
 │   ├── create_tables.py
-│   ├── generate_test_data.py
-│   ├── performance_test.py
 │   ├── insert_customers.py
 │   ├── test_bot.py
 │   └── verify_deployment.py
