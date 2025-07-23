@@ -36,7 +36,6 @@
 ### Database Setup
 - [ ] Set up production PostgreSQL database
 - [ ] Run database migrations: `python scripts/create_tables.py`
-- [ ] Seed initial data: `python scripts/seed_constants_simple.py`
 - [ ] Test database connection
 
 ### Infrastructure
@@ -108,7 +107,6 @@ samna_salta/
 ├── src/                    # Main application code
 ├── scripts/               # Essential scripts only
 │   ├── create_tables.py
-│   ├── seed_constants_simple.py
 │   ├── insert_customers.py
 │   ├── test_bot.py
 │   └── verify_deployment.py
