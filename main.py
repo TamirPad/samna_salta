@@ -38,6 +38,28 @@ def setup_bot():
         # Get config
         config = get_config()
         logger.info("Configuration loaded successfully")
+        
+        # Production readiness validation
+        if config.environment == 'production':
+            from src.utils.production_checks import (
+                ensure_production_readiness, 
+                setup_error_monitoring,
+                validate_database_connection
+            )
+            
+            # Validate production readiness
+            if not ensure_production_readiness():
+                logger.critical("Production readiness validation failed - stopping startup")
+                raise RuntimeError("Production environment not properly configured")
+            
+            # Setup error monitoring
+            setup_error_monitoring()
+            
+            # Setup metrics collection
+            from src.utils.metrics import setup_metrics_collection
+            setup_metrics_collection()
+            
+            logger.info("Production environment validated and monitoring enabled")
 
         # Initialize database with retry logic
         logger.info("Initializing database...")
@@ -242,23 +264,43 @@ def run_webhook():
 
     @app.get("/health")
     async def health_check(background_tasks: BackgroundTasks):
-        """Health check endpoint"""
+        """Comprehensive health check endpoint with metrics"""
         try:
             # Add health check to background tasks
             background_tasks.add_task(log_health_check)
             
-            if application and application.bot:
-                return {
-                    "status": "healthy",
-                    "bot": "running",
-                    "timestamp": asyncio.get_event_loop().time()
+            # Import metrics here to avoid circular imports
+            from src.utils.metrics import get_health_monitor, get_metrics
+            
+            health_monitor = get_health_monitor()
+            metrics = get_metrics()
+            
+            # Run comprehensive health checks
+            health_results = health_monitor.run_health_checks()
+            
+            # Add basic application status
+            app_status = {
+                "bot_initialized": application and application.bot is not None,
+                "uptime_seconds": metrics.get_summary()['uptime_seconds'],
+                "total_requests": metrics.counters.get('http_requests_total', 0),
+                "error_count": metrics.counters.get('http_errors_total', 0)
+            }
+            
+            # Combine results
+            result = {
+                **health_results,
+                "application": app_status,
+                "metrics_summary": {
+                    "counters": dict(list(metrics.counters.items())[:5]),  # Top 5 counters
+                    "gauges": dict(list(metrics.gauges.items())[:5])       # Top 5 gauges
                 }
-            else:
-                return {
-                    "status": "unhealthy",
-                    "bot": "not_initialized",
-                    "timestamp": asyncio.get_event_loop().time()
-                }
+            }
+            
+            # Record health check metric
+            metrics.increment('health_checks_total')
+            
+            return result
+            
         except Exception as e:
             logger.error(f"Health check failed: {e}")
             raise HTTPException(status_code=500, detail="Health check failed")
@@ -283,13 +325,41 @@ def run_webhook():
             logger.error(f"Webhook handler error: {e}")
             raise HTTPException(status_code=500, detail="Webhook processing failed")
 
+    @app.get("/metrics")
+    async def metrics_endpoint():
+        """Metrics endpoint for monitoring systems"""
+        try:
+            from src.utils.metrics import get_metrics
+            
+            metrics = get_metrics()
+            format_type = 'json'  # Could be made configurable
+            
+            if format_type == 'json':
+                return metrics.get_summary()
+            else:
+                # Return Prometheus format
+                from fastapi.responses import PlainTextResponse
+                return PlainTextResponse(
+                    content=metrics.export_metrics('prometheus'),
+                    media_type='text/plain'
+                )
+                
+        except Exception as e:
+            logger.error(f"Metrics endpoint failed: {e}")
+            raise HTTPException(status_code=500, detail="Metrics unavailable")
+
     @app.get("/")
     async def root():
         """Root endpoint"""
         return {
             "message": "Samna Salta Bot API",
             "status": "running",
-            "version": "1.0.0"
+            "version": "1.0.0",
+            "endpoints": {
+                "health": "/health",
+                "metrics": "/metrics",
+                "webhook": "/webhook"
+            }
         }
 
     # Run the FastAPI app

@@ -43,9 +43,20 @@ def get_dynamic_main_menu_keyboard(user_id: int = None):
             # Add category buttons (max 2 per row)
             row = []
             for category, category_products in categories.items():
-                # Create category button with product count using translated category name
+                # Create professional category button with beautiful icons and product count
                 translated_category = translate_category_name(category, user_id)
-                button_text = f"📂 {translated_category} ({len(category_products)})"
+                category_emoji = {
+                    'kubaneh': '🥖',
+                    'samneh': '🧈', 
+                    'red_bisbas': '🌶️',
+                    'hawaij_soup': '🍲',
+                    'hawaij_coffee': '☕',
+                    'white_coffee': '🤍',
+                    'hilbeh': '🫘',
+                    'other': '📂'
+                }.get(category.lower(), '🍽️')
+                
+                button_text = f"{category_emoji} {translated_category} ({len(category_products)})"
                 callback_data = f"category_{category}"
                 
                 row.append(InlineKeyboardButton(button_text, callback_data=callback_data))
@@ -55,9 +66,15 @@ def get_dynamic_main_menu_keyboard(user_id: int = None):
                     keyboard.append(row)
                     row = []
             
-            # Add standard action buttons
-            keyboard.append([InlineKeyboardButton(i18n.get_text("BUTTON_VIEW_CART", user_id=user_id), callback_data="cart_view")])
-            keyboard.append([InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="main_page")])
+            # Add professional action buttons with beautiful styling
+            keyboard.append([InlineKeyboardButton(
+                i18n.get_text('BUTTON_VIEW_CART', user_id=user_id), 
+                callback_data="cart_view"
+            )])
+            keyboard.append([InlineKeyboardButton(
+                i18n.get_text('BACK_TO_MAIN', user_id=user_id), 
+                callback_data="main_page"
+            )])
             
             return InlineKeyboardMarkup(keyboard)
         
@@ -222,13 +239,28 @@ def get_direct_add_keyboard(product_type: str, user_id: int = None):
 
 
 def get_cart_keyboard(user_id: int = None):
-    """Get cart view keyboard"""
+    """Get professional cart view keyboard with beautiful styling"""
     keyboard = [
-        [InlineKeyboardButton(i18n.get_text("CHANGE_DELIVERY", user_id=user_id), callback_data="cart_change_delivery")],
-        [InlineKeyboardButton(i18n.get_text("SEND_ORDER", user_id=user_id), callback_data="cart_send_order")],
+        # Primary Action
+        [InlineKeyboardButton(
+            i18n.get_text('SEND_ORDER', user_id=user_id), 
+            callback_data="cart_send_order"
+        )],
+        # Secondary Actions
+        [InlineKeyboardButton(
+            i18n.get_text('CHANGE_DELIVERY', user_id=user_id), 
+            callback_data="cart_change_delivery"
+        )],
+        # Bottom Actions
         [
-            InlineKeyboardButton(i18n.get_text("CLEAR_CART", user_id=user_id), callback_data="cart_clear_confirm"),
-            InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main"),
+            InlineKeyboardButton(
+                i18n.get_text('CLEAR_CART', user_id=user_id), 
+                callback_data="cart_clear_confirm"
+            ),
+            InlineKeyboardButton(
+                i18n.get_text('BACK_MAIN_MENU', user_id=user_id), 
+                callback_data="menu_main"
+            ),
         ],
     ]
 

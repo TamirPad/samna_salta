@@ -267,8 +267,12 @@ class AdminHandler:
             await self._show_business_settings(query)
         elif data == "admin_edit_business_settings":
             await self._start_edit_business_settings(query)
-        elif data.startswith("admin_edit_business_") or data == "admin_edit_currency" or data == "admin_edit_delivery_charge":
+        elif (data.startswith("admin_edit_business_") or 
+              data == "admin_edit_currency" or 
+              data == "admin_edit_delivery_charge"):
             await self._handle_business_settings_edit(update, None)
+        elif data == "admin_cancel_business_edit":
+            await self._cancel_business_edit(query)
 
         elif data == "admin_view_categories":
             await self._show_all_categories(query)
@@ -304,6 +308,56 @@ class AdminHandler:
             await self._show_admin_dashboard_from_callback(query)
             await query.answer()
 
+    def _create_professional_admin_keyboard(self, user_id: int) -> list:
+        """Create a professional admin dashboard keyboard with beautiful styling"""
+        return [
+            # 📋 Orders Section
+            [
+                InlineKeyboardButton(
+                    i18n.get_text('ADMIN_PENDING_ORDERS', user_id=user_id), 
+                    callback_data="admin_pending_orders"
+                ),
+                InlineKeyboardButton(
+                    i18n.get_text('ADMIN_ACTIVE_ORDERS', user_id=user_id), 
+                    callback_data="admin_active_orders"
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    i18n.get_text('ADMIN_ALL_ORDERS', user_id=user_id), 
+                    callback_data="admin_all_orders"
+                ),
+                InlineKeyboardButton(
+                    i18n.get_text('ADMIN_COMPLETED_ORDERS', user_id=user_id), 
+                    callback_data="admin_completed_orders"
+                ),
+            ],
+            # 📊 Analytics & People Section  
+            [
+                InlineKeyboardButton(
+                    i18n.get_text('ADMIN_ANALYTICS', user_id=user_id), 
+                    callback_data="admin_analytics"
+                ),
+                InlineKeyboardButton(
+                    i18n.get_text('ADMIN_CUSTOMERS', user_id=user_id), 
+                    callback_data="admin_customers"
+                )
+            ],
+            # 🍽️ Business Management Section
+            [
+                InlineKeyboardButton(
+                    i18n.get_text('ADMIN_MENU_MANAGEMENT', user_id=user_id), 
+                    callback_data="admin_menu_management"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    i18n.get_text('ADMIN_BUSINESS_SETTINGS', user_id=user_id), 
+                    callback_data="admin_business_settings"
+                )
+            ],
+        ]
+
     async def _show_admin_dashboard_from_callback(self, query: CallbackQuery) -> None:
         """Show admin dashboard from callback query"""
         try:
@@ -326,44 +380,20 @@ class AdminHandler:
                 len(today_orders),
             )
 
-            dashboard_text = (
-                i18n.get_text("ADMIN_DASHBOARD_TITLE", user_id=user_id) + "\n\n" +
-                i18n.get_text("ADMIN_ORDER_STATS", user_id=user_id) + "\n" +
-                i18n.get_text("ADMIN_PENDING_COUNT", user_id=user_id).format(count=len(pending_orders)) + "\n" +
-                i18n.get_text("ADMIN_ACTIVE_COUNT", user_id=user_id).format(count=len(active_orders)) + "\n" +
-                i18n.get_text("ADMIN_COMPLETED_COUNT", user_id=user_id).format(count=len(completed_orders)) + "\n" +
-                i18n.get_text("ADMIN_TOTAL_TODAY", user_id=user_id).format(count=len(today_orders)) + "\n\n" +
-                i18n.get_text("ADMIN_QUICK_ACTIONS", user_id=user_id)
-            )
+            # Create professional dashboard with clean formatting
+            dashboard_text = f"""
+🏢 <b>{i18n.get_text("ADMIN_DASHBOARD_TITLE", user_id=user_id)}</b>
 
-            keyboard = [
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_PENDING_ORDERS", user_id=user_id), callback_data="admin_pending_orders"
-                    ),
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_ACTIVE_ORDERS", user_id=user_id), callback_data="admin_active_orders"
-                    ),
-                ],
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_ALL_ORDERS", user_id=user_id), callback_data="admin_all_orders"
-                    ),
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_COMPLETED_ORDERS", user_id=user_id), callback_data="admin_completed_orders"
-                    ),
-                ],
-                [
-                    InlineKeyboardButton(i18n.get_text("ADMIN_ANALYTICS", user_id=user_id), callback_data="admin_analytics"),
-                    InlineKeyboardButton(i18n.get_text("ADMIN_CUSTOMERS", user_id=user_id), callback_data="admin_customers")
-                ],
-                [
-                    InlineKeyboardButton(i18n.get_text("ADMIN_MENU_MANAGEMENT", user_id=user_id), callback_data="admin_menu_management")
-                ],
-                [
-                    InlineKeyboardButton(i18n.get_text("ADMIN_BUSINESS_SETTINGS", user_id=user_id), callback_data="admin_business_settings")
-                ],
-            ]
+📊 <b>{i18n.get_text("ADMIN_ORDER_STATS", user_id=user_id)}</b>
+🟡 {i18n.get_text("ADMIN_PENDING_COUNT", user_id=user_id).format(count=len(pending_orders))}
+🔵 {i18n.get_text("ADMIN_ACTIVE_COUNT", user_id=user_id).format(count=len(active_orders))}
+🟢 {i18n.get_text("ADMIN_COMPLETED_COUNT", user_id=user_id).format(count=len(completed_orders))}
+📅 {i18n.get_text("ADMIN_TOTAL_TODAY", user_id=user_id).format(count=len(today_orders))}
+
+🚀 <b>{i18n.get_text("ADMIN_QUICK_ACTIONS", user_id=user_id)}</b>
+            """.strip()
+
+            keyboard = self._create_professional_admin_keyboard(user_id)
 
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
@@ -401,44 +431,20 @@ class AdminHandler:
                 len(today_orders),
             )
 
-            dashboard_text = (
-                i18n.get_text("ADMIN_DASHBOARD_TITLE", user_id=user_id) + "\n\n" +
-                i18n.get_text("ADMIN_ORDER_STATS", user_id=user_id) + "\n" +
-                i18n.get_text("ADMIN_PENDING_COUNT", user_id=user_id).format(count=len(pending_orders)) + "\n" +
-                i18n.get_text("ADMIN_ACTIVE_COUNT", user_id=user_id).format(count=len(active_orders)) + "\n" +
-                i18n.get_text("ADMIN_COMPLETED_COUNT", user_id=user_id).format(count=len(completed_orders)) + "\n" +
-                i18n.get_text("ADMIN_TOTAL_TODAY", user_id=user_id).format(count=len(today_orders)) + "\n\n" +
-                i18n.get_text("ADMIN_QUICK_ACTIONS", user_id=user_id)
-            )
+            # Create professional dashboard with clean formatting
+            dashboard_text = f"""
+🏢 <b>{i18n.get_text("ADMIN_DASHBOARD_TITLE", user_id=user_id)}</b>
 
-            keyboard = [
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_PENDING_ORDERS", user_id=user_id), callback_data="admin_pending_orders"
-                    ),
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_ACTIVE_ORDERS", user_id=user_id), callback_data="admin_active_orders"
-                    ),
-                ],
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_ALL_ORDERS", user_id=user_id), callback_data="admin_all_orders"
-                    ),
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_COMPLETED_ORDERS", user_id=user_id), callback_data="admin_completed_orders"
-                    ),
-                ],
-                [
-                    InlineKeyboardButton(i18n.get_text("ADMIN_ANALYTICS", user_id=user_id), callback_data="admin_analytics"),
-                    InlineKeyboardButton(i18n.get_text("ADMIN_CUSTOMERS", user_id=user_id), callback_data="admin_customers")
-                ],
-                [
-                    InlineKeyboardButton(i18n.get_text("ADMIN_MENU_MANAGEMENT", user_id=user_id), callback_data="admin_menu_management")
-                ],
-                [
-                    InlineKeyboardButton(i18n.get_text("ADMIN_BUSINESS_SETTINGS", user_id=user_id), callback_data="admin_business_settings")
-                ],
-            ]
+📊 <b>{i18n.get_text("ADMIN_ORDER_STATS", user_id=user_id)}</b>
+🟡 {i18n.get_text("ADMIN_PENDING_COUNT", user_id=user_id).format(count=len(pending_orders))}
+🔵 {i18n.get_text("ADMIN_ACTIVE_COUNT", user_id=user_id).format(count=len(active_orders))}
+🟢 {i18n.get_text("ADMIN_COMPLETED_COUNT", user_id=user_id).format(count=len(completed_orders))}
+📅 {i18n.get_text("ADMIN_TOTAL_TODAY", user_id=user_id).format(count=len(today_orders))}
+
+🚀 <b>{i18n.get_text("ADMIN_QUICK_ACTIONS", user_id=user_id)}</b>
+            """.strip()
+
+            keyboard = self._create_professional_admin_keyboard(user_id)
 
             reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -514,6 +520,7 @@ class AdminHandler:
 {i18n.get_text("ANALYTICS_DASHBOARD_TITLE", user_id=user_id)}
 
 {i18n.get_text("ANALYTICS_QUICK_OVERVIEW", user_id=user_id)}
+
 • {i18n.get_text("ANALYTICS_LABEL_TODAY", user_id=user_id)}: {quick_overview.get('today', {}).get('orders', 0)} {i18n.get_text("ANALYTICS_LABEL_ORDERS", user_id=user_id).lower()}, ₪{quick_overview.get('today', {}).get('revenue', 0):.2f}
 • {i18n.get_text("ANALYTICS_LABEL_THIS_WEEK", user_id=user_id)}: {quick_overview.get('this_week', {}).get('orders', 0)} {i18n.get_text("ANALYTICS_LABEL_ORDERS", user_id=user_id).lower()}, ₪{quick_overview.get('this_week', {}).get('revenue', 0):.2f}
 • {i18n.get_text("ANALYTICS_LABEL_THIS_MONTH", user_id=user_id)}: {quick_overview.get('this_month', {}).get('orders', 0)} {i18n.get_text("ANALYTICS_LABEL_ORDERS", user_id=user_id).lower()}, ₪{quick_overview.get('this_month', {}).get('revenue', 0):.2f}
@@ -1208,7 +1215,16 @@ class AdminHandler:
             self.logger.error("💥 COMPLETED ORDERS ERROR: %s", e)
             await query.message.reply_text(i18n.get_text("ALL_ORDERS_ERROR"))
 
-    def _create_pagination_keyboard(self, items: list, page: int, items_per_page: int, callback_prefix: str, user_id: int, extra_buttons: list = None, show_page_size_options: bool = True) -> tuple[list, dict]:
+    def _create_pagination_keyboard(
+        self, 
+        items: list, 
+        page: int, 
+        items_per_page: int, 
+        callback_prefix: str, 
+        user_id: int, 
+        extra_buttons: list = None, 
+        show_page_size_options: bool = True
+    ) -> tuple[list, dict]:
         """
         Create pagination keyboard and get page info
         
@@ -1388,7 +1404,7 @@ class AdminHandler:
                 i18n.get_text("ADMIN_CUSTOMER_PHONE", user_id=user_id).format(phone=customer['phone_number']),
                 i18n.get_text("ADMIN_CUSTOMER_LANGUAGE", user_id=user_id).format(language=customer['language'].upper() if customer['language'] else 'EN'),
                 i18n.get_text("ADMIN_CUSTOMER_JOINED", user_id=user_id).format(
-                    date=customer['created_at'].strftime('%Y-%m-%d %H:%M') if customer['created_at'] else "Unknown"
+                    date=customer['created_at'].strftime('%Y-%m-%d %H:%M') if customer['created_at'] else i18n.get_text("UNKNOWN_DATE", user_id=user_id)
                 ),
             ]
             
@@ -1551,9 +1567,9 @@ class AdminHandler:
             # Create confirmation message
             text = i18n.get_text("ADMIN_DELETE_ORDER_CONFIRMATION", user_id=user_id).format(
                 order_number=order_info.get("order_number", f"#{order_id}"),
-                customer_name=order_info.get("customer_name", "Unknown"),
+                customer_name=order_info.get("customer_name", i18n.get_text("UNKNOWN_CUSTOMER", user_id=user_id)),
                 total=order_info.get("total", 0),
-                status=order_info.get("status", "Unknown")
+                status=order_info.get("status", i18n.get_text("UNKNOWN_STATUS", user_id=user_id))
             )
             
             # Create confirmation keyboard
@@ -2579,7 +2595,7 @@ class AdminHandler:
             
             category = category_map.get(data)
             if not category:
-                await query.answer("Invalid category selection")
+                await query.answer(i18n.get_text("ERROR_INVALID_CATEGORY", user_id=user_id))
                 return AWAITING_PRODUCT_CATEGORY
             
             # Store category in context
@@ -3678,8 +3694,6 @@ class AdminHandler:
             
             if data.startswith("admin_language_"):
                 # Handle language change
-                from src.utils.language_manager import language_manager
-                
                 language = data.split("_")[-1]  # admin_language_en -> en
                 language_manager.set_user_language(user_id, language)
                 
@@ -4026,7 +4040,7 @@ class AdminHandler:
                 [
                     InlineKeyboardButton(
                         i18n.get_text("CANCEL", user_id=user_id),
-                        callback_data="admin_edit_business_settings"
+                        callback_data="admin_cancel_business_edit"
                     )
                 ]
             ]
@@ -4110,6 +4124,22 @@ class AdminHandler:
             del self.admin_conversations[user_id]
             self.logger.info("Cleared business conversation state for user %d", user_id)
 
+    async def _cancel_business_edit(self, query: CallbackQuery) -> None:
+        """Cancel business settings edit and return to business settings"""
+        try:
+            user_id = query.from_user.id
+            await query.answer("✅ Edit cancelled")
+            
+            # Clear conversation state
+            self._clear_business_conversation(user_id)
+            
+            # Return to business settings view
+            await self._show_business_settings(query)
+            
+        except Exception as e:
+            self.logger.error("Error cancelling business edit: %s", e)
+            await query.answer(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
     async def _handle_business_conversation_fallback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         """Handle business settings conversation fallback - clear state and end conversation"""
         try:
@@ -4118,23 +4148,34 @@ class AdminHandler:
             # Log the fallback first
             self.logger.info("Business conversation fallback triggered for user %d", user_id)
             
+            # Clear conversation state FIRST to prevent re-entry issues
+            self._clear_business_conversation(user_id)
+            
             # Always answer the callback query first
             if update.callback_query:
-                await update.callback_query.answer("✅ Conversation cancelled")
+                await update.callback_query.answer("✅ Edit cancelled")
                 
                 callback_data = update.callback_query.data
                 
-                # If it's the business settings callback, show the business settings screen
-                if callback_data == "admin_business_settings":
+                # If it's the cancel button or business settings callback, show the business settings screen
+                if callback_data in ["admin_cancel_business_edit", "admin_business_settings"]:
                     await self._show_business_settings(update.callback_query)
                 elif callback_data == "admin_dashboard":
                     await self._show_admin_dashboard_from_callback(update.callback_query)
                 else:
                     # For any other callback during fallback, go back to business settings
                     await self._show_business_settings(update.callback_query)
-            
-            # Clear conversation state AFTER handling the callback
-            self._clear_business_conversation(user_id)
+            elif update.message:
+                # Handle /cancel command
+                await update.message.reply_text(
+                    "✅ Business settings edit cancelled",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton(
+                            "🏢 Business Settings", 
+                            callback_data="admin_business_settings"
+                        )
+                    ]])
+                )
             
             return ConversationHandler.END
             
@@ -4143,7 +4184,7 @@ class AdminHandler:
             # Always answer callback query even on error
             if update.callback_query:
                 try:
-                    await update.callback_query.answer("❌ Error occurred")
+                    await update.callback_query.answer("✅ Edit cancelled")
                 except:
                     pass
             return ConversationHandler.END
@@ -4242,7 +4283,7 @@ class AdminHandler:
             # Even if there's an error, try to answer the callback query to prevent retries
             if update.callback_query:
                 try:
-                    await update.callback_query.answer("❌ Error occurred")
+                    await update.callback_query.answer("✅ Conversation reset")
                 except:
                     pass
             return ConversationHandler.END
@@ -4260,7 +4301,7 @@ def register_admin_handlers(application: Application):
 
     # Admin callback handlers (excluding conversation patterns but including fallback handlers)
     application.add_handler(
-        CallbackQueryHandler(handler.handle_admin_callback, pattern="^admin_(?!add_product_category_|add_product_confirm_|edit_category_name_|edit_product_field_|edit_product_confirm_|edit_product_category_|product_edit_|edit_business_name$|edit_business_description$|edit_business_address$|edit_business_phone$|edit_business_email$|edit_business_website$|edit_business_hours$|edit_currency$|edit_delivery_charge$)")
+        CallbackQueryHandler(handler.handle_admin_callback, pattern="^admin_(?!add_product_category_|add_product_confirm_|edit_category_name_|edit_product_field_|edit_product_confirm_|edit_product_category_|product_edit_|edit_business_name$|edit_business_description$|edit_business_address$|edit_business_phone$|edit_business_email$|edit_business_website$|edit_business_hours$|edit_currency$|edit_delivery_charge$|cancel_business_edit$)")
     )
 
     # Admin conversation handler for status updates
@@ -4413,7 +4454,10 @@ def register_admin_handlers(application: Application):
             ]
         },
         fallbacks=[
-            CommandHandler("cancel", handler._handle_business_conversation_fallback)
+            CommandHandler("cancel", handler._handle_business_conversation_fallback),
+            CallbackQueryHandler(handler._handle_business_conversation_fallback, pattern="^admin_cancel_business_edit$"),
+            CallbackQueryHandler(handler._handle_business_conversation_fallback, pattern="^admin_business_settings$"),
+            CallbackQueryHandler(handler._handle_business_conversation_fallback, pattern="^admin_dashboard$")
         ],
         name="business_settings_conversation",
         persistent=False,

@@ -1628,7 +1628,7 @@ def create_order_with_items(
             
             # Create order items
             for item in items:
-                product_name = item.get("product_name", "Unknown Product")
+                product_name = item.get("product_name", "Unknown Product")  # This is stored in DB, not displayed
                 quantity = item.get("quantity", 1)
                 unit_price = item.get("unit_price", 0)  # Use unit_price from cart item
                 total_price = item.get("total_price", unit_price * quantity)  # Use total_price from cart item

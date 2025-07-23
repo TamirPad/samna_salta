@@ -60,13 +60,15 @@ class OnboardingHandler:
             if existing_customer:
                 # Check if customer has complete profile data
                 if self._is_customer_profile_complete(existing_customer):
-                    # Welcome back existing customer with main page
+                    # Welcome back existing customer with beautiful main page
                     user_id = user.id
-                    welcome_message = (
-                        f"<b>{get_dynamic_welcome_for_returning_users(user_id=user_id)}</b>\n\n"
-                        f"<b>{i18n.get_text('WELCOME_BACK', user_id=user_id).format(name=existing_customer.name)}</b>\n\n"
-                        f"{i18n.get_text('WHAT_TO_ORDER_TODAY', user_id=user_id)}"
-                    )
+                    welcome_message = f"""
+🌟 <b>{get_dynamic_welcome_for_returning_users(user_id=user_id)}</b>
+
+👋 <b>{i18n.get_text('WELCOME_BACK', user_id=user_id).format(name=existing_customer.name)}</b>
+
+🍽️ <b>{i18n.get_text('WHAT_TO_ORDER_TODAY', user_id=user_id)}</b>
+                    """.strip()
                     await update.message.reply_text(
                         welcome_message,
                         reply_markup=self._get_main_page_keyboard(user_id),
@@ -83,12 +85,18 @@ class OnboardingHandler:
                     )
                     # Continue to language selection
 
-            # Start onboarding for new customer or incomplete profile with language selection
+            # Start onboarding for new customer or incomplete profile with beautiful language selection
             user_id = user.id
+            welcome_text = f"""
+🎉 <b>{get_dynamic_welcome_message(user_id=user_id)}</b>
+
+🌟 <b>{i18n.get_text("WELCOME_HELP_MESSAGE", user_id=user_id)}</b>
+
+🌍 <b>{i18n.get_text("SELECT_LANGUAGE_PROMPT", user_id=user_id)}</b>
+            """.strip()
+
             await update.message.reply_text(
-                get_dynamic_welcome_message(user_id=user_id) + "\n\n" +
-                i18n.get_text("WELCOME_HELP_MESSAGE", user_id=user_id) + "\n\n" +
-                i18n.get_text("SELECT_LANGUAGE_PROMPT", user_id=user_id),
+                welcome_text,
                 reply_markup=self._get_language_selection_keyboard(),
                 parse_mode="HTML"
             )
@@ -365,7 +373,7 @@ class OnboardingHandler:
             self.logger.error("Failed to send error message: %s", e)
 
     def _get_language_selection_keyboard(self):
-        """Get language selection keyboard for onboarding"""
+        """Get professional language selection keyboard"""
         keyboard = [
             [
                 InlineKeyboardButton("🇺🇸 English", callback_data="language_en"),
@@ -375,15 +383,29 @@ class OnboardingHandler:
         return InlineKeyboardMarkup(keyboard)
 
     def _get_main_page_keyboard(self, user_id: int = None):
-        """Get main page keyboard with Menu, My Info, and Order tracking buttons"""
+        """Get professional main page keyboard with beautiful icons and layout"""
         keyboard = [
+            # Main Actions Row
             [
-                InlineKeyboardButton(i18n.get_text("BUTTON_MENU", user_id=user_id), callback_data="main_menu"),
-                InlineKeyboardButton(i18n.get_text("BUTTON_MY_INFO", user_id=user_id), callback_data="main_my_info"),
+                InlineKeyboardButton(
+                    i18n.get_text('BUTTON_MENU', user_id=user_id), 
+                    callback_data="main_menu"
+                ),
+                InlineKeyboardButton(
+                    i18n.get_text('BUTTON_MY_INFO', user_id=user_id), 
+                    callback_data="main_my_info"
+                ),
             ],
+            # Orders Tracking Row
             [
-                InlineKeyboardButton(i18n.get_text("BUTTON_ACTIVE_ORDERS", user_id=user_id), callback_data="main_active_orders"),
-                InlineKeyboardButton(i18n.get_text("BUTTON_COMPLETED_ORDERS", user_id=user_id), callback_data="main_completed_orders"),
+                InlineKeyboardButton(
+                    i18n.get_text('BUTTON_ACTIVE_ORDERS', user_id=user_id), 
+                    callback_data="main_active_orders"
+                ),
+                InlineKeyboardButton(
+                    i18n.get_text('BUTTON_COMPLETED_ORDERS', user_id=user_id), 
+                    callback_data="main_completed_orders"
+                ),
             ],
         ]
         return InlineKeyboardMarkup(keyboard)
@@ -439,13 +461,15 @@ class OnboardingHandler:
             customer = self.cart_service.get_customer(user_id)
             
             if customer:
-                info_text = (
-                    f"👤 <b>{i18n.get_text('MY_INFO_TITLE', user_id=user_id)}</b>\n\n"
-                    f"<b>{i18n.get_text('NAME_FIELD', user_id=user_id)}</b> {customer.name or '🤷'}\n"
-                    f"<b>{i18n.get_text('PHONE_FIELD', user_id=user_id)}</b> {customer.phone or '📞'}\n"
-                    f"<b>{i18n.get_text('ADDRESS_FIELD', user_id=user_id)}</b> {customer.delivery_address or i18n.get_text('NOT_SET', user_id=user_id)}\n\n"
-                    f"{i18n.get_text('CONTACT_SUPPORT_FOR_UPDATES', user_id=user_id)}"
-                )
+                info_text = f"""
+👤 <b>{i18n.get_text('MY_INFO_TITLE', user_id=user_id)}</b>
+
+👨‍💼 <b>{i18n.get_text('NAME_FIELD', user_id=user_id)}</b> {customer.name or '🤷'}
+📞 <b>{i18n.get_text('PHONE_FIELD', user_id=user_id)}</b> {customer.phone or '📞'}
+🏠 <b>{i18n.get_text('ADDRESS_FIELD', user_id=user_id)}</b> {customer.delivery_address or i18n.get_text('NOT_SET', user_id=user_id)}
+
+💬 {i18n.get_text('CONTACT_SUPPORT_FOR_UPDATES', user_id=user_id)}
+                """.strip()
                 
                 # Add business contact information
                 from src.utils.helpers import get_business_info_for_customers
@@ -519,14 +543,20 @@ class OnboardingHandler:
             )
 
     def _get_my_info_keyboard(self, user_id: int):
-        """Get My Info keyboard with language selection"""
+        """Get professional My Info keyboard with beautiful styling"""
         from src.utils.language_manager import language_manager
         
         current_lang = language_manager.get_user_language(user_id)
         
         keyboard = [
-            [InlineKeyboardButton(i18n.get_text("LANGUAGE_BUTTON", user_id=user_id), callback_data="language_selection")],
-            [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="main_page")],
+            [InlineKeyboardButton(
+                i18n.get_text('LANGUAGE_BUTTON', user_id=user_id), 
+                callback_data="language_selection"
+            )],
+            [InlineKeyboardButton(
+                i18n.get_text('BACK_TO_MAIN', user_id=user_id), 
+                callback_data="main_page"
+            )],
         ]
         return InlineKeyboardMarkup(keyboard)
 
@@ -739,13 +769,14 @@ class OnboardingHandler:
             # Format order details
             details = [
                 i18n.get_text("CUSTOMER_ORDER_DETAILS_TITLE", user_id=user_id).format(number=order["order_number"]),
+                "",
                 i18n.get_text("CUSTOMER_ORDER_STATUS", user_id=user_id).format(status=order["status"].capitalize()),
                 i18n.get_text("CUSTOMER_ORDER_TOTAL", user_id=user_id).format(total=order["total"]),
                 i18n.get_text("CUSTOMER_ORDER_DATE", user_id=user_id).format(
-                    date=order["created_at"].strftime('%Y-%m-%d %H:%M') if order["created_at"] else "Unknown"
+                    date=order["created_at"].strftime('%Y-%m-%d %H:%M') if order["created_at"] else i18n.get_text("UNKNOWN_DATE", user_id=user_id)
                 ),
                 i18n.get_text("CUSTOMER_ORDER_DELIVERY_METHOD", user_id=user_id).format(
-                    method=order["delivery_method"].capitalize() if order["delivery_method"] else "Unknown"
+                    method=order["delivery_method"].capitalize() if order["delivery_method"] else i18n.get_text("UNKNOWN_METHOD", user_id=user_id)
                 ),
             ]
             
@@ -757,7 +788,8 @@ class OnboardingHandler:
                 )
             
             if order.get("items"):
-                details.append(f"\n{i18n.get_text('CUSTOMER_ORDER_ITEMS', user_id=user_id)}")
+                details.append("")
+                details.append(i18n.get_text('CUSTOMER_ORDER_ITEMS', user_id=user_id))
                 for item in order["items"]:
                     from src.utils.helpers import translate_product_name
                     translated_name = translate_product_name(item["product_name"], item.get("options", {}), user_id)

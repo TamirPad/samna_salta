@@ -157,13 +157,13 @@ class MenuHandler:
                 )
             else:
                 await query.answer(
-                    i18n.get_text("QUICK_ADD_ERROR", user_id=user_id).format(error="Failed to add to cart"),
+                    i18n.get_text("QUICK_ADD_ERROR", user_id=user_id).format(error=i18n.get_text("ERROR_FAILED_ADD_TO_CART", user_id=user_id)),
                     show_alert=True
                 )
                 
         except Exception as e:
             self.logger.error("Error in quick add to cart: %s", e)
-            await query.answer(i18n.get_text("QUICK_ADD_ERROR", user_id=user_id).format(error="Unknown error"), show_alert=True)
+            await query.answer(i18n.get_text("QUICK_ADD_ERROR", user_id=user_id).format(error=i18n.get_text("ERROR_UNKNOWN", user_id=user_id)), show_alert=True)
 
     async def _show_main_menu(self, query: CallbackQuery):
         """Show the main menu"""
@@ -233,7 +233,7 @@ class MenuHandler:
             category_name = product.category or "other"
             image_url = get_product_image(product.image_url, category_name)
             
-            # Format product details
+            # Format product details with better spacing
             text = i18n.get_text("PRODUCT_DETAILS_TITLE", user_id=user_id).format(name=product.name)
             text += f"\n\n📄 <b>{i18n.get_text('PRODUCT_DESCRIPTION', user_id=user_id)}:</b>\n{product.description or i18n.get_text('NO_DESCRIPTION', user_id=user_id)}"
             text += f"\n\n💰 <b>{i18n.get_text('PRODUCT_PRICE', user_id=user_id)}:</b> ₪{product.price:.2f}"

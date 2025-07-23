@@ -153,14 +153,21 @@ class CartHandler:
                     cart_total,
                 )
 
-                # Send success message
+                # Send beautiful success message
                 from src.utils.helpers import translate_product_name
                 translated_product_name = translate_product_name(product_info['display_name'], product_info.get('options', {}), user_id)
-                message = i18n.get_text("CART_SUCCESS_MESSAGE", user_id=user_id).format(
-                    product_name=translated_product_name,
-                    item_count=item_count,
-                    cart_total=cart_total
-                )
+                
+                message = f"""
+✅ <b>{i18n.get_text("CART_SUCCESS_TITLE", user_id=user_id)}</b>
+
+📦 <b>{translated_product_name}</b>
+{i18n.get_text("CART_ADDED_SUCCESSFULLY", user_id=user_id)}
+
+🛒 {i18n.get_text("CART_ITEMS_COUNT", user_id=user_id)}: {item_count}
+💰 {i18n.get_text("CART_TOTAL", user_id=user_id).format(total=cart_total)}
+
+🎯 {i18n.get_text("CART_WHAT_NEXT_QUESTION", user_id=user_id)}
+                """.strip()
 
                 await self._safe_edit_message(
                     query,
@@ -195,34 +202,52 @@ class CartHandler:
             cart_items = cart_service.get_items(user_id)
 
             if not cart_items:
+                empty_cart_message = f"""
+🛒 <b>{i18n.get_text("CART_VIEW_TITLE", user_id=user_id)}</b>
+
+🤷‍♀️ {i18n.get_text("CART_EMPTY_READY", user_id=user_id)}
+
+🍽️ {i18n.get_text("BROWSE_MENU_SUGGESTION", user_id=user_id)}
+                """.strip()
+
                 await query.edit_message_text(
-                    i18n.get_text("CART_EMPTY_READY", user_id=user_id),
+                    empty_cart_message,
                     parse_mode="HTML",
-                    reply_markup=self._get_empty_cart_keyboard(user_id),
+                    reply_markup=self._get_professional_empty_cart_keyboard(user_id),
                 )
                 return
 
             # Calculate total
             cart_total = cart_service.calculate_total(cart_items)
 
-            # Build cart display
-            message = i18n.get_text("CART_VIEW_TITLE", user_id=user_id) + "\n\n"
+            # Build beautiful cart display with clean styling
+            message = f"""
+🛒 <b>{i18n.get_text("CART_VIEW_TITLE", user_id=user_id)}</b>
+
+"""
             
             for i, item in enumerate(cart_items, 1):
                 item_total = item.get("unit_price", 0) * item.get("quantity", 1)
                 # Translate product name
                 from src.utils.helpers import translate_product_name
-                translated_product_name = translate_product_name(item.get('product_name', 'Unknown Product'), item.get('options', {}), user_id)
-                message += i18n.get_text("CART_ITEM_FORMAT", user_id=user_id).format(
-                    index=i,
-                    product_name=translated_product_name,
-                    quantity=item.get('quantity', 1),
-                    price=item.get('unit_price', 0),
-                    item_total=item_total
-                ) + "\n\n"
+                translated_product_name = translate_product_name(item.get('product_name', i18n.get_text('PRODUCT_UNKNOWN', user_id=user_id)), item.get('options', {}), user_id)
+                
+                message += f"""
+<b>{i}.</b> 📦 <b>{translated_product_name}</b>
+   🔢 {i18n.get_text("CART_QUANTITY_LABEL", user_id=user_id)}: {item.get('quantity', 1)}
+   💰 {i18n.get_text("CART_PRICE_LABEL", user_id=user_id)}: ₪{item.get('unit_price', 0):.2f}
+   💵 {i18n.get_text("CART_SUBTOTAL_LABEL", user_id=user_id)}: ₪{item_total:.2f}"""
+                
+                if i < len(cart_items):
+                    message += "\n"
 
-            message += i18n.get_text("CART_TOTAL", user_id=user_id).format(total=cart_total) + "\n\n"
-            message += i18n.get_text("CART_WHAT_NEXT", user_id=user_id)
+            message += f"""
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💸 <b>{i18n.get_text("CART_TOTAL", user_id=user_id).format(total=cart_total)}</b>
+
+🤔 {i18n.get_text("CART_WHAT_NEXT", user_id=user_id)}"""
 
             await query.edit_message_text(
                 message,
@@ -272,7 +297,7 @@ class CartHandler:
                 await query.edit_message_text(
                     i18n.get_text("CART_CLEARED_SUCCESS", user_id=user_id),
                     parse_mode="HTML",
-                    reply_markup=self._get_empty_cart_keyboard(user_id),
+                    reply_markup=self._get_professional_empty_cart_keyboard(user_id),
                 )
             else:
                 self.logger.error("❌ CART CLEAR FAILED: User %s", user_id)
@@ -303,7 +328,7 @@ class CartHandler:
                 await query.edit_message_text(
                     i18n.get_text("CART_EMPTY_CHECKOUT", user_id=user_id),
                     parse_mode="HTML",
-                    reply_markup=self._get_empty_cart_keyboard(user_id),
+                    reply_markup=self._get_professional_empty_cart_keyboard(user_id),
                 )
                 return
 
@@ -317,7 +342,7 @@ class CartHandler:
                 item_total = item.get("unit_price", 0) * item.get("quantity", 1)
                 # Translate product name
                 from src.utils.helpers import translate_product_name
-                translated_product_name = translate_product_name(item.get('product_name', 'Unknown Product'), item.get('options', {}), user_id)
+                translated_product_name = translate_product_name(item.get('product_name', i18n.get_text('PRODUCT_UNKNOWN', user_id=user_id)), item.get('options', {}), user_id)
                 message += i18n.get_text("CART_ITEM_FORMAT", user_id=user_id).format(
                     index=i,
                     product_name=translated_product_name,
@@ -542,7 +567,7 @@ class CartHandler:
                 self.logger.info("✅ ORDER CREATED: #%s for user %s", order_number, user_id)
                 
             else:
-                error_msg = order_result.get("error", "Unknown error occurred")
+                error_msg = order_result.get("error", i18n.get_text("ERROR_UNKNOWN_OCCURRED", user_id=user_id))
                 self.logger.error("❌ ORDER CREATION FAILED: %s", error_msg)
                 await query.edit_message_text(
                     i18n.get_text("ORDER_CREATION_FAILED", user_id=user_id).format(error_msg=error_msg),
@@ -727,12 +752,12 @@ class CartHandler:
             
             # Show item details
             from src.utils.helpers import translate_product_name
-            product_name = translate_product_name(item.get('product_name', 'Unknown Product'), item.get('options', {}), user_id)
+            product_name = translate_product_name(item.get('product_name', i18n.get_text('PRODUCT_UNKNOWN', user_id=user_id)), item.get('options', {}), user_id)
             
             info_message = f"📦 <b>{product_name}</b>\n"
-            info_message += f"💰 מחיר: ₪{item.get('unit_price', 0):.2f}\n"
-            info_message += f"📊 כמות: {item.get('quantity', 1)}\n"
-            info_message += f"💵 סה״כ: ₪{item.get('unit_price', 0) * item.get('quantity', 1):.2f}"
+            info_message += f"💰 {i18n.get_text('CART_PRICE_LABEL', user_id=user_id)}: ₪{item.get('unit_price', 0):.2f}\n"
+            info_message += f"📊 {i18n.get_text('CART_QUANTITY_LABEL', user_id=user_id)}: {item.get('quantity', 1)}\n"
+            info_message += f"💵 {i18n.get_text('CART_SUBTOTAL_LABEL', user_id=user_id)}: ₪{item.get('unit_price', 0) * item.get('quantity', 1):.2f}"
             
             await query.answer(info_message, show_alert=True)
                 
@@ -757,7 +782,7 @@ class CartHandler:
                 await query.edit_message_text(
                     i18n.get_text("CART_EMPTY_READY", user_id=user_id),
                     parse_mode="HTML",
-                    reply_markup=self._get_empty_cart_keyboard(user_id),
+                    reply_markup=self._get_professional_empty_cart_keyboard(user_id),
                 )
                 return
 
@@ -861,13 +886,24 @@ class CartHandler:
             return None
 
     def _get_cart_success_keyboard(self, user_id: int = None) -> InlineKeyboardMarkup:
-        """Get keyboard for successful cart addition"""
+        """Get professional keyboard for successful cart addition"""
         keyboard = [
+            # Primary Actions
             [
-                InlineKeyboardButton(i18n.get_text("VIEW_CART", user_id=user_id), callback_data="cart_view"),
-                InlineKeyboardButton(i18n.get_text("ADD_MORE", user_id=user_id), callback_data="menu_main"),
+                InlineKeyboardButton(
+                    i18n.get_text('VIEW_CART', user_id=user_id), 
+                    callback_data="cart_view"
+                ),
+                InlineKeyboardButton(
+                    i18n.get_text('ADD_MORE', user_id=user_id), 
+                    callback_data="menu_main"
+                ),
             ],
-            [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main")],
+            # Secondary Action
+            [InlineKeyboardButton(
+                i18n.get_text('BACK_TO_MAIN', user_id=user_id), 
+                callback_data="main_page"
+            )],
         ]
         return InlineKeyboardMarkup(keyboard)
 
@@ -882,7 +918,7 @@ class CartHandler:
             
             # Get product name for better identification
             from src.utils.helpers import translate_product_name
-            product_name = translate_product_name(item.get('product_name', 'Unknown Product'), item.get('options', {}), user_id)
+            product_name = translate_product_name(item.get('product_name', i18n.get_text('PRODUCT_UNKNOWN', user_id=user_id)), item.get('options', {}), user_id)
             short_name = product_name[:15] + "..." if len(product_name) > 15 else product_name
             
             # Item label row - shows which item these controls belong to
@@ -953,7 +989,7 @@ class CartHandler:
             
             # Get product name for better identification
             from src.utils.helpers import translate_product_name
-            product_name = translate_product_name(item.get('product_name', 'Unknown Product'), item.get('options', {}), user_id)
+            product_name = translate_product_name(item.get('product_name', i18n.get_text('PRODUCT_UNKNOWN', user_id=user_id)), item.get('options', {}), user_id)
             short_name = product_name[:15] + "..." if len(product_name) > 15 else product_name
             
             # Item label row - shows which item these controls belong to
@@ -1014,10 +1050,17 @@ class CartHandler:
         ]
         return InlineKeyboardMarkup(keyboard)
 
-    def _get_empty_cart_keyboard(self, user_id: int = None) -> InlineKeyboardMarkup:
-        """Get keyboard for empty cart"""
+    def _get_professional_empty_cart_keyboard(self, user_id: int = None) -> InlineKeyboardMarkup:
+        """Get professional keyboard for empty cart with beautiful styling"""
         keyboard = [
-            [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main")],
+            [InlineKeyboardButton(
+                i18n.get_text('BROWSE_MENU', user_id=user_id), 
+                callback_data="menu_main"
+            )],
+            [InlineKeyboardButton(
+                i18n.get_text('BACK_TO_MAIN', user_id=user_id), 
+                callback_data="main_page"
+            )],
         ]
         return InlineKeyboardMarkup(keyboard)
 
@@ -1102,13 +1145,13 @@ class CartHandler:
                     address=cart_info.get('delivery_address')
                 ) + "\n"
             
-            message += "\n"
+            message += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
             
             for i, item in enumerate(cart_items, 1):
                 item_total = item.get("unit_price", 0) * item.get("quantity", 1)
                 # Translate product name
                 from src.utils.helpers import translate_product_name
-                translated_product_name = translate_product_name(item.get('product_name', 'Unknown Product'), item.get('options', {}), user_id)
+                translated_product_name = translate_product_name(item.get('product_name', i18n.get_text('PRODUCT_UNKNOWN', user_id=user_id)), item.get('options', {}), user_id)
                 message += i18n.get_text("CART_ITEM_FORMAT", user_id=user_id).format(
                     index=i,
                     product_name=translated_product_name,
@@ -1157,16 +1200,20 @@ class CartHandler:
             
             for i, item in enumerate(cart_items, 1):
                 item_total = item.get("unit_price", 0) * item.get("quantity", 1)
-                confirmation_message += i18n.get_text("CART_ITEM_FORMAT", user_id=user_id).format(
-                    index=i,
-                    product_name=item.get('product_name', 'Unknown Product'),
-                    quantity=item.get('quantity', 1),
-                    price=item.get('unit_price', 0),
-                    item_total=item_total
-                ) + "\n\n"
+                confirmation_message += f"""
+<b>{i}.</b> 📦 <b>{item.get('product_name', i18n.get_text('PRODUCT_UNKNOWN', user_id=user_id))}</b>
+   🔢 {i18n.get_text("CART_QUANTITY_LABEL", user_id=user_id)}: {item.get('quantity', 1)}
+   💰 {i18n.get_text("CART_PRICE_LABEL", user_id=user_id)}: ₪{item.get('unit_price', 0):.2f}
+   💵 {i18n.get_text("CART_SUBTOTAL_LABEL", user_id=user_id)}: ₪{item_total:.2f}
 
-            confirmation_message += i18n.get_text("CART_TOTAL", user_id=user_id).format(total=cart_total) + "\n\n"
-            confirmation_message += i18n.get_text("CONFIRM_ORDER_PROMPT", user_id=user_id)
+"""
+
+            confirmation_message += f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💸 <b>{i18n.get_text("CART_TOTAL", user_id=user_id).format(total=cart_total)}</b>
+
+🤔 {i18n.get_text("CONFIRM_ORDER_PROMPT", user_id=user_id)}"""
 
             await message.reply_text(
                 confirmation_message,
