@@ -305,3 +305,9 @@ $RECYCLE.BIN/
 *.pfx
 secrets/
 .secrets
+
+# Production cleanup additions
+*.pyc
+*.pyo
+test.db
+.env.production

@@ -119,6 +119,271 @@ class MenuCategory(Base):
         return f"<MenuCategory(id={self.id}, name='{self.name}')>"
 
 
+class ProductOption(Base):
+    """Product option/variant model (e.g., Kubaneh Classic, Samneh Smoked)"""
+
+    __tablename__ = "product_options"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    display_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    option_type: Mapped[str] = mapped_column(String(50), nullable=False)  # e.g., 'kubaneh_type', 'samneh_type'
+    price_modifier: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
+    
+    # Multilingual support
+    name_en: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    name_he: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    display_name_en: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    display_name_he: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    description_en: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description_he: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    def get_localized_name(self, language: str = "en") -> str:
+        """Get localized name for the option"""
+        if language == "he" and self.name_he:
+            return self.name_he
+        elif language == "en" and self.name_en:
+            return self.name_en
+        return self.name
+
+    def get_localized_display_name(self, language: str = "en") -> str:
+        """Get localized display name for the option"""
+        if language == "he" and self.display_name_he:
+            return self.display_name_he
+        elif language == "en" and self.display_name_en:
+            return self.display_name_en
+        return self.display_name or self.name
+
+    def get_localized_description(self, language: str = "en") -> str:
+        """Get localized description for the option"""
+        if language == "he" and self.description_he:
+            return self.description_he
+        elif language == "en" and self.description_en:
+            return self.description_en
+        return self.description or ""
+
+    def __str__(self) -> str:
+        return f"<ProductOption(id={self.id}, name='{self.name}', type='{self.option_type}')>"
+
+
+class ProductSize(Base):
+    """Product size model (e.g., Small, Medium, Large, XL)"""
+
+    __tablename__ = "product_sizes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    display_name: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    price_modifier: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
+    
+    # Multilingual support
+    name_en: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    name_he: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    display_name_en: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    display_name_he: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    def get_localized_name(self, language: str = "en") -> str:
+        """Get localized name for the size"""
+        if language == "he" and self.name_he:
+            return self.name_he
+        elif language == "en" and self.name_en:
+            return self.name_en
+        return self.name
+
+    def get_localized_display_name(self, language: str = "en") -> str:
+        """Get localized display name for the size"""
+        if language == "he" and self.display_name_he:
+            return self.display_name_he
+        elif language == "en" and self.display_name_en:
+            return self.display_name_en
+        return self.display_name or self.name
+
+    def __str__(self) -> str:
+        return f"<ProductSize(id={self.id}, name='{self.name}')>"
+
+
+class OrderStatus(Base):
+    """Order status model"""
+
+    __tablename__ = "order_statuses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    display_name: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    color: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # For UI display
+    icon: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # Emoji or icon
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
+    
+    # Multilingual support
+    name_en: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    name_he: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    display_name_en: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    display_name_he: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    description_en: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description_he: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    def get_localized_name(self, language: str = "en") -> str:
+        """Get localized name for the status"""
+        if language == "he" and self.name_he:
+            return self.name_he
+        elif language == "en" and self.name_en:
+            return self.name_en
+        return self.name
+
+    def get_localized_display_name(self, language: str = "en") -> str:
+        """Get localized display name for the status"""
+        if language == "he" and self.display_name_he:
+            return self.display_name_he
+        elif language == "en" and self.display_name_en:
+            return self.display_name_en
+        return self.display_name or self.name
+
+    def get_localized_description(self, language: str = "en") -> str:
+        """Get localized description for the status"""
+        if language == "he" and self.description_he:
+            return self.description_he
+        elif language == "en" and self.description_en:
+            return self.description_en
+        return self.description or ""
+
+    def __str__(self) -> str:
+        return f"<OrderStatus(id={self.id}, name='{self.name}')>"
+
+
+class DeliveryMethod(Base):
+    """Delivery method model"""
+
+    __tablename__ = "delivery_methods"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    display_name: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    charge: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
+    
+    # Multilingual support
+    name_en: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    name_he: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    display_name_en: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    display_name_he: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    description_en: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description_he: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    def get_localized_name(self, language: str = "en") -> str:
+        """Get localized name for the delivery method"""
+        if language == "he" and self.name_he:
+            return self.name_he
+        elif language == "en" and self.name_en:
+            return self.name_en
+        return self.name
+
+    def get_localized_display_name(self, language: str = "en") -> str:
+        """Get localized display name for the delivery method"""
+        if language == "he" and self.display_name_he:
+            return self.display_name_he
+        elif language == "en" and self.display_name_en:
+            return self.display_name_en
+        return self.display_name or self.name
+
+    def get_localized_description(self, language: str = "en") -> str:
+        """Get localized description for the delivery method"""
+        if language == "he" and self.description_he:
+            return self.description_he
+        elif language == "en" and self.description_en:
+            return self.description_en
+        return self.description or ""
+
+    def __str__(self) -> str:
+        return f"<DeliveryMethod(id={self.id}, name='{self.name}')>"
+
+
+class PaymentMethod(Base):
+    """Payment method model"""
+
+    __tablename__ = "payment_methods"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    display_name: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
+    
+    # Multilingual support
+    name_en: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    name_he: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    display_name_en: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    display_name_he: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    description_en: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description_he: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    def get_localized_name(self, language: str = "en") -> str:
+        """Get localized name for the payment method"""
+        if language == "he" and self.name_he:
+            return self.name_he
+        elif language == "en" and self.name_en:
+            return self.name_en
+        return self.name
+
+    def get_localized_display_name(self, language: str = "en") -> str:
+        """Get localized display name for the payment method"""
+        if language == "he" and self.display_name_he:
+            return self.display_name_he
+        elif language == "en" and self.display_name_en:
+            return self.display_name_en
+        return self.display_name or self.name
+
+    def get_localized_description(self, language: str = "en") -> str:
+        """Get localized description for the payment method"""
+        if language == "he" and self.description_he:
+            return self.description_he
+        elif language == "en" and self.description_en:
+            return self.description_en
+        return self.description or ""
+
+    def __str__(self) -> str:
+        return f"<PaymentMethod(id={self.id}, name='{self.name}')>"
+
+
 class Product(Base):
     """Product model"""
 

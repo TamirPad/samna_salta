@@ -289,11 +289,53 @@ class MenuHandler:
             error_text = i18n.get_text("MENU_ERROR_OCCURRED", user_id=user_id)
             await self._safe_edit_message(query, error_text)
 
+    def _get_product_description_from_db(self, category_name: str, user_id: int) -> str:
+        """Get product description from database for a category"""
+        try:
+            from src.db.operations import get_products_by_category
+            from src.utils.language_manager import language_manager
+            
+            products = get_products_by_category(category_name)
+            if not products:
+                return i18n.get_text("CATEGORY_EMPTY", user_id=user_id).format(category=category_name)
+            
+            # Get user language
+            user_language = language_manager.get_user_language(user_id)
+            
+            # Get the first product in the category for description
+            product = products[0]
+            
+            # Get localized name and description
+            name = product.get_localized_name(user_language)
+            description = product.get_localized_description(user_language)
+            
+            # Check if hilbeh is available (special case)
+            is_available = True
+            if category_name.lower() == "hilbeh":
+                from src.utils.helpers import is_hilbeh_available
+                is_available = is_hilbeh_available()
+            
+            # Use appropriate template
+            if is_available:
+                template_key = "PRODUCT_AVAILABLE_TEMPLATE"
+            else:
+                template_key = "PRODUCT_NOT_AVAILABLE_TEMPLATE"
+            
+            return i18n.get_text(template_key, user_id=user_id).format(
+                name=name,
+                description=description or i18n.get_text("NO_DESCRIPTION", user_id=user_id),
+                price=product.price
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Error getting product description from DB: {e}")
+            return i18n.get_text("MENU_ERROR_OCCURRED", user_id=user_id)
+
     async def _show_kubaneh_menu(self, query: CallbackQuery):
         """Show Kubaneh sub-menu"""
         self.logger.debug("📋 SHOWING: Kubaneh menu")
         user_id = query.from_user.id
-        text = i18n.get_text("KUBANEH_DESC", user_id=user_id)
+        text = self._get_product_description_from_db("kubaneh", user_id)
         reply_markup = get_kubaneh_menu_keyboard(user_id)
         await self._safe_edit_message(query, text, reply_markup, "HTML")
 
@@ -301,7 +343,7 @@ class MenuHandler:
         """Show Samneh sub-menu"""
         self.logger.debug("📋 SHOWING: Samneh menu")
         user_id = query.from_user.id
-        text = i18n.get_text("SAMNEH_DESC", user_id=user_id)
+        text = self._get_product_description_from_db("samneh", user_id)
         reply_markup = get_samneh_menu_keyboard(user_id)
         await self._safe_edit_message(query, text, reply_markup, "HTML")
 
@@ -309,7 +351,7 @@ class MenuHandler:
         """Show Red Bisbas menu"""
         self.logger.debug("📋 SHOWING: Red Bisbas menu")
         user_id = query.from_user.id
-        text = i18n.get_text("RED_BISBAS_DESC", user_id=user_id)
+        text = self._get_product_description_from_db("red_bisbas", user_id)
         reply_markup = get_red_bisbas_menu_keyboard(user_id)
         await self._safe_edit_message(query, text, reply_markup, "HTML")
 
@@ -317,7 +359,7 @@ class MenuHandler:
         """Show Hilbeh menu"""
         self.logger.debug("📋 SHOWING: Hilbeh menu")
         user_id = query.from_user.id
-        text = i18n.get_text("HILBEH_DESC", user_id=user_id)
+        text = self._get_product_description_from_db("hilbeh", user_id)
         reply_markup = get_hilbeh_menu_keyboard(user_id)
         await self._safe_edit_message(query, text, reply_markup, "HTML")
 
@@ -325,7 +367,7 @@ class MenuHandler:
         """Show Hawaij for Soup menu"""
         self.logger.debug("📋 SHOWING: Hawaij for Soup menu")
         user_id = query.from_user.id
-        text = i18n.get_text("HAWAIIJ_SOUP_DESC", user_id=user_id)
+        text = self._get_product_description_from_db("hawaij_soup", user_id)
         reply_markup = get_direct_add_keyboard("hawaij_soup", user_id)
         await self._safe_edit_message(query, text, reply_markup, "HTML")
 
@@ -333,7 +375,7 @@ class MenuHandler:
         """Show Hawaij for Coffee menu"""
         self.logger.debug("📋 SHOWING: Hawaij for Coffee menu")
         user_id = query.from_user.id
-        text = i18n.get_text("HAWAIIJ_COFFEE_DESC", user_id=user_id)
+        text = self._get_product_description_from_db("hawaij_coffee", user_id)
         reply_markup = get_direct_add_keyboard("hawaij_coffee_spice", user_id)
         await self._safe_edit_message(query, text, reply_markup, "HTML")
 
@@ -341,7 +383,7 @@ class MenuHandler:
         """Show White Coffee menu"""
         self.logger.debug("📋 SHOWING: White Coffee menu")
         user_id = query.from_user.id
-        text = i18n.get_text("WHITE_COFFEE_DESC", user_id=user_id)
+        text = self._get_product_description_from_db("white_coffee", user_id)
         reply_markup = get_direct_add_keyboard("white_coffee", user_id)
         await self._safe_edit_message(query, text, reply_markup, "HTML")
 

@@ -5,6 +5,7 @@ Order-related keyboards for the Samna Salta bot
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from src.utils.i18n import i18n
+from src.utils.constants_manager import get_delivery_method_name
 
 
 def get_order_confirmation_keyboard():
@@ -16,11 +17,11 @@ def get_order_confirmation_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_delivery_method_keyboard():
+def get_delivery_method_keyboard(user_id: int = None):
     """Get delivery method selection keyboard"""
     keyboard = [
-        [InlineKeyboardButton(i18n.get_text("DELIVERY_PICKUP"), callback_data="delivery_pickup")],
-        [InlineKeyboardButton(i18n.get_text("DELIVERY_DELIVERY"), callback_data="delivery_delivery")],
+        [InlineKeyboardButton(get_delivery_method_name("pickup", user_id), callback_data="delivery_pickup")],
+        [InlineKeyboardButton(get_delivery_method_name("delivery", user_id), callback_data="delivery_delivery")],
     ]
     return InlineKeyboardMarkup(keyboard)
 

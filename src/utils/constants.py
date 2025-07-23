@@ -102,7 +102,7 @@ class FileSettings:
 
     LOGS_DIRECTORY: Final[str] = "logs"
     DATA_DIRECTORY: Final[str] = "data"
-    DEFAULT_DATABASE_PATH: Final[str] = "postgresql://postgres:password@localhost:5432/samna_salta"
+    DEFAULT_DATABASE_PATH: Final[str] = "postgresql://postgres:your_password_here@localhost:5432/samna_salta"
 
     # Log file names
     MAIN_LOG_FILE: Final[str] = "app.log"

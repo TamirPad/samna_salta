@@ -11,6 +11,7 @@ from telegram.ext import ContextTypes, filters, Application
 from src.container import get_container
 from src.utils.i18n import i18n
 from src.utils.error_handler import handle_error
+from src.utils.constants_manager import get_delivery_method_name
 
 logger = logging.getLogger(__name__)
 
@@ -1075,8 +1076,8 @@ class CartHandler:
         """Get keyboard for delivery method selection"""
         keyboard = [
             [
-                InlineKeyboardButton(i18n.get_text("DELIVERY_PICKUP", user_id=user_id), callback_data="delivery_pickup"),
-                InlineKeyboardButton(i18n.get_text("DELIVERY_DELIVERY", user_id=user_id), callback_data="delivery_delivery"),
+                InlineKeyboardButton(get_delivery_method_name("pickup", user_id), callback_data="delivery_pickup"),
+                InlineKeyboardButton(get_delivery_method_name("delivery", user_id), callback_data="delivery_delivery"),
             ],
             [InlineKeyboardButton(i18n.get_text("BACK_TO_CART", user_id=user_id), callback_data="cart_view")],
         ]

@@ -33,6 +33,11 @@ from src.db.models import (
     AnalyticsDailySales,
     AnalyticsProductPerformance,
     BusinessSettings,
+    ProductOption,
+    ProductSize,
+    OrderStatus,
+    DeliveryMethod,
+    PaymentMethod,
 )
 from src.utils.logger import PerformanceLogger
 from src.utils.constants import (
@@ -1935,14 +1940,337 @@ def update_business_settings(**kwargs) -> bool:
 @retry_on_database_error()
 def get_business_settings_dict() -> dict:
     """Get business settings as dictionary"""
-    settings = get_business_settings()
-    if settings:
-        data = settings.to_dict()
-        # Parse JSON fields
-        if data.get('hilbeh_available_days'):
-            try:
-                data['hilbeh_available_days'] = json.loads(data['hilbeh_available_days'])
-            except json.JSONDecodeError:
-                data['hilbeh_available_days'] = []
-        return data
-    return {}
+    db_manager = get_db_manager()
+    
+    with db_manager.get_session_context() as session:
+        settings = session.query(BusinessSettings).first()
+        
+        if settings:
+            return settings.to_dict()
+        else:
+            # Return default settings if none exist
+            return {
+                "business_name": "Samna Salta",
+                "business_description": None,
+                "business_address": None,
+                "business_phone": None,
+                "business_email": None,
+                "business_website": None,
+                "business_hours": None,
+                "delivery_charge": 5.00,
+                "currency": "ILS",
+                "hilbeh_available_days": None,
+                "hilbeh_available_hours": None,
+                "welcome_message": None,
+                "about_us": None,
+                "contact_info": None
+            }
+
+
+# ============================================================================
+# CONSTANT MODELS OPERATIONS
+# ============================================================================
+
+@retry_on_database_error()
+def get_product_options(option_type: Optional[str] = None, language: str = "en") -> List[Dict]:
+    """Get product options with optional filtering by type"""
+    db_manager = get_db_manager()
+    
+    with db_manager.get_session_context() as session:
+        query = session.query(ProductOption).filter(ProductOption.is_active == True)
+        
+        if option_type:
+            query = query.filter(ProductOption.option_type == option_type)
+        
+        query = query.order_by(ProductOption.display_order)
+        options = query.all()
+        
+        result = []
+        for option in options:
+            result.append({
+                "id": option.id,
+                "name": option.name,
+                "display_name": option.get_localized_display_name(language),
+                "description": option.get_localized_description(language),
+                "option_type": option.option_type,
+                "price_modifier": option.price_modifier,
+                "display_order": option.display_order
+            })
+        
+        return result
+
+
+@retry_on_database_error()
+def get_product_option_by_name(name: str, option_type: str, language: str = "en") -> Optional[Dict]:
+    """Get a specific product option by name and type"""
+    db_manager = get_db_manager()
+    
+    with db_manager.get_session_context() as session:
+        option = session.query(ProductOption).filter(
+            ProductOption.name == name,
+            ProductOption.option_type == option_type,
+            ProductOption.is_active == True
+        ).first()
+        
+        if option:
+            return {
+                "id": option.id,
+                "name": option.name,
+                "display_name": option.get_localized_display_name(language),
+                "description": option.get_localized_description(language),
+                "option_type": option.option_type,
+                "price_modifier": option.price_modifier,
+                "display_order": option.display_order
+            }
+        return None
+
+
+@retry_on_database_error()
+def get_product_sizes(language: str = "en") -> List[Dict]:
+    """Get all product sizes"""
+    db_manager = get_db_manager()
+    
+    with db_manager.get_session_context() as session:
+        sizes = session.query(ProductSize).filter(
+            ProductSize.is_active == True
+        ).order_by(ProductSize.display_order).all()
+        
+        result = []
+        for size in sizes:
+            result.append({
+                "id": size.id,
+                "name": size.name,
+                "display_name": size.get_localized_display_name(language),
+                "price_modifier": size.price_modifier,
+                "display_order": size.display_order
+            })
+        
+        return result
+
+
+@retry_on_database_error()
+def get_product_size_by_name(name: str, language: str = "en") -> Optional[Dict]:
+    """Get a specific product size by name"""
+    db_manager = get_db_manager()
+    
+    with db_manager.get_session_context() as session:
+        size = session.query(ProductSize).filter(
+            ProductSize.name == name,
+            ProductSize.is_active == True
+        ).first()
+        
+        if size:
+            return {
+                "id": size.id,
+                "name": size.name,
+                "display_name": size.get_localized_display_name(language),
+                "price_modifier": size.price_modifier,
+                "display_order": size.display_order
+            }
+        return None
+
+
+@retry_on_database_error()
+def get_order_statuses(language: str = "en") -> List[Dict]:
+    """Get all order statuses"""
+    db_manager = get_db_manager()
+    
+    with db_manager.get_session_context() as session:
+        statuses = session.query(OrderStatus).filter(
+            OrderStatus.is_active == True
+        ).order_by(OrderStatus.display_order).all()
+        
+        result = []
+        for status in statuses:
+            result.append({
+                "id": status.id,
+                "name": status.name,
+                "display_name": status.get_localized_display_name(language),
+                "description": status.get_localized_description(language),
+                "color": status.color,
+                "icon": status.icon,
+                "display_order": status.display_order
+            })
+        
+        return result
+
+
+@retry_on_database_error()
+def get_order_status_by_name(name: str, language: str = "en") -> Optional[Dict]:
+    """Get a specific order status by name"""
+    db_manager = get_db_manager()
+    
+    with db_manager.get_session_context() as session:
+        status = session.query(OrderStatus).filter(
+            OrderStatus.name == name,
+            OrderStatus.is_active == True
+        ).first()
+        
+        if status:
+            return {
+                "id": status.id,
+                "name": status.name,
+                "display_name": status.get_localized_display_name(language),
+                "description": status.get_localized_description(language),
+                "color": status.color,
+                "icon": status.icon,
+                "display_order": status.display_order
+            }
+        return None
+
+
+@retry_on_database_error()
+def get_delivery_methods(language: str = "en") -> List[Dict]:
+    """Get all delivery methods"""
+    db_manager = get_db_manager()
+    
+    with db_manager.get_session_context() as session:
+        methods = session.query(DeliveryMethod).filter(
+            DeliveryMethod.is_active == True
+        ).order_by(DeliveryMethod.display_order).all()
+        
+        result = []
+        for method in methods:
+            result.append({
+                "id": method.id,
+                "name": method.name,
+                "display_name": method.get_localized_display_name(language),
+                "description": method.get_localized_description(language),
+                "charge": method.charge,
+                "display_order": method.display_order
+            })
+        
+        return result
+
+
+@retry_on_database_error()
+def get_delivery_method_by_name(name: str, language: str = "en") -> Optional[Dict]:
+    """Get a specific delivery method by name"""
+    db_manager = get_db_manager()
+    
+    with db_manager.get_session_context() as session:
+        method = session.query(DeliveryMethod).filter(
+            DeliveryMethod.name == name,
+            DeliveryMethod.is_active == True
+        ).first()
+        
+        if method:
+            return {
+                "id": method.id,
+                "name": method.name,
+                "display_name": method.get_localized_display_name(language),
+                "description": method.get_localized_description(language),
+                "charge": method.charge,
+                "display_order": method.display_order
+            }
+        return None
+
+
+@retry_on_database_error()
+def get_payment_methods(language: str = "en") -> List[Dict]:
+    """Get all payment methods"""
+    db_manager = get_db_manager()
+    
+    with db_manager.get_session_context() as session:
+        methods = session.query(PaymentMethod).filter(
+            PaymentMethod.is_active == True
+        ).order_by(PaymentMethod.display_order).all()
+        
+        result = []
+        for method in methods:
+            result.append({
+                "id": method.id,
+                "name": method.name,
+                "display_name": method.get_localized_display_name(language),
+                "description": method.get_localized_description(language),
+                "display_order": method.display_order
+            })
+        
+        return result
+
+
+@retry_on_database_error()
+def get_payment_method_by_name(name: str, language: str = "en") -> Optional[Dict]:
+    """Get a specific payment method by name"""
+    db_manager = get_db_manager()
+    
+    with db_manager.get_session_context() as session:
+        method = session.query(PaymentMethod).filter(
+            PaymentMethod.name == name,
+            PaymentMethod.is_active == True
+        ).first()
+        
+        if method:
+            return {
+                "id": method.id,
+                "name": method.name,
+                "display_name": method.get_localized_display_name(language),
+                "description": method.get_localized_description(language),
+                "display_order": method.display_order
+            }
+        return None
+
+
+@retry_on_database_error()
+def get_localized_constant(constant_type: str, name: str, language: str = "en") -> Optional[str]:
+    """Get localized display name for any constant type"""
+    db_manager = get_db_manager()
+    
+    with db_manager.get_session_context() as session:
+        if constant_type == "product_option":
+            item = session.query(ProductOption).filter(
+                ProductOption.name == name,
+                ProductOption.is_active == True
+            ).first()
+            if item:
+                return item.get_localized_display_name(language)
+        
+        elif constant_type == "product_size":
+            item = session.query(ProductSize).filter(
+                ProductSize.name == name,
+                ProductSize.is_active == True
+            ).first()
+            if item:
+                return item.get_localized_display_name(language)
+        
+        elif constant_type == "order_status":
+            item = session.query(OrderStatus).filter(
+                OrderStatus.name == name,
+                OrderStatus.is_active == True
+            ).first()
+            if item:
+                return item.get_localized_display_name(language)
+        
+        elif constant_type == "delivery_method":
+            item = session.query(DeliveryMethod).filter(
+                DeliveryMethod.name == name,
+                DeliveryMethod.is_active == True
+            ).first()
+            if item:
+                return item.get_localized_display_name(language)
+        
+        elif constant_type == "payment_method":
+            item = session.query(PaymentMethod).filter(
+                PaymentMethod.name == name,
+                PaymentMethod.is_active == True
+            ).first()
+            if item:
+                return item.get_localized_display_name(language)
+        
+        return None
+
+
+@retry_on_database_error()
+def get_delivery_charge(method_name: str) -> float:
+    """Get delivery charge for a specific method"""
+    db_manager = get_db_manager()
+    
+    with db_manager.get_session_context() as session:
+        method = session.query(DeliveryMethod).filter(
+            DeliveryMethod.name == method_name,
+            DeliveryMethod.is_active == True
+        ).first()
+        
+        if method:
+            return method.charge
+        return 0.0

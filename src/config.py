@@ -23,7 +23,7 @@ class Settings(BaseSettings):
 
     # Database configuration
     database_url: str = Field(
-        default="postgresql://postgres:password@localhost:5432/samna_salta", description="Database connection URL"
+        default="postgresql://postgres:your_password_here@localhost:5432/samna_salta", description="Database connection URL"
     )
     supabase_connection_string: str = Field(
         default="", description="Supabase PostgreSQL connection string"

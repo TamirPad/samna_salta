@@ -12,6 +12,7 @@ from typing import Any, Dict, Generic, Optional, TypeVar, Union
 
 from src.config import get_config
 from src.utils.constants import CacheSettings
+from src.utils.constants_manager import get_product_option_name, get_product_size_name
 
 logger = logging.getLogger(__name__)
 
@@ -132,15 +133,14 @@ def translate_product_name(product_name: str, options: Optional[dict] = None, us
     if "kubaneh" in product_name_lower:
         if options and "type" in options:
             kubaneh_type = options["type"]
-            type_key = f"KUBANEH_{kubaneh_type.upper()}"
             try:
-                type_display = i18n.get_text(type_key, user_id=user_id)
-                return i18n.get_text("KUBANEH_DISPLAY_NAME", user_id=user_id).format(type=type_display)
+                type_display = get_product_option_name("kubaneh", kubaneh_type, user_id)
+                return f"Kubaneh ({type_display})"
             except:
                 # Fallback if translation key doesn't exist
                 return f"Kubaneh ({kubaneh_type.title()})"
         try:
-            return i18n.get_text("PRODUCT_KUBANEH_CLASSIC", user_id=user_id)
+            return "Kubaneh"
         except:
             # Fallback to original name if translation fails
             return product_name
@@ -149,15 +149,14 @@ def translate_product_name(product_name: str, options: Optional[dict] = None, us
     elif "samneh" in product_name_lower:
         if options and "type" in options:
             samneh_type = options["type"]
-            type_key = f"SAMNEH_{samneh_type.upper()}"
             try:
-                type_display = i18n.get_text(type_key, user_id=user_id)
-                return i18n.get_text("SAMNEH_DISPLAY_NAME", user_id=user_id).format(type=type_display)
+                type_display = get_product_option_name("samneh", samneh_type, user_id)
+                return f"Samneh ({type_display})"
             except:
                 # Fallback if translation key doesn't exist
                 return f"Samneh ({samneh_type.title()})"
         try:
-            return i18n.get_text("PRODUCT_SAMNEH_SMOKED", user_id=user_id)
+            return "Samneh"
         except:
             # Fallback to original name if translation fails
             return product_name
@@ -166,15 +165,14 @@ def translate_product_name(product_name: str, options: Optional[dict] = None, us
     elif "red bisbas" in product_name_lower or "bisbas" in product_name_lower:
         if options and "size" in options:
             size = options["size"]
-            size_key = f"SIZE_{size.upper()}"
             try:
-                size_display = i18n.get_text(size_key, user_id=user_id)
-                return i18n.get_text("RED_BISBAS_DISPLAY_NAME", user_id=user_id).format(size=size_display)
+                size_display = get_product_size_name(size, user_id)
+                return f"Red Bisbas ({size_display})"
             except:
                 # Fallback if translation key doesn't exist
                 return f"Red Bisbas ({size.title()})"
         try:
-            return i18n.get_text("PRODUCT_RED_BISBAS", user_id=user_id)
+            return "Red Bisbas"
         except:
             # Fallback to original name if translation fails
             return product_name
@@ -183,52 +181,33 @@ def translate_product_name(product_name: str, options: Optional[dict] = None, us
     elif "hilbeh" in product_name_lower:
         if options and "type" in options:
             hilbeh_type = options["type"]
-            type_key = f"HILBEH_{hilbeh_type.upper()}"
             try:
-                type_display = i18n.get_text(type_key, user_id=user_id)
-                return i18n.get_text("HILBEH_DISPLAY_NAME", user_id=user_id).format(type=type_display)
+                type_display = get_product_option_name("hilbeh", hilbeh_type, user_id)
+                return f"Hilbeh ({type_display})"
             except:
                 # Fallback if translation key doesn't exist
                 return f"Hilbeh ({hilbeh_type.title()})"
         try:
-            return i18n.get_text("PRODUCT_HILBEH", user_id=user_id)
+            return "Hilbeh"
         except:
             # Fallback to original name if translation fails
             return product_name
     
     # Handle Hawaij products specifically
     elif "hawaij soup spice" in product_name_lower:
-        try:
-            return i18n.get_text("PRODUCT_HAWAIJ_SOUP", user_id=user_id)
-        except:
-            return product_name
+        return "Hawaij for Soup"
     
     elif "hawaij coffee spice" in product_name_lower:
-        try:
-            return i18n.get_text("PRODUCT_HAWAIJ_COFFEE", user_id=user_id)
-        except:
-            return product_name
+        return "Hawaij for Coffee"
     
     # Handle White Coffee
     elif "white coffee" in product_name_lower:
-        try:
-            return i18n.get_text("PRODUCT_WHITE_COFFEE", user_id=user_id)
-        except:
-            return product_name
+        return "White Coffee"
     
     # Handle other products
     else:
-        # Try to find a direct product translation
-        product_key = f"PRODUCT_{product_name.upper().replace(' ', '_')}"
-        try:
-            return i18n.get_text(product_key, user_id=user_id)
-        except:
-            # Try to find a generic unknown product translation
-            try:
-                return i18n.get_text("PRODUCT_UNKNOWN", user_id=user_id)
-            except:
-                # Final fallback to original name
-                return product_name
+        # Final fallback to original name
+        return product_name
 
 
 def translate_category_name(category_name: str, user_id: Optional[int] = None) -> str:
