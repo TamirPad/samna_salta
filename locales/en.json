@@ -619,6 +619,8 @@
   "ADMIN_CUSTOMERS": "👥 Customers",
   "ADMIN_CUSTOMERS_TITLE": "👥 <b>All Customers</b>",
   "ADMIN_NO_CUSTOMERS": "No customers found.",
+  "ADMIN_PAGE": "Page {page} of {total}",
+  "ADMIN_SHOWING_ITEMS": "Showing {start}-{end} of {total}",
   "ADMIN_CUSTOMER_ORDERS": "Orders",
   "ADMIN_CUSTOMER_SPENT": "Total Spent",
   "CUSTOMERS_ERROR": "❌ Error loading customers. Please try again.",

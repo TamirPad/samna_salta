@@ -103,6 +103,103 @@ class AdminHandler:
             await self._show_completed_orders(query)
         elif data == "admin_customers":
             await self._show_customers(query)
+        elif data.startswith("admin_customers_"):
+            if "_size_" in data and "_page_" in data:
+                # New format: admin_customers_size_20_page_0
+                parts = data.split("_")
+                size_idx = parts.index("size") + 1
+                page_idx = parts.index("page") + 1
+                page_size = int(parts[size_idx])
+                page = int(parts[page_idx])
+            elif "_page_" in data:
+                # Old format: admin_customers_page_0
+                page = int(data.split("_")[-1])
+                page_size = 20  # default
+            else:
+                return
+            await self._show_customers(query, page, page_size)
+        elif data.startswith("admin_all_orders_"):
+            if "_size_" in data and "_page_" in data:
+                parts = data.split("_")
+                size_idx = parts.index("size") + 1
+                page_idx = parts.index("page") + 1
+                page_size = int(parts[size_idx])
+                page = int(parts[page_idx])
+            elif "_page_" in data:
+                page = int(data.split("_")[-1])
+                page_size = 15  # default
+            else:
+                return
+            await self._show_all_orders(query, page, page_size)
+        elif data.startswith("admin_active_orders_"):
+            if "_size_" in data and "_page_" in data:
+                parts = data.split("_")
+                size_idx = parts.index("size") + 1
+                page_idx = parts.index("page") + 1
+                page_size = int(parts[size_idx])
+                page = int(parts[page_idx])
+            elif "_page_" in data:
+                page = int(data.split("_")[-1])
+                page_size = 15  # default
+            else:
+                return
+            await self._show_active_orders(query, page, page_size)
+        elif data.startswith("admin_completed_orders_"):
+            if "_size_" in data and "_page_" in data:
+                parts = data.split("_")
+                size_idx = parts.index("size") + 1
+                page_idx = parts.index("page") + 1
+                page_size = int(parts[size_idx])
+                page = int(parts[page_idx])
+            elif "_page_" in data:
+                page = int(data.split("_")[-1])
+                page_size = 15  # default
+            else:
+                return
+            await self._show_completed_orders(query, page, page_size)
+        elif data.startswith("admin_pending_orders_"):
+            if "_size_" in data and "_page_" in data:
+                parts = data.split("_")
+                size_idx = parts.index("size") + 1
+                page_idx = parts.index("page") + 1
+                page_size = int(parts[size_idx])
+                page = int(parts[page_idx])
+            elif "_page_" in data:
+                page = int(data.split("_")[-1])
+                page_size = 15  # default
+            else:
+                return
+            await self._show_pending_orders(query, page, page_size)
+        elif data.startswith("admin_products_"):
+            if "_size_" in data and "_page_" in data:
+                parts = data.split("_")
+                size_idx = parts.index("size") + 1
+                page_idx = parts.index("page") + 1
+                page_size = int(parts[size_idx])
+                page = int(parts[page_idx])
+            elif "_page_" in data:
+                page = int(data.split("_")[-1])
+                page_size = 10  # default
+            else:
+                return
+            await self._show_all_products(query, page, page_size)
+        elif data.startswith("analytics_customers_"):
+            if "_size_" in data and "_page_" in data:
+                parts = data.split("_")
+                size_idx = parts.index("size") + 1
+                page_idx = parts.index("page") + 1
+                page_size = int(parts[size_idx])
+                page = int(parts[page_idx])
+            elif "_page_" in data:
+                page = int(data.split("_")[-1])
+                page_size = 10  # default
+            else:
+                return
+            analytics_data = await self.admin_service.get_business_analytics()
+            await self._show_customer_report(query, analytics_data, page, page_size)
+        elif data == "pagination_info":
+            # Just a display button, answer the callback without doing anything
+            await query.answer()
         elif data == "admin_update_status":
             await self._start_status_update(query)
         elif data == "admin_analytics":
@@ -619,7 +716,7 @@ class AdminHandler:
             text=report_text, parse_mode="HTML", reply_markup=reply_markup
         )
 
-    async def _show_customer_report(self, query: CallbackQuery, analytics_data: Dict) -> None:
+    async def _show_customer_report(self, query: CallbackQuery, analytics_data: Dict, page: int = 0, page_size: int = 10) -> None:
         user_id = query.from_user.id
         customers = analytics_data.get('customers', [])
 
@@ -638,23 +735,40 @@ class AdminHandler:
 {i18n.get_text('ANALYTICS_CUSTOMER_BEHAVIOR', user_id=user_id)}
 {i18n.get_text('ANALYTICS_NO_DATA', user_id=user_id)}
             """.strip()
+            keyboard = [
+                [InlineKeyboardButton(i18n.get_text("ANALYTICS_BACK_TO_ANALYTICS", user_id=user_id), callback_data="analytics_back")]
+            ]
         else:
-            top_customers = customers[:5]
+            # Use pagination for large customer lists
+            customers_per_page = page_size
+            total_customers = len(customers)
+            total_pages = (total_customers + customers_per_page - 1) // customers_per_page if total_customers > 0 else 1
+            
+            # Ensure page is within bounds
+            page = max(0, min(page, total_pages - 1))
+            
+            # Get customers for current page
+            start_idx = page * customers_per_page
+            end_idx = start_idx + customers_per_page
+            page_customers = customers[start_idx:end_idx]
+            
             customer_lines = []
-            for i, customer in enumerate(top_customers, 1):
+            for i, customer in enumerate(page_customers, start_idx + 1):
                 customer_lines.append(
                     f"{i}. {customer['customer_name']}\n"
                     f"   • {i18n.get_text('ANALYTICS_LABEL_ORDERS', user_id=user_id)}: {customer.get('total_orders', 0)}\n"
                     f"   • {i18n.get_text('ANALYTICS_LABEL_TOTAL_SPENT', user_id=user_id)}: ₪{fmt(customer.get('total_spent'))}\n"
                     f"   • {i18n.get_text('ANALYTICS_LABEL_AVG_ORDER', user_id=user_id)}: ₪{fmt(customer.get('avg_order_value'))}"
                 )
-            total_customers = len(customers)
+            
             total_customer_revenue = sum(c.get('total_spent', 0) or 0 for c in customers)
             avg_customer_value = total_customer_revenue / total_customers if total_customers > 0 else None
+            
             report_text = f"""
 {i18n.get_text('ANALYTICS_CUSTOMER_TITLE', user_id=user_id)}
 
 {i18n.get_text('ANALYTICS_TOP_CUSTOMERS', user_id=user_id)}
+📄 {i18n.get_text('ADMIN_SHOWING_ITEMS', user_id=user_id).format(start=start_idx + 1, end=min(end_idx, total_customers), total=total_customers)}
 
 {chr(10).join(customer_lines)}
 
@@ -666,9 +780,63 @@ class AdminHandler:
 
 <i>{i18n.get_text('ANALYTICS_REPORT_PERIOD', user_id=user_id).format(days=analytics_data.get('period', {}).get('days', 30))}</i>
             """.strip()
-        keyboard = [
-            [InlineKeyboardButton(i18n.get_text("ANALYTICS_BACK_TO_ANALYTICS", user_id=user_id), callback_data="analytics_back")]
-        ]
+            
+            # Create pagination keyboard for analytics
+            keyboard = []
+            
+            # Add page size options
+            page_size_row = []
+            page_sizes = [5, 10, 20, 50]
+            
+            for size in page_sizes:
+                if size != page_size and size <= total_customers:
+                    page_size_row.append(
+                        InlineKeyboardButton(
+                            f"{size}/page",
+                            callback_data=f"analytics_customers_size_{size}_page_0"
+                        )
+                    )
+                elif size == page_size:
+                    page_size_row.append(
+                        InlineKeyboardButton(
+                            f"✅{size}/page",
+                            callback_data="pagination_info"
+                        )
+                    )
+            
+            if page_size_row:
+                keyboard.append(page_size_row)
+            
+            # Add pagination controls if multiple pages
+            if total_pages > 1:
+                pagination_row = []
+                
+                # Previous page button
+                if page > 0:
+                    pagination_row.append(
+                        InlineKeyboardButton("⬅️", callback_data=f"analytics_customers_size_{page_size}_page_{page - 1}")
+                    )
+                
+                # Page indicator
+                pagination_row.append(
+                    InlineKeyboardButton(
+                        f"📄 {page + 1}/{total_pages}", 
+                        callback_data="pagination_info"
+                    )
+                )
+                
+                # Next page button
+                if page < total_pages - 1:
+                    pagination_row.append(
+                        InlineKeyboardButton("➡️", callback_data=f"analytics_customers_size_{page_size}_page_{page + 1}")
+                    )
+                
+                keyboard.append(pagination_row)
+            
+            keyboard.append([
+                InlineKeyboardButton(i18n.get_text("ANALYTICS_BACK_TO_ANALYTICS", user_id=user_id), callback_data="analytics_back")
+            ])
+            
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
             text=report_text, parse_mode="HTML", reply_markup=reply_markup
@@ -784,35 +952,43 @@ class AdminHandler:
             text=report_text, parse_mode="HTML", reply_markup=reply_markup
         )
 
-    async def _show_pending_orders(self, query: CallbackQuery) -> None:
-        """Show pending orders"""
+    async def _show_pending_orders(self, query: CallbackQuery, page: int = 0, page_size: int = 15) -> None:
+        """Show pending orders with pagination"""
         try:
             orders = await self.admin_service.get_pending_orders()
+            user_id = query.from_user.id
 
             if not orders:
                 text = (
-                    i18n.get_text("ADMIN_PENDING_ORDERS_TITLE", user_id=query.from_user.id) + "\n\n" + i18n.get_text("ADMIN_NO_PENDING_ORDERS", user_id=query.from_user.id)
+                    i18n.get_text("ADMIN_PENDING_ORDERS_TITLE", user_id=user_id) + "\n\n" + i18n.get_text("ADMIN_NO_PENDING_ORDERS", user_id=user_id)
                 )
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back"
                         )
                     ]
                 ]
             else:
+                # Use pagination helper
+                extra_buttons = []
+                pagination_keyboard, page_info = self._create_pagination_keyboard(
+                    orders, page, page_size, "admin_pending_orders", user_id, extra_buttons
+                )
+                
                 text = (
-                    f"{i18n.get_text('ADMIN_PENDING_ORDERS_TITLE', user_id=query.from_user.id)} ({len(orders)})\n\n"
-                    f"{i18n.get_text('ADMIN_PENDING_ORDERS_LIST', user_id=query.from_user.id)}"
+                    f"{i18n.get_text('ADMIN_PENDING_ORDERS_TITLE', user_id=user_id)} ({page_info['total_items']})\n"
+                    f"📄 {i18n.get_text('ADMIN_SHOWING_ITEMS', user_id=user_id).format(start=page_info['start_idx'] + 1, end=page_info['end_idx'], total=page_info['total_items'])}\n\n"
+                    f"{i18n.get_text('ADMIN_PENDING_ORDERS_LIST', user_id=user_id)}"
                 )
 
-                keyboard = []
-                for order in orders:  # Show all pending orders
+                # Add order buttons for current page
+                for order in page_info['page_items']:
                     order_summary = (
                         f"#{order['order_id']} - {order['customer_name']} - "
                         f"₪{order['total']:.2f}"
                     )
-                    keyboard.append(
+                    pagination_keyboard.append(
                         [
                             InlineKeyboardButton(
                                 order_summary,
@@ -821,13 +997,16 @@ class AdminHandler:
                         ]
                     )
 
-                keyboard.append(
+                # Add back button
+                pagination_keyboard.append(
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back"
                         )
                     ]
                 )
+                
+                keyboard = pagination_keyboard
 
             reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -839,32 +1018,41 @@ class AdminHandler:
             self.logger.error("💥 PENDING ORDERS ERROR: %s", e)
             await query.message.reply_text(i18n.get_text("PENDING_ORDERS_ERROR"))
 
-    async def _show_active_orders(self, query: CallbackQuery) -> None:
-        """Show active orders"""
+    async def _show_active_orders(self, query: CallbackQuery, page: int = 0, page_size: int = 15) -> None:
+        """Show active orders with pagination"""
         try:
             orders = await self.admin_service.get_active_orders()
+            user_id = query.from_user.id
 
             if not orders:
-                text = i18n.get_text("ADMIN_ACTIVE_ORDERS_TITLE", user_id=query.from_user.id) + "\n\n" + i18n.get_text("ADMIN_NO_ACTIVE_ORDERS", user_id=query.from_user.id)
+                text = i18n.get_text("ADMIN_ACTIVE_ORDERS_TITLE", user_id=user_id) + "\n\n" + i18n.get_text("ADMIN_NO_ACTIVE_ORDERS", user_id=user_id)
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back"
                         )
                     ]
                 ]
             else:
-                text = (
-                    f"{i18n.get_text('ADMIN_ACTIVE_ORDERS_TITLE', user_id=query.from_user.id)} ({len(orders)})\n\n"
-                    f"{i18n.get_text('ADMIN_ACTIVE_ORDERS_LIST', user_id=query.from_user.id)}"
+                # Use pagination helper
+                extra_buttons = []
+                pagination_keyboard, page_info = self._create_pagination_keyboard(
+                    orders, page, page_size, "admin_active_orders", user_id, extra_buttons
                 )
-                keyboard = []
-                for order in orders[:10]:  # Show max 10 orders
+                
+                text = (
+                    f"{i18n.get_text('ADMIN_ACTIVE_ORDERS_TITLE', user_id=user_id)} ({page_info['total_items']})\n"
+                    f"📄 {i18n.get_text('ADMIN_SHOWING_ITEMS', user_id=user_id).format(start=page_info['start_idx'] + 1, end=page_info['end_idx'], total=page_info['total_items'])}\n\n"
+                    f"{i18n.get_text('ADMIN_ACTIVE_ORDERS_LIST', user_id=user_id)}"
+                )
+                
+                # Add order buttons for current page
+                for order in page_info['page_items']:
                     order_summary = (
                         f"#{order['order_id']} - {order['customer_name']} - "
                         f"{order['status'].capitalize()}"
                     )
-                    keyboard.append(
+                    pagination_keyboard.append(
                         [
                             InlineKeyboardButton(
                                 order_summary,
@@ -872,13 +1060,17 @@ class AdminHandler:
                             )
                         ]
                     )
-                keyboard.append(
+                
+                # Add back button
+                pagination_keyboard.append(
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back"
                         )
                     ]
                 )
+                
+                keyboard = pagination_keyboard
 
             reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -890,29 +1082,40 @@ class AdminHandler:
             self.logger.error("💥 ACTIVE ORDERS ERROR: %s", e)
             await query.message.reply_text(i18n.get_text("ACTIVE_ORDERS_ERROR"))
 
-    async def _show_all_orders(self, query: CallbackQuery) -> None:
-        """Show all orders"""
+    async def _show_all_orders(self, query: CallbackQuery, page: int = 0, page_size: int = 15) -> None:
+        """Show all orders with pagination"""
         try:
             orders = await self.admin_service.get_all_orders()
+            user_id = query.from_user.id
 
             if not orders:
-                text = i18n.get_text("ADMIN_ALL_ORDERS_TITLE", user_id=query.from_user.id) + "\n\n" + i18n.get_text("ADMIN_NO_ORDERS_FOUND", user_id=query.from_user.id)
+                text = i18n.get_text("ADMIN_ALL_ORDERS_TITLE", user_id=user_id) + "\n\n" + i18n.get_text("ADMIN_NO_ORDERS_FOUND", user_id=user_id)
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back"
                         )
                     ]
                 ]
             else:
-                text = f"{i18n.get_text('ADMIN_ALL_ORDERS_TITLE', user_id=query.from_user.id)} ({len(orders)})"
-                keyboard = []
-                for order in orders[:15]:  # Show max 15
+                # Use pagination helper
+                extra_buttons = []
+                pagination_keyboard, page_info = self._create_pagination_keyboard(
+                    orders, page, page_size, "admin_all_orders", user_id, extra_buttons
+                )
+                
+                text = (
+                    f"{i18n.get_text('ADMIN_ALL_ORDERS_TITLE', user_id=user_id)} ({page_info['total_items']})\n"
+                    f"📄 {i18n.get_text('ADMIN_SHOWING_ITEMS', user_id=user_id).format(start=page_info['start_idx'] + 1, end=page_info['end_idx'], total=page_info['total_items'])}"
+                )
+                
+                # Add order buttons for current page
+                for order in page_info['page_items']:
                     order_summary = (
                         f"#{order['order_id']} - {order['customer_name']} - "
                         f"{order['status'].capitalize()}"
                     )
-                    keyboard.append(
+                    pagination_keyboard.append(
                         [
                             InlineKeyboardButton(
                                 order_summary,
@@ -920,13 +1123,17 @@ class AdminHandler:
                             )
                         ]
                     )
-                keyboard.append(
+                
+                # Add back button
+                pagination_keyboard.append(
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back"
                         )
                     ]
                 )
+                
+                keyboard = pagination_keyboard
 
             reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -938,29 +1145,40 @@ class AdminHandler:
             self.logger.error("💥 ALL ORDERS ERROR: %s", e)
             await query.message.reply_text(i18n.get_text("ALL_ORDERS_ERROR"))
 
-    async def _show_completed_orders(self, query: CallbackQuery) -> None:
-        """Show completed (delivered) orders"""
+    async def _show_completed_orders(self, query: CallbackQuery, page: int = 0, page_size: int = 15) -> None:
+        """Show completed (delivered) orders with pagination"""
         try:
             orders = await self.admin_service.get_completed_orders()
+            user_id = query.from_user.id
 
             if not orders:
-                text = i18n.get_text("ADMIN_COMPLETED_ORDERS_TITLE", user_id=query.from_user.id) + "\n\n" + i18n.get_text("ADMIN_NO_COMPLETED_ORDERS", user_id=query.from_user.id)
+                text = i18n.get_text("ADMIN_COMPLETED_ORDERS_TITLE", user_id=user_id) + "\n\n" + i18n.get_text("ADMIN_NO_COMPLETED_ORDERS", user_id=user_id)
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back"
                         )
                     ]
                 ]
             else:
-                text = f"{i18n.get_text('ADMIN_COMPLETED_ORDERS_TITLE', user_id=query.from_user.id)} ({len(orders)})"
-                keyboard = []
-                for order in orders[:15]:  # Show max 15
+                # Use pagination helper
+                extra_buttons = []
+                pagination_keyboard, page_info = self._create_pagination_keyboard(
+                    orders, page, page_size, "admin_completed_orders", user_id, extra_buttons
+                )
+                
+                text = (
+                    f"{i18n.get_text('ADMIN_COMPLETED_ORDERS_TITLE', user_id=user_id)} ({page_info['total_items']})\n"
+                    f"📄 {i18n.get_text('ADMIN_SHOWING_ITEMS', user_id=user_id).format(start=page_info['start_idx'] + 1, end=page_info['end_idx'], total=page_info['total_items'])}"
+                )
+                
+                # Add order buttons for current page
+                for order in page_info['page_items']:
                     order_summary = (
                         f"#{order['order_id']} - {order['customer_name']} - "
                         f"₪{order['total']:.2f}"
                     )
-                    keyboard.append(
+                    pagination_keyboard.append(
                         [
                             InlineKeyboardButton(
                                 order_summary,
@@ -968,13 +1186,17 @@ class AdminHandler:
                             )
                         ]
                     )
-                keyboard.append(
+                
+                # Add back button
+                pagination_keyboard.append(
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back"
                         )
                     ]
                 )
+                
+                keyboard = pagination_keyboard
 
             reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -986,26 +1208,136 @@ class AdminHandler:
             self.logger.error("💥 COMPLETED ORDERS ERROR: %s", e)
             await query.message.reply_text(i18n.get_text("ALL_ORDERS_ERROR"))
 
-    async def _show_customers(self, query: CallbackQuery) -> None:
-        """Show all customers"""
+    def _create_pagination_keyboard(self, items: list, page: int, items_per_page: int, callback_prefix: str, user_id: int, extra_buttons: list = None, show_page_size_options: bool = True) -> tuple[list, dict]:
+        """
+        Create pagination keyboard and get page info
+        
+        Returns:
+            tuple: (keyboard, page_info)
+                - keyboard: List of keyboard rows
+                - page_info: Dict with pagination details
+        """
+        total_items = len(items)
+        total_pages = (total_items + items_per_page - 1) // items_per_page if total_items > 0 else 1
+        
+        # Ensure page is within bounds
+        page = max(0, min(page, total_pages - 1))
+        
+        # Get items for current page
+        start_idx = page * items_per_page
+        end_idx = start_idx + items_per_page
+        page_items = items[start_idx:end_idx]
+        
+        keyboard = []
+        
+        # Add extra buttons at the top if provided
+        if extra_buttons:
+            keyboard.extend(extra_buttons)
+        
+        # Add page size options if enabled and there are items
+        if show_page_size_options and total_items > 0:
+            page_size_row = []
+            page_sizes = [10, 20, 50, 100]
+            
+            for size in page_sizes:
+                if size != items_per_page and size <= total_items:
+                    page_size_row.append(
+                        InlineKeyboardButton(
+                            f"{size}/page",
+                            callback_data=f"{callback_prefix}_size_{size}_page_0"
+                        )
+                    )
+                elif size == items_per_page:
+                    page_size_row.append(
+                        InlineKeyboardButton(
+                            f"✅{size}/page",
+                            callback_data="pagination_info"
+                        )
+                    )
+            
+            if page_size_row:
+                keyboard.append(page_size_row)
+        
+        # Add pagination controls if multiple pages
+        if total_pages > 1:
+            pagination_row = []
+            
+            # First page button
+            if page > 1:
+                pagination_row.append(
+                    InlineKeyboardButton("⏪", callback_data=f"{callback_prefix}_size_{items_per_page}_page_0")
+                )
+            
+            # Previous page button
+            if page > 0:
+                pagination_row.append(
+                    InlineKeyboardButton("⬅️", callback_data=f"{callback_prefix}_size_{items_per_page}_page_{page - 1}")
+                )
+            
+            # Page indicator
+            pagination_row.append(
+                InlineKeyboardButton(
+                    f"📄 {page + 1}/{total_pages}", 
+                    callback_data="pagination_info"  # Non-functional, just for display
+                )
+            )
+            
+            # Next page button
+            if page < total_pages - 1:
+                pagination_row.append(
+                    InlineKeyboardButton("➡️", callback_data=f"{callback_prefix}_size_{items_per_page}_page_{page + 1}")
+                )
+            
+            # Last page button
+            if page < total_pages - 2:
+                pagination_row.append(
+                    InlineKeyboardButton("⏩", callback_data=f"{callback_prefix}_size_{items_per_page}_page_{total_pages - 1}")
+                )
+            
+            keyboard.append(pagination_row)
+        
+        page_info = {
+            'page_items': page_items,
+            'current_page': page + 1,
+            'total_pages': total_pages,
+            'total_items': total_items,
+            'start_idx': start_idx,
+            'end_idx': min(end_idx, total_items)
+        }
+        
+        return keyboard, page_info
+
+    async def _show_customers(self, query: CallbackQuery, page: int = 0, page_size: int = 20) -> None:
+        """Show customers with pagination"""
         try:
             customers = await self.admin_service.get_all_customers()
+            user_id = query.from_user.id
 
             if not customers:
-                text = i18n.get_text("ADMIN_CUSTOMERS_TITLE", user_id=query.from_user.id) + "\n\n" + i18n.get_text("ADMIN_NO_CUSTOMERS", user_id=query.from_user.id)
+                text = i18n.get_text("ADMIN_CUSTOMERS_TITLE", user_id=user_id) + "\n\n" + i18n.get_text("ADMIN_NO_CUSTOMERS", user_id=user_id)
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back"
                         )
                     ]
                 ]
             else:
-                text = f"{i18n.get_text('ADMIN_CUSTOMERS_TITLE', user_id=query.from_user.id)} ({len(customers)})"
-                keyboard = []
-                for customer in customers[:15]:  # Show max 15
+                # Use pagination helper
+                extra_buttons = []
+                pagination_keyboard, page_info = self._create_pagination_keyboard(
+                    customers, page, page_size, "admin_customers", user_id, extra_buttons
+                )
+                
+                text = (
+                    f"{i18n.get_text('ADMIN_CUSTOMERS_TITLE', user_id=user_id)} ({page_info['total_items']})\n"
+                    f"📄 {i18n.get_text('ADMIN_SHOWING_ITEMS', user_id=user_id).format(start=page_info['start_idx'] + 1, end=page_info['end_idx'], total=page_info['total_items'])}"
+                )
+                
+                # Add customer buttons for current page
+                for customer in page_info['page_items']:
                     customer_summary = f"👤 {customer['full_name']} (ID: {customer['customer_id']})"
-                    keyboard.append(
+                    pagination_keyboard.append(
                         [
                             InlineKeyboardButton(
                                 customer_summary,
@@ -1013,13 +1345,17 @@ class AdminHandler:
                             )
                         ]
                     )
-                keyboard.append(
+                
+                # Add back button
+                pagination_keyboard.append(
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=query.from_user.id), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back"
                         )
                     ]
                 )
+                
+                keyboard = pagination_keyboard
 
             reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -1440,8 +1776,8 @@ class AdminHandler:
             self.logger.error("Error showing products management: %s", e)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
 
-    async def _show_all_products(self, query: CallbackQuery) -> None:
-        """Show all products for admin management"""
+    async def _show_all_products(self, query: CallbackQuery, page: int = 0, page_size: int = 10) -> None:
+        """Show all products for admin management with pagination"""
         try:
             user_id = query.from_user.id
             products = await self.admin_service.get_all_products_for_admin()
@@ -1457,13 +1793,19 @@ class AdminHandler:
                     ]
                 ]
             else:
-                # Build text with product count
-                text = i18n.get_text("ADMIN_PRODUCTS_TITLE", user_id=user_id) + f"\n\n{i18n.get_text('ADMIN_PRODUCT_TOTAL_COUNT', user_id=user_id).format(count=len(products))}"
+                # Use pagination helper
+                extra_buttons = []
+                pagination_keyboard, page_info = self._create_pagination_keyboard(
+                    products, page, page_size, "admin_products", user_id, extra_buttons
+                )
                 
-                keyboard = []
+                text = (
+                    f"{i18n.get_text('ADMIN_PRODUCTS_TITLE', user_id=user_id)} ({page_info['total_items']})\n"
+                    f"📄 {i18n.get_text('ADMIN_SHOWING_ITEMS', user_id=user_id).format(start=page_info['start_idx'] + 1, end=page_info['end_idx'], total=page_info['total_items'])}"
+                )
                 
-                # Add product list
-                for product in products:
+                # Add product list for current page
+                for product in page_info['page_items']:
                     status_text = i18n.get_text("ADMIN_PRODUCT_ACTIVE", user_id=user_id) if product["is_active"] else i18n.get_text("ADMIN_PRODUCT_INACTIVE", user_id=user_id)
                     product_text = i18n.get_text("ADMIN_PRODUCT_BUTTON_FORMAT", user_id=user_id).format(
                         name=product["name"],
@@ -1472,19 +1814,22 @@ class AdminHandler:
                         status=status_text
                     )
                     
-                    keyboard.append([
+                    pagination_keyboard.append([
                         InlineKeyboardButton(
                             product_text,
                             callback_data=f"admin_product_details_{product['id']}"
                         )
                     ])
                 
-                keyboard.append([
+                # Add back button
+                pagination_keyboard.append([
                     InlineKeyboardButton(
                         i18n.get_text("ADMIN_PRODUCT_BACK_TO_PRODUCTS", user_id=user_id),
                         callback_data="admin_products_management"
                     )
                 ])
+                
+                keyboard = pagination_keyboard
             
             reply_markup = InlineKeyboardMarkup(keyboard)
             try:

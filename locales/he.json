@@ -471,6 +471,8 @@
   "ADMIN_CUSTOMERS": "👥 לקוחות",
   "ADMIN_CUSTOMERS_TITLE": "👥 <b>ניהול לקוחות</b>",
   "ADMIN_NO_CUSTOMERS": "📭 לא נמצאו לקוחות.",
+  "ADMIN_PAGE": "עמוד {page} מתוך {total}",
+  "ADMIN_SHOWING_ITEMS": "מציג {start}-{end} מתוך {total}",
   "ADMIN_CUSTOMER_ORDERS": "📋 הזמנות לקוח",
   "ADMIN_CUSTOMER_SPENT": "💰 סכום שהוציא",
   "CUSTOMERS_ERROR": "❌ שגיאה בטעינת לקוחות.",
