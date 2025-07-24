@@ -55,7 +55,7 @@
   "CART_WHAT_NEXT_QUESTION": "🤔 מה תרצה לעשות הלאה?",
   "CART_VIEW_TITLE": "🛒 <b>העגלה שלך</b>",
   "CART_ITEM_FORMAT": "{index}. <b>{product_name}</b>\n   • כמות: {quantity}\n   • מחיר: ₪{price:.2f}\n   • סה״כ: ₪{item_total:.2f}",
-  "CART_TOTAL": "💰 <b>סה״כ: ₪{total:.2f}</b>",
+  "CART_TOTAL": "💰 <b>סה״כ: {total}</b>",
   "CART_WHAT_NEXT": "מה תרצה לעשות הלאה?",
   "CHECKOUT_TITLE": "🛒 <b>סיכום הזמנה</b>",
   "SELECT_DELIVERY_METHOD": "אנא בחר שיטת משלוח:",
@@ -505,5 +505,14 @@
   "CART_PRICE_LABEL": "מחיר",
   "CART_SUBTOTAL_LABEL": "סה״כ",
   "BROWSE_MENU_SUGGESTION": "עיין בתפריט שלנו להוספת פריטים טעימים!",
-  "DELIVERY_ADDRESS_ONBOARDING_HELP": "אנא ספק את כתובת המשלוח המלאה שלך כולל רחוב, עיר ומיקוד."
+  "DELIVERY_ADDRESS_ONBOARDING_HELP": "אנא ספק את כתובת המשלוח המלאה שלך כולל רחוב, עיר ומיקוד.",
+  "PRODUCT_KUBANEH": "קובנה",
+  "PRODUCT_SAMNEH": "סמנה",
+  "PRODUCT_RED_BISBAS": "בסבס אדום",
+  "PRODUCT_HAWAIIJ_SOUP": "חוואיג' למרק",
+  "PRODUCT_HAWAIIJ_COFFEE": "חוואיג' לקפה",
+  "PRODUCT_WHITE_COFFEE": "קפה לבן",
+  "PRODUCT_HILBEH": "חילבה",
+  "PRODUCT_BUREKAS_CHEESE": "בורקס גבינה",
+  "PRODUCT_JACHNUN": "ג'חנון"
 }

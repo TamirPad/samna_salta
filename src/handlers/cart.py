@@ -155,17 +155,24 @@ class CartHandler:
                 )
 
                 # Send beautiful success message
-                from src.utils.helpers import translate_product_name
-                translated_product_name = translate_product_name(product_info['display_name'], product_info.get('options', {}), user_id)
+                localized_product_name = self._get_localized_product_name(
+                    {"product_name": product_info["display_name"], "options": product_info.get('options', {})}, 
+                    user_id
+                )
+                
+                # Format total with RTL support
+                from src.utils.helpers import format_price, format_quantity
+                formatted_total = format_price(cart_total, user_id)
+                formatted_item_count = format_quantity(item_count, user_id)
                 
                 message = f"""
 ✅ <b>{i18n.get_text("CART_SUCCESS_TITLE", user_id=user_id)}</b>
 
-📦 <b>{translated_product_name}</b>
+📦 <b>{localized_product_name}</b>
 {i18n.get_text("CART_ADDED_SUCCESSFULLY", user_id=user_id)}
 
-🛒 {i18n.get_text("CART_ITEMS_COUNT", user_id=user_id)}: {item_count}
-💰 {i18n.get_text("CART_TOTAL", user_id=user_id).format(total=cart_total)}
+🛒 {i18n.get_text("CART_ITEMS_COUNT", user_id=user_id)}: {formatted_item_count}
+💰 {i18n.get_text("CART_TOTAL", user_id=user_id).format(total=formatted_total)}
 
 🎯 {i18n.get_text("CART_WHAT_NEXT_QUESTION", user_id=user_id)}
                 """.strip()
@@ -229,24 +236,31 @@ class CartHandler:
             
             for i, item in enumerate(cart_items, 1):
                 item_total = item.get("unit_price", 0) * item.get("quantity", 1)
-                # Translate product name
-                from src.utils.helpers import translate_product_name
-                translated_product_name = translate_product_name(item.get('product_name', i18n.get_text('PRODUCT_UNKNOWN', user_id=user_id)), item.get('options', {}), user_id)
+                # Get localized product name
+                localized_product_name = self._get_localized_product_name(item, user_id)
+                
+                # Format prices and quantities with RTL support
+                from src.utils.helpers import format_price, format_quantity
+                formatted_unit_price = format_price(item.get('unit_price', 0), user_id)
+                formatted_item_total = format_price(item_total, user_id)
+                formatted_quantity = format_quantity(item.get('quantity', 1), user_id)
                 
                 message += f"""
-<b>{i}.</b> 📦 <b>{translated_product_name}</b>
-   🔢 {i18n.get_text("CART_QUANTITY_LABEL", user_id=user_id)}: {item.get('quantity', 1)}
-   💰 {i18n.get_text("CART_PRICE_LABEL", user_id=user_id)}: ₪{item.get('unit_price', 0):.2f}
-   💵 {i18n.get_text("CART_SUBTOTAL_LABEL", user_id=user_id)}: ₪{item_total:.2f}"""
+<b>{i}.</b> 📦 <b>{localized_product_name}</b>
+   🔢 {i18n.get_text("CART_QUANTITY_LABEL", user_id=user_id)}: {formatted_quantity}
+   💰 {i18n.get_text("CART_PRICE_LABEL", user_id=user_id)}: {formatted_unit_price}
+   💵 {i18n.get_text("CART_SUBTOTAL_LABEL", user_id=user_id)}: {formatted_item_total}"""
                 
                 if i < len(cart_items):
                     message += "\n"
 
+            # Format total with RTL support
+            from src.utils.helpers import format_price
+            formatted_total = format_price(cart_total, user_id)
+            
             message += f"""
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-💸 <b>{i18n.get_text("CART_TOTAL", user_id=user_id).format(total=cart_total)}</b>
+💸 <b>{i18n.get_text("CART_TOTAL", user_id=user_id).format(total=formatted_total)}</b>
 
 🤔 {i18n.get_text("CART_WHAT_NEXT", user_id=user_id)}"""
 
@@ -1146,23 +1160,34 @@ class CartHandler:
                     address=cart_info.get('delivery_address')
                 ) + "\n"
             
-            message += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
             
             for i, item in enumerate(cart_items, 1):
                 item_total = item.get("unit_price", 0) * item.get("quantity", 1)
-                # Translate product name
-                from src.utils.helpers import translate_product_name
-                translated_product_name = translate_product_name(item.get('product_name', i18n.get_text('PRODUCT_UNKNOWN', user_id=user_id)), item.get('options', {}), user_id)
-                message += i18n.get_text("CART_ITEM_FORMAT", user_id=user_id).format(
-                    index=i,
-                    product_name=translated_product_name,
-                    quantity=item.get('quantity', 1),
-                    price=item.get('unit_price', 0),
-                    item_total=item_total
-                ) + "\n\n"
+                # Get localized product name
+                localized_product_name = self._get_localized_product_name(item, user_id)
+                
+                # Format prices and quantities with RTL support
+                from src.utils.helpers import format_price, format_quantity
+                formatted_unit_price = format_price(item.get('unit_price', 0), user_id)
+                formatted_item_total = format_price(item_total, user_id)
+                formatted_quantity = format_quantity(item.get('quantity', 1), user_id)
+                
+                message += f"""
+<b>{i}.</b> 📦 <b>{localized_product_name}</b>
+   🔢 {i18n.get_text("CART_QUANTITY_LABEL", user_id=user_id)}: {formatted_quantity}
+   💰 {i18n.get_text("CART_PRICE_LABEL", user_id=user_id)}: {formatted_unit_price}
+   💵 {i18n.get_text("CART_SUBTOTAL_LABEL", user_id=user_id)}: {formatted_item_total}
 
-            message += i18n.get_text("CART_TOTAL", user_id=user_id).format(total=cart_total) + "\n\n"
-            message += i18n.get_text("CONFIRM_ORDER_PROMPT", user_id=user_id)
+"""
+
+            # Format total with RTL support
+            from src.utils.helpers import format_price
+            formatted_total = format_price(cart_total, user_id)
+            
+            message += f"""
+💸 <b>{i18n.get_text("CART_TOTAL", user_id=user_id).format(total=formatted_total)}</b>
+
+🤔 {i18n.get_text("CONFIRM_ORDER_PROMPT", user_id=user_id)}"""
 
             await query.edit_message_text(
                 message,
@@ -1201,18 +1226,30 @@ class CartHandler:
             
             for i, item in enumerate(cart_items, 1):
                 item_total = item.get("unit_price", 0) * item.get("quantity", 1)
+                # Get localized product name
+                localized_product_name = self._get_localized_product_name(item, user_id)
+                
+                # Format prices and quantities with RTL support
+                from src.utils.helpers import format_price, format_quantity
+                formatted_unit_price = format_price(item.get('unit_price', 0), user_id)
+                formatted_item_total = format_price(item_total, user_id)
+                formatted_quantity = format_quantity(item.get('quantity', 1), user_id)
+                
                 confirmation_message += f"""
-<b>{i}.</b> 📦 <b>{item.get('product_name', i18n.get_text('PRODUCT_UNKNOWN', user_id=user_id))}</b>
-   🔢 {i18n.get_text("CART_QUANTITY_LABEL", user_id=user_id)}: {item.get('quantity', 1)}
-   💰 {i18n.get_text("CART_PRICE_LABEL", user_id=user_id)}: ₪{item.get('unit_price', 0):.2f}
-   💵 {i18n.get_text("CART_SUBTOTAL_LABEL", user_id=user_id)}: ₪{item_total:.2f}
+<b>{i}.</b> 📦 <b>{localized_product_name}</b>
+   🔢 {i18n.get_text("CART_QUANTITY_LABEL", user_id=user_id)}: {formatted_quantity}
+   💰 {i18n.get_text("CART_PRICE_LABEL", user_id=user_id)}: {formatted_unit_price}
+   💵 {i18n.get_text("CART_SUBTOTAL_LABEL", user_id=user_id)}: {formatted_item_total}
 
 """
 
+            # Format total with RTL support
+            from src.utils.helpers import format_price
+            formatted_total = format_price(cart_total, user_id)
+            
             confirmation_message += f"""
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-💸 <b>{i18n.get_text("CART_TOTAL", user_id=user_id).format(total=cart_total)}</b>
+💸 <b>{i18n.get_text("CART_TOTAL", user_id=user_id).format(total=formatted_total)}</b>
 
 🤔 {i18n.get_text("CONFIRM_ORDER_PROMPT", user_id=user_id)}"""
 
@@ -1229,3 +1266,27 @@ class CartHandler:
                 parse_mode="HTML",
                 reply_markup=self._get_back_to_cart_keyboard(user_id),
             )
+
+    def _get_localized_product_name(self, item: Dict, user_id: int) -> str:
+        """Get localized product name for display"""
+        try:
+            # Get user language
+            from src.utils.language_manager import language_manager
+            user_language = language_manager.get_user_language(user_id)
+            
+            # If we have multilingual fields in the item, use them
+            if user_language == "he" and item.get("name_he"):
+                return item["name_he"]
+            elif user_language == "en" and item.get("name_en"):
+                return item["name_en"]
+            
+            # Fallback to the old translation system
+            from src.utils.helpers import translate_product_name
+            return translate_product_name(
+                item.get('product_name', ''), 
+                item.get('options', {}), 
+                user_id
+            )
+        except Exception as e:
+            self.logger.error("Error getting localized product name: %s", e)
+            return item.get('product_name', 'Unknown Product')

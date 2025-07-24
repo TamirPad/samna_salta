@@ -1206,7 +1206,7 @@ def get_cart_items(telegram_id: int) -> list[dict]:
         telegram_id: Customer's Telegram ID
         
     Returns:
-        List of cart items with product information
+        List of cart items with product information including multilingual names
     """
     try:
         with ACIDTransactionManager.atomic_transaction("READ_COMMITTED") as session:
@@ -1226,7 +1226,7 @@ def get_cart_items(telegram_id: int) -> list[dict]:
                 logger.info("No active cart found for customer %d", telegram_id)
                 return []
 
-            # Get cart items with product information
+            # Get cart items with product information including multilingual fields
             cart_items = (
                 session.query(CartItem, Product)
                 .join(Product, CartItem.product_id == Product.id)
@@ -1240,12 +1240,16 @@ def get_cart_items(telegram_id: int) -> list[dict]:
                     "id": cart_item.id,
                     "product_id": cart_item.product_id,
                     "product_name": product.name,
+                    "name_en": product.name_en,  # Add English name
+                    "name_he": product.name_he,  # Add Hebrew name
                     "quantity": cart_item.quantity,
                     "unit_price": float(cart_item.unit_price),
                     "total_price": float(cart_item.unit_price * cart_item.quantity),
                     "options": cart_item.product_options or {},
                     "special_instructions": cart_item.special_instructions or "",
                     "product_description": product.description,
+                    "description_en": product.description_en,  # Add English description
+                    "description_he": product.description_he,  # Add Hebrew description
                     "product_image_url": product.image_url
                 }
                 items.append(item_data)

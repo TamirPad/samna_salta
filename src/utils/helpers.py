@@ -122,10 +122,14 @@ def is_hilbeh_available() -> bool:
 def translate_product_name(product_name: str, options: Optional[dict] = None, user_id: Optional[int] = None) -> str:
     """Translate a product name from database format to localized display name"""
     from src.utils.i18n import i18n
+    from src.utils.language_manager import language_manager
     
     # Handle None or empty input
     if not product_name:
         return ""
+    
+    # Get user language
+    user_language = language_manager.get_user_language(user_id) if user_id else "en"
     
     product_name_lower = product_name.lower()
     
@@ -135,15 +139,13 @@ def translate_product_name(product_name: str, options: Optional[dict] = None, us
             kubaneh_type = options["type"]
             try:
                 type_display = get_product_option_name("kubaneh", kubaneh_type, user_id)
-                return f"Kubaneh ({type_display})"
+                base_name = i18n.get_text("PRODUCT_KUBANEH", user_id=user_id) if user_language == "he" else "Kubaneh"
+                return f"{base_name} ({type_display})"
             except:
                 # Fallback if translation key doesn't exist
-                return f"Kubaneh ({kubaneh_type.title()})"
-        try:
-            return "Kubaneh"
-        except:
-            # Fallback to original name if translation fails
-            return product_name
+                base_name = i18n.get_text("PRODUCT_KUBANEH", user_id=user_id) if user_language == "he" else "Kubaneh"
+                return f"{base_name} ({kubaneh_type.title()})"
+        return i18n.get_text("PRODUCT_KUBANEH", user_id=user_id) if user_language == "he" else "Kubaneh"
     
     # Handle Samneh with type options
     elif "samneh" in product_name_lower:
@@ -151,15 +153,13 @@ def translate_product_name(product_name: str, options: Optional[dict] = None, us
             samneh_type = options["type"]
             try:
                 type_display = get_product_option_name("samneh", samneh_type, user_id)
-                return f"Samneh ({type_display})"
+                base_name = i18n.get_text("PRODUCT_SAMNEH", user_id=user_id) if user_language == "he" else "Samneh"
+                return f"{base_name} ({type_display})"
             except:
                 # Fallback if translation key doesn't exist
-                return f"Samneh ({samneh_type.title()})"
-        try:
-            return "Samneh"
-        except:
-            # Fallback to original name if translation fails
-            return product_name
+                base_name = i18n.get_text("PRODUCT_SAMNEH", user_id=user_id) if user_language == "he" else "Samneh"
+                return f"{base_name} ({samneh_type.title()})"
+        return i18n.get_text("PRODUCT_SAMNEH", user_id=user_id) if user_language == "he" else "Samneh"
     
     # Handle Red Bisbas with size options
     elif "red bisbas" in product_name_lower or "bisbas" in product_name_lower:
@@ -167,15 +167,13 @@ def translate_product_name(product_name: str, options: Optional[dict] = None, us
             size = options["size"]
             try:
                 size_display = get_product_size_name(size, user_id)
-                return f"Red Bisbas ({size_display})"
+                base_name = i18n.get_text("PRODUCT_RED_BISBAS", user_id=user_id) if user_language == "he" else "Red Bisbas"
+                return f"{base_name} ({size_display})"
             except:
                 # Fallback if translation key doesn't exist
-                return f"Red Bisbas ({size.title()})"
-        try:
-            return "Red Bisbas"
-        except:
-            # Fallback to original name if translation fails
-            return product_name
+                base_name = i18n.get_text("PRODUCT_RED_BISBAS", user_id=user_id) if user_language == "he" else "Red Bisbas"
+                return f"{base_name} ({size.title()})"
+        return i18n.get_text("PRODUCT_RED_BISBAS", user_id=user_id) if user_language == "he" else "Red Bisbas"
     
     # Handle Hilbeh with type options
     elif "hilbeh" in product_name_lower:
@@ -183,26 +181,32 @@ def translate_product_name(product_name: str, options: Optional[dict] = None, us
             hilbeh_type = options["type"]
             try:
                 type_display = get_product_option_name("hilbeh", hilbeh_type, user_id)
-                return f"Hilbeh ({type_display})"
+                base_name = i18n.get_text("PRODUCT_HILBEH", user_id=user_id) if user_language == "he" else "Hilbeh"
+                return f"{base_name} ({type_display})"
             except:
                 # Fallback if translation key doesn't exist
-                return f"Hilbeh ({hilbeh_type.title()})"
-        try:
-            return "Hilbeh"
-        except:
-            # Fallback to original name if translation fails
-            return product_name
+                base_name = i18n.get_text("PRODUCT_HILBEH", user_id=user_id) if user_language == "he" else "Hilbeh"
+                return f"{base_name} ({hilbeh_type.title()})"
+        return i18n.get_text("PRODUCT_HILBEH", user_id=user_id) if user_language == "he" else "Hilbeh"
     
     # Handle Hawaij products specifically
     elif "hawaij soup spice" in product_name_lower:
-        return "Hawaij for Soup"
+        return i18n.get_text("PRODUCT_HAWAIIJ_SOUP", user_id=user_id) if user_language == "he" else "Hawaij for Soup"
     
     elif "hawaij coffee spice" in product_name_lower:
-        return "Hawaij for Coffee"
+        return i18n.get_text("PRODUCT_HAWAIIJ_COFFEE", user_id=user_id) if user_language == "he" else "Hawaij for Coffee"
     
     # Handle White Coffee
     elif "white coffee" in product_name_lower:
-        return "White Coffee"
+        return i18n.get_text("PRODUCT_WHITE_COFFEE", user_id=user_id) if user_language == "he" else "White Coffee"
+    
+    # Handle Burekas
+    elif "burekas" in product_name_lower or "בורקס" in product_name:
+        return i18n.get_text("PRODUCT_BUREKAS_CHEESE", user_id=user_id) if user_language == "he" else "Cheese Burekas"
+    
+    # Handle Jachnun
+    elif "jachnun" in product_name_lower:
+        return i18n.get_text("PRODUCT_JACHNUN", user_id=user_id) if user_language == "he" else "Jachnun"
     
     # Handle other products
     else:
@@ -365,3 +369,36 @@ def get_business_info_for_customers(user_id: Optional[int] = None, compact: bool
     except Exception as e:
         logger.error(f"Error getting business info for customers: {e}")
         return ""
+
+def format_price(price: float, user_id: Optional[int] = None) -> str:
+    """Format price with proper RTL support for Hebrew users"""
+    from src.utils.language_manager import language_manager
+    
+    # Get user language
+    user_language = language_manager.get_user_language(user_id) if user_id else "en"
+    
+    # Format the price
+    formatted_price = f"₪{price:.2f}"
+    
+    # For Hebrew users, add a left-to-right mark to ensure proper display
+    if user_language == "he":
+        return f"\u200E{formatted_price}"
+    
+    return formatted_price
+
+
+def format_quantity(quantity: int, user_id: Optional[int] = None) -> str:
+    """Format quantity with proper RTL support for Hebrew users"""
+    from src.utils.language_manager import language_manager
+    
+    # Get user language
+    user_language = language_manager.get_user_language(user_id) if user_id else "en"
+    
+    # Format the quantity
+    formatted_quantity = str(quantity)
+    
+    # For Hebrew users, add a left-to-right mark to ensure proper display
+    if user_language == "he":
+        return f"\u200E{formatted_quantity}"
+    
+    return formatted_quantity
