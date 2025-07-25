@@ -142,7 +142,7 @@ class AdminHandler:
             elif "_page_" in data:
                 # Old format: admin_customers_page_0
                 page = int(data.split("_")[-1])
-                page_size = 20  # default
+                page_size = 5  # default
             else:
                 return
             await self._show_customers(query, page, page_size)
@@ -155,7 +155,7 @@ class AdminHandler:
                 page = int(parts[page_idx])
             elif "_page_" in data:
                 page = int(data.split("_")[-1])
-                page_size = 15  # default
+                page_size = 5  # default
             else:
                 return
             await self._show_all_orders(query, page, page_size)
@@ -168,7 +168,7 @@ class AdminHandler:
                 page = int(parts[page_idx])
             elif "_page_" in data:
                 page = int(data.split("_")[-1])
-                page_size = 15  # default
+                page_size = 5  # default
             else:
                 return
             await self._show_active_orders(query, page, page_size)
@@ -181,7 +181,7 @@ class AdminHandler:
                 page = int(parts[page_idx])
             elif "_page_" in data:
                 page = int(data.split("_")[-1])
-                page_size = 15  # default
+                page_size = 5  # default
             else:
                 return
             await self._show_completed_orders(query, page, page_size)
@@ -194,7 +194,7 @@ class AdminHandler:
                 page = int(parts[page_idx])
             elif "_page_" in data:
                 page = int(data.split("_")[-1])
-                page_size = 15  # default
+                page_size = 5  # default
             else:
                 return
             await self._show_pending_orders(query, page, page_size)
@@ -210,7 +210,7 @@ class AdminHandler:
                 page = int(parts[page_idx])
             elif "_page_" in data:
                 page = int(data.split("_")[-1])
-                page_size = 10  # default
+                page_size = 5  # default
             else:
                 return
             await self._show_all_products(query, page, page_size)
@@ -223,7 +223,7 @@ class AdminHandler:
                 page = int(parts[page_idx])
             elif "_page_" in data:
                 page = int(data.split("_")[-1])
-                page_size = 10  # default
+                page_size = 5  # default
             else:
                 return
             analytics_data = await self.admin_service.get_business_analytics()
@@ -808,7 +808,7 @@ class AdminHandler:
             text=report_text, parse_mode="HTML", reply_markup=reply_markup
         )
 
-    async def _show_customer_report(self, query: CallbackQuery, analytics_data: Dict, page: int = 0, page_size: int = 10) -> None:
+    async def _show_customer_report(self, query: CallbackQuery, analytics_data: Dict, page: int = 0, page_size: int = 5) -> None:
         user_id = query.from_user.id
         customers = analytics_data.get('customers', [])
 
@@ -878,7 +878,7 @@ class AdminHandler:
             
             # Add page size options
             page_size_row = []
-            page_sizes = [5, 10, 20, 50]
+            page_sizes = [5, 10, 15]
             
             for size in page_sizes:
                 if size != page_size and size <= total_customers:
@@ -1044,7 +1044,7 @@ class AdminHandler:
             text=report_text, parse_mode="HTML", reply_markup=reply_markup
         )
 
-    async def _show_pending_orders(self, query: CallbackQuery, page: int = 0, page_size: int = 15) -> None:
+    async def _show_pending_orders(self, query: CallbackQuery, page: int = 0, page_size: int = 5) -> None:
         """Show pending orders with pagination"""
         try:
             orders = await self.admin_service.get_pending_orders()
@@ -1110,7 +1110,7 @@ class AdminHandler:
             self.logger.error("💥 PENDING ORDERS ERROR: %s", e)
             await query.message.reply_text(i18n.get_text("PENDING_ORDERS_ERROR"))
 
-    async def _show_active_orders(self, query: CallbackQuery, page: int = 0, page_size: int = 15) -> None:
+    async def _show_active_orders(self, query: CallbackQuery, page: int = 0, page_size: int = 5) -> None:
         """Show active orders with pagination"""
         try:
             orders = await self.admin_service.get_active_orders()
@@ -1174,7 +1174,7 @@ class AdminHandler:
             self.logger.error("💥 ACTIVE ORDERS ERROR: %s", e)
             await query.message.reply_text(i18n.get_text("ACTIVE_ORDERS_ERROR"))
 
-    async def _show_all_orders(self, query: CallbackQuery, page: int = 0, page_size: int = 15) -> None:
+    async def _show_all_orders(self, query: CallbackQuery, page: int = 0, page_size: int = 5) -> None:
         """Show all orders with pagination"""
         try:
             orders = await self.admin_service.get_all_orders()
@@ -1237,7 +1237,7 @@ class AdminHandler:
             self.logger.error("💥 ALL ORDERS ERROR: %s", e)
             await query.message.reply_text(i18n.get_text("ALL_ORDERS_ERROR"))
 
-    async def _show_completed_orders(self, query: CallbackQuery, page: int = 0, page_size: int = 15) -> None:
+    async def _show_completed_orders(self, query: CallbackQuery, page: int = 0, page_size: int = 5) -> None:
         """Show completed (delivered) orders with pagination"""
         try:
             orders = await self.admin_service.get_completed_orders()
@@ -1338,7 +1338,7 @@ class AdminHandler:
         # Add page size options if enabled and there are items
         if show_page_size_options and total_items > 0:
             page_size_row = []
-            page_sizes = [10, 20, 50, 100]
+            page_sizes = [5, 10, 15]
             
             for size in page_sizes:
                 if size != items_per_page and size <= total_items:
@@ -1408,7 +1408,7 @@ class AdminHandler:
         
         return keyboard, page_info
 
-    async def _show_customers(self, query: CallbackQuery, page: int = 0, page_size: int = 20) -> None:
+    async def _show_customers(self, query: CallbackQuery, page: int = 0, page_size: int = 5) -> None:
         """Show customers with pagination"""
         try:
             customers = await self.admin_service.get_all_customers()
@@ -1887,7 +1887,7 @@ class AdminHandler:
             self.logger.error("Error showing products management: %s", e)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
 
-    async def _show_all_products(self, query: CallbackQuery, page: int = 0, page_size: int = 10) -> None:
+    async def _show_all_products(self, query: CallbackQuery, page: int = 0, page_size: int = 5) -> None:
         """Show all products for admin management with pagination"""
         try:
             user_id = query.from_user.id
