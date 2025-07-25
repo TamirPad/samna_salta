@@ -111,7 +111,7 @@ class NotificationService:
         
         items_text = ""
         for i, item in enumerate(order_data.get('items', []), 1):
-            item_total = item.get("price", 0) * item.get("quantity", 1)
+            item_total = item.get("unit_price", 0) * item.get("quantity", 1)
             
             # Use the new localization system
             from src.utils.language_manager import language_manager
