@@ -119,7 +119,9 @@ class AdminHandler:
             await query.message.reply_text(i18n.get_text("ADMIN_ACCESS_DENIED", user_id=user_id))
             return
 
-        if data == "admin_pending_orders":
+        if data == "admin_orders":
+            await self._show_orders_submenu(query)
+        elif data == "admin_pending_orders":
             await self._show_pending_orders(query)
         elif data == "admin_active_orders":
             await self._show_active_orders(query)
@@ -332,6 +334,9 @@ class AdminHandler:
         elif data == "admin_back":
             await self._show_admin_dashboard_from_callback(query)
             await query.answer()
+        elif data == "admin_back_to_orders":
+            await self._show_orders_submenu(query)
+            await query.answer()
         elif data == "admin_dashboard":
             await self._show_admin_dashboard_from_callback(query)
             await query.answer()
@@ -342,47 +347,37 @@ class AdminHandler:
             # 📋 Orders Section
             [
                 InlineKeyboardButton(
-                    i18n.get_text('ADMIN_PENDING_ORDERS', user_id=user_id), 
-                    callback_data="admin_pending_orders"
-                ),
-                InlineKeyboardButton(
-                    i18n.get_text('ADMIN_ACTIVE_ORDERS', user_id=user_id), 
-                    callback_data="admin_active_orders"
+                    i18n.get_text('ADMIN_ORDERS', user_id=user_id), 
+                    callback_data="admin_orders"
                 ),
             ],
+            # 👥 Customers Section
             [
-                InlineKeyboardButton(
-                    i18n.get_text('ADMIN_ALL_ORDERS', user_id=user_id), 
-                    callback_data="admin_all_orders"
-                ),
-                InlineKeyboardButton(
-                    i18n.get_text('ADMIN_COMPLETED_ORDERS', user_id=user_id), 
-                    callback_data="admin_completed_orders"
-                ),
-            ],
-            # 📊 Analytics & People Section  
-            [
-                InlineKeyboardButton(
-                    i18n.get_text('ADMIN_ANALYTICS', user_id=user_id), 
-                    callback_data="admin_analytics"
-                ),
                 InlineKeyboardButton(
                     i18n.get_text('ADMIN_CUSTOMERS', user_id=user_id), 
                     callback_data="admin_customers"
                 )
             ],
-            # 🍽️ Business Management Section
+            # 🍽️ Menu Management Section
             [
                 InlineKeyboardButton(
                     i18n.get_text('ADMIN_MENU_MANAGEMENT', user_id=user_id), 
                     callback_data="admin_menu_management"
                 )
             ],
+            # ⚙️ Business Settings Section
             [
                 InlineKeyboardButton(
                     i18n.get_text('ADMIN_BUSINESS_SETTINGS', user_id=user_id), 
                     callback_data="admin_business_settings"
                 )
+            ],
+            # 📊 Analytics Section
+            [
+                InlineKeyboardButton(
+                    i18n.get_text('ADMIN_ANALYTICS', user_id=user_id), 
+                    callback_data="admin_analytics"
+                ),
             ],
         ]
 
@@ -512,6 +507,68 @@ class AdminHandler:
                     e,
                     exc_info=True,
                 )
+
+    async def _show_orders_submenu(self, query: CallbackQuery) -> None:
+        """Show orders submenu with all order-related options"""
+        try:
+            self.logger.info("📋 LOADING ORDERS SUBMENU")
+            user_id = query.from_user.id
+            
+            # Get order statistics for the submenu
+            pending_orders = await self.admin_service.get_pending_orders()
+            active_orders = await self.admin_service.get_active_orders()
+            completed_orders = await self.admin_service.get_completed_orders()
+            today_orders = await self.admin_service.get_today_orders()
+            
+            text = f"""
+📋 <b>{i18n.get_text("ADMIN_ORDERS", user_id=user_id)}</b>
+
+📊 <b>{i18n.get_text("ADMIN_ORDER_STATS", user_id=user_id)}</b>
+🟡 {i18n.get_text("ADMIN_PENDING_COUNT", user_id=user_id).format(count=len(pending_orders))}
+🔵 {i18n.get_text("ADMIN_ACTIVE_COUNT", user_id=user_id).format(count=len(active_orders))}
+🟢 {i18n.get_text("ADMIN_COMPLETED_COUNT", user_id=user_id).format(count=len(completed_orders))}
+📅 {i18n.get_text("ADMIN_TOTAL_TODAY", user_id=user_id).format(count=len(today_orders))}
+
+{i18n.get_text("ADMIN_QUICK_ACTIONS", user_id=user_id)}
+            """.strip()
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text('ADMIN_PENDING_ORDERS', user_id=user_id), 
+                        callback_data="admin_pending_orders"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text('ADMIN_ACTIVE_ORDERS', user_id=user_id), 
+                        callback_data="admin_active_orders"
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text('ADMIN_ALL_ORDERS', user_id=user_id), 
+                        callback_data="admin_all_orders"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text('ADMIN_COMPLETED_ORDERS', user_id=user_id), 
+                        callback_data="admin_completed_orders"
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), 
+                        callback_data="admin_back"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(
+                text=text, parse_mode="HTML", reply_markup=reply_markup
+            )
+            
+        except Exception as e:
+            self.logger.error("💥 ORDERS SUBMENU ERROR: %s", e, exc_info=True)
+            await query.answer(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
 
     async def _show_analytics(self, query: CallbackQuery) -> None:
         """Show enhanced business analytics report"""
@@ -1000,7 +1057,7 @@ class AdminHandler:
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_ORDERS", user_id=user_id), callback_data="admin_back_to_orders"
                         )
                     ]
                 ]
@@ -1064,7 +1121,7 @@ class AdminHandler:
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_ORDERS", user_id=user_id), callback_data="admin_back_to_orders"
                         )
                     ]
                 ]
@@ -1100,7 +1157,7 @@ class AdminHandler:
                 pagination_keyboard.append(
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_ORDERS", user_id=user_id), callback_data="admin_back_to_orders"
                         )
                     ]
                 )
@@ -1128,7 +1185,7 @@ class AdminHandler:
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_ORDERS", user_id=user_id), callback_data="admin_back_to_orders"
                         )
                     ]
                 ]
@@ -1163,7 +1220,7 @@ class AdminHandler:
                 pagination_keyboard.append(
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_ORDERS", user_id=user_id), callback_data="admin_back_to_orders"
                         )
                     ]
                 )
@@ -1191,7 +1248,7 @@ class AdminHandler:
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_ORDERS", user_id=user_id), callback_data="admin_back_to_orders"
                         )
                     ]
                 ]
@@ -1226,7 +1283,7 @@ class AdminHandler:
                 pagination_keyboard.append(
                     [
                         InlineKeyboardButton(
-                            i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back"
+                            i18n.get_text("ADMIN_BACK_TO_ORDERS", user_id=user_id), callback_data="admin_back_to_orders"
                         )
                     ]
                 )
@@ -1544,7 +1601,7 @@ class AdminHandler:
         ])
         
         keyboard.append(
-            [InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_back")]
+            [InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_ORDERS", user_id=user_id), callback_data="admin_back_to_orders")]
         )
         return keyboard
 
