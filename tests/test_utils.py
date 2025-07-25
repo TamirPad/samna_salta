@@ -93,14 +93,14 @@ class TestHelpers:
     def test_translate_product_name_hebrew(self, mock_i18n):
         """Test product name translation to Hebrew"""
         mock_i18n.get_text.side_effect = lambda key, user_id=None: {
-            "PRODUCT_KUBANEH_CLASSIC": "כובאנה",
+            "PRODUCT_KUBANEH_CLASSIC": "קובנה",
             "KUBANEH_CLASSIC": "קלאסי",
-            "KUBANEH_DISPLAY_NAME": "כובאנה ({type})"
+            "KUBANEH_DISPLAY_NAME": "קובנה ({type})"
         }.get(key, key)
         
         result = translate_product_name("kubaneh", user_id=123456789)
         
-        assert "כובאנה" in result
+        assert "קובנה" in result
 
     def test_translate_product_name_unknown_product(self, mock_i18n):
         """Test product name translation for unknown product"""
@@ -456,14 +456,14 @@ class TestUtilsIntegration:
         SimpleCache().clear()
         
         mock_i18n.get_text.side_effect = lambda key, user_id=None: {
-            "PRODUCT_KUBANEH_CLASSIC": "כובאנה",
+            "PRODUCT_KUBANEH_CLASSIC": "קובנה",
             "KUBANEH_CLASSIC": "קלאסי",
-            "KUBANEH_DISPLAY_NAME": "כובאנה ({type})"
+            "KUBANEH_DISPLAY_NAME": "קובנה ({type})"
         }.get(key, key)
         
         # Test product translation
         product_name = translate_product_name("kubaneh", user_id=123456789)
-        assert "כובאנה" in product_name
+        assert "קובנה" in product_name
         
         # Test category translation
         category_name = translate_category_name("bread", user_id=123456789)

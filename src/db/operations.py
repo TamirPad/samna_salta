@@ -578,12 +578,48 @@ def init_default_products():
             logger.info("Products already exist, skipping initialization")
             return
 
-        # First, create categories with image URLs
+        # First, create categories with image URLs and Hebrew names
         categories_data = [
-            {"name": "bread", "description": "Traditional breads", "display_order": 1, "image_url": "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&h=600&fit=crop"},
-            {"name": "spread", "description": "Traditional spreads and condiments", "display_order": 2, "image_url": "https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=800&h=600&fit=crop"},
-            {"name": "spice", "description": "Traditional spice blends", "display_order": 3, "image_url": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop"},
-            {"name": "beverage", "description": "Traditional beverages", "display_order": 4, "image_url": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&h=600&fit=crop"},
+            {
+                "name": "bread", 
+                "name_he": "מאפים",
+                "name_en": "Bread",
+                "description": "Traditional breads", 
+                "description_he": "לחמים מסורתיים",
+                "description_en": "Traditional breads",
+                "display_order": 1, 
+                "image_url": "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&h=600&fit=crop"
+            },
+            {
+                "name": "spread", 
+                "name_he": "ממרח",
+                "name_en": "Spread",
+                "description": "Traditional spreads and condiments", 
+                "description_he": "ממרחים ותבלינים מסורתיים",
+                "description_en": "Traditional spreads and condiments",
+                "display_order": 2, 
+                "image_url": "https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=800&h=600&fit=crop"
+            },
+            {
+                "name": "spice", 
+                "name_he": "תבלין",
+                "name_en": "Spice",
+                "description": "Traditional spice blends", 
+                "description_he": "תערובות תבלינים מסורתיות",
+                "description_en": "Traditional spice blends",
+                "display_order": 3, 
+                "image_url": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop"
+            },
+            {
+                "name": "beverage", 
+                "name_he": "משקה",
+                "name_en": "Beverage",
+                "description": "Traditional beverages", 
+                "description_he": "משקאות מסורתיים",
+                "description_en": "Traditional beverages",
+                "display_order": 4, 
+                "image_url": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&h=600&fit=crop"
+            },
         ]
         
         # Create categories and store them in a dict for easy lookup
@@ -598,54 +634,82 @@ def init_default_products():
                 session.flush()  # Get the ID
                 categories[cat_data["name"]] = category
 
-        # Default products configuration with image URLs
+        # Default products configuration with image URLs and Hebrew names
         products = [
             {
                 "name": "Kubaneh",
+                "name_he": "קובנה",
+                "name_en": "Kubaneh",
                 "category_id": categories["bread"].id,
                 "description": "Traditional Yemenite bread",
+                "description_he": "לחם תימני מסורתי",
+                "description_en": "Traditional Yemenite bread",
                 "price": 25.00,
                 "image_url": "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&h=600&fit=crop",
             },
             {
                 "name": "Samneh",
+                "name_he": "סמנה",
+                "name_en": "Samneh",
                 "category_id": categories["spread"].id,
                 "description": "Traditional clarified butter",
+                "description_he": "חמאה מזוקקת מסורתית",
+                "description_en": "Traditional clarified butter",
                 "price": 15.00,
                 "image_url": "https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=800&h=600&fit=crop",
             },
             {
                 "name": "Red Bisbas",
+                "name_he": "בסבס אדום",
+                "name_en": "Red Bisbas",
                 "category_id": categories["spice"].id,
                 "description": "Traditional Yemenite spice blend",
+                "description_he": "תערובת תבלינים תימנית מסורתית",
+                "description_en": "Traditional Yemenite spice blend",
                 "price": 12.00,
                 "image_url": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop",
             },
             {
                 "name": "Hawaij soup spice",
+                "name_he": "חוואיג' למרק",
+                "name_en": "Hawaij for Soup",
                 "category_id": categories["spice"].id,
                 "description": "Traditional soup spice blend",
+                "description_he": "תערובת תבלינים למרק",
+                "description_en": "Traditional soup spice blend",
                 "price": 8.00,
                 "image_url": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop",
             },
             {
                 "name": "Hawaij coffee spice",
+                "name_he": "חוואיג' לקפה",
+                "name_en": "Hawaij for Coffee",
                 "category_id": categories["spice"].id,
                 "description": "Traditional coffee spice blend",
+                "description_he": "תערובת תבלינים לקפה",
+                "description_en": "Traditional coffee spice blend",
                 "price": 8.00,
                 "image_url": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop",
             },
             {
                 "name": "White coffee",
+                "name_he": "קפה לבן",
+                "name_en": "White Coffee",
                 "category_id": categories["beverage"].id,
                 "description": "Traditional Yemenite white coffee",
+                "description_he": "קפה לבן תימני מסורתי",
+                "description_en": "Traditional Yemenite white coffee",
                 "price": 10.00,
                 "image_url": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&h=600&fit=crop",
             },
             {
                 "name": "Hilbeh",
+                "name_he": "חילבה",
+                "name_en": "Hilbeh",
                 "category_id": categories["spread"].id,
                 "description": "Traditional fenugreek spread (available Wed-Fri only)",
+                "description_he": "ממרח חילבה מסורתי (זמין בימים רביעי-שישי בלבד)",
+                "description_en": "Traditional fenugreek spread (available Wed-Fri only)",
                 "price": 18.00,
                 "image_url": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop",
             },

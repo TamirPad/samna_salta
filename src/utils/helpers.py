@@ -272,10 +272,7 @@ def get_dynamic_welcome_message(user_id: Optional[int] = None) -> str:
         # Format the template with the business name
         welcome_message = welcome_template.format(business_name=business_name)
         
-        # Add business information if available
-        business_info = get_business_info_for_customers(user_id)
-        if business_info:
-            welcome_message += f"\n\n{business_info}"
+        # Note: Removed business_info addition to avoid showing email/phone in welcome message
         
         return welcome_message
         
@@ -304,10 +301,7 @@ def get_dynamic_welcome_for_returning_users(user_id: Optional[int] = None) -> st
         # Format the template with the business name
         welcome_message = welcome_template.format(business_name=business_name)
         
-        # Add business information if available (shorter version for returning users)
-        business_info = get_business_info_for_customers(user_id, compact=True)
-        if business_info:
-            welcome_message += f"\n\n{business_info}"
+        # Note: Removed business_info addition to avoid showing email/phone in welcome message
         
         return welcome_message
         

@@ -165,17 +165,25 @@ class CartHandler:
                 formatted_total = format_price(cart_total, user_id)
                 formatted_item_count = format_quantity(item_count, user_id)
                 
-                message = f"""
-✅ <b>{i18n.get_text("CART_SUCCESS_TITLE", user_id=user_id)}</b>
+                from src.utils.text_formatter import center_text
+                
+                from src.utils.text_formatter import format_title
+                success_title = format_title(f'✅ {i18n.get_text("CART_SUCCESS_TITLE", user_id=user_id)}')
+                product_name = f'📦 <b>{localized_product_name}</b>'
+                added_success = i18n.get_text("CART_ADDED_SUCCESSFULLY", user_id=user_id)
+                items_count = f'🛒 {i18n.get_text("CART_ITEMS_COUNT", user_id=user_id)}: {formatted_item_count}'
+                total_text = f'💰 {i18n.get_text("CART_TOTAL", user_id=user_id).format(total=formatted_total)}'
+                what_next = f'🎯 {i18n.get_text("CART_WHAT_NEXT_QUESTION", user_id=user_id)}'
+                
+                message = f"""{success_title}
 
-📦 <b>{localized_product_name}</b>
-{i18n.get_text("CART_ADDED_SUCCESSFULLY", user_id=user_id)}
+{product_name}
+{added_success}
 
-🛒 {i18n.get_text("CART_ITEMS_COUNT", user_id=user_id)}: {formatted_item_count}
-💰 {i18n.get_text("CART_TOTAL", user_id=user_id).format(total=formatted_total)}
+{items_count}
+{total_text}
 
-🎯 {i18n.get_text("CART_WHAT_NEXT_QUESTION", user_id=user_id)}
-                """.strip()
+{what_next}"""
 
                 await self._safe_edit_message(
                     query,
@@ -210,13 +218,18 @@ class CartHandler:
             cart_items = cart_service.get_items(user_id)
 
             if not cart_items:
-                empty_cart_message = f"""
-🛒 <b>{i18n.get_text("CART_VIEW_TITLE", user_id=user_id)}</b>
+                from src.utils.text_formatter import center_text
+                
+                from src.utils.text_formatter import format_title
+                cart_title = format_title(f'🛒 {i18n.get_text("CART_VIEW_TITLE", user_id=user_id)}')
+                empty_ready = f'🤷‍♀️ {i18n.get_text("CART_EMPTY_READY", user_id=user_id)}'
+                browse_suggestion = f'🍽️ {i18n.get_text("BROWSE_MENU_SUGGESTION", user_id=user_id)}'
+                
+                empty_cart_message = f"""{cart_title}
 
-🤷‍♀️ {i18n.get_text("CART_EMPTY_READY", user_id=user_id)}
+{empty_ready}
 
-🍽️ {i18n.get_text("BROWSE_MENU_SUGGESTION", user_id=user_id)}
-                """.strip()
+{browse_suggestion}"""
 
                 await query.edit_message_text(
                     empty_cart_message,
@@ -228,11 +241,11 @@ class CartHandler:
             # Calculate total
             cart_total = cart_service.calculate_total(cart_items)
 
-            # Build beautiful cart display with clean styling
-            message = f"""
-🛒 <b>{i18n.get_text("CART_VIEW_TITLE", user_id=user_id)}</b>
-
-"""
+            from src.utils.text_formatter import format_title
+            
+            # Build beautiful cart display with centering
+            message = format_title(f'🛒 {i18n.get_text("CART_VIEW_TITLE", user_id=user_id)}')
+            message += "\n\n"
             
             for i, item in enumerate(cart_items, 1):
                 item_total = item.get("unit_price", 0) * item.get("quantity", 1)
@@ -245,11 +258,11 @@ class CartHandler:
                 formatted_item_total = format_price(item_total, user_id)
                 formatted_quantity = format_quantity(item.get('quantity', 1), user_id)
                 
-                message += f"""
-<b>{i}.</b> 📦 <b>{localized_product_name}</b>
-   🔢 {i18n.get_text("CART_QUANTITY_LABEL", user_id=user_id)}: {formatted_quantity}
-   💰 {i18n.get_text("CART_PRICE_LABEL", user_id=user_id)}: {formatted_unit_price}
-   💵 {i18n.get_text("CART_SUBTOTAL_LABEL", user_id=user_id)}: {formatted_item_total}"""
+                item_text = f"""<b>{i}.</b> 📦 <b>{localized_product_name}</b>
+🔢 {i18n.get_text("CART_QUANTITY_LABEL", user_id=user_id)}: {formatted_quantity}
+💰 {i18n.get_text("CART_PRICE_LABEL", user_id=user_id)}: {formatted_unit_price}
+💵 {i18n.get_text("CART_SUBTOTAL_LABEL", user_id=user_id)}: {formatted_item_total}"""
+                message += f"\n{item_text}\n"
                 
                 if i < len(cart_items):
                     message += "\n"
@@ -258,11 +271,11 @@ class CartHandler:
             from src.utils.helpers import format_price
             formatted_total = format_price(cart_total, user_id)
             
-            message += f"""
-
-💸 <b>{i18n.get_text("CART_TOTAL", user_id=user_id).format(total=formatted_total)}</b>
-
-🤔 {i18n.get_text("CART_WHAT_NEXT", user_id=user_id)}"""
+            from src.utils.text_formatter import format_title
+            total_text = format_title(f'💸 {i18n.get_text("CART_TOTAL", user_id=user_id).format(total=formatted_total)}')
+            what_next_text = f'🤔 {i18n.get_text("CART_WHAT_NEXT", user_id=user_id)}'
+            message += f"\n\n{total_text}"
+            message += f"\n\n{what_next_text}"
 
             await query.edit_message_text(
                 message,
@@ -838,12 +851,15 @@ class CartHandler:
                 if product:
                     return {
                         "product_id": product.id,
-                        "display_name": product.name,
+                        "display_name": product.name,  # This will be localized later in the process
+                        "name_en": product.name_en,
+                        "name_he": product.name_he,
                         "options": {}
                     }
             
             # Handle legacy product option patterns (from sub-menus)
             # These map to specific product variants with options
+            # Note: display_name will be localized later in the process
             legacy_product_mapping = {
                 # Kubaneh options - all map to product_id 1 with different types
                 "kubaneh_classic": {"product_id": 1, "display_name": "Kubaneh", "options": {"type": "classic"}},
@@ -886,6 +902,7 @@ class CartHandler:
                     product_type = parts[1]
                     
                     # Simple mapping for basic products without options
+                    # Note: display_name will be localized later in the process
                     basic_product_mapping = {
                         "hawaij": {"product_id": 4, "display_name": "Hawaij for Soup", "options": {}},
                         "white": {"product_id": 6, "display_name": "White Coffee", "options": {}},
@@ -982,13 +999,11 @@ class CartHandler:
         return InlineKeyboardMarkup(keyboard)
 
     def _get_simplified_cart_keyboard(self, cart_items: List[Dict], user_id: int = None) -> InlineKeyboardMarkup:
-        """Get simplified cart keyboard with Edit Cart button"""
+        """Get simplified cart keyboard with Edit Cart button and each button on its own line"""
         keyboard = [
             [InlineKeyboardButton(i18n.get_text("EDIT_CART", user_id=user_id), callback_data="cart_edit_mode")],
-            [
-                InlineKeyboardButton(i18n.get_text("CLEAR_CART", user_id=user_id), callback_data="cart_clear_confirm"),
-                InlineKeyboardButton(i18n.get_text("CHECKOUT", user_id=user_id), callback_data="cart_checkout"),
-            ],
+            [InlineKeyboardButton(i18n.get_text("CLEAR_CART", user_id=user_id), callback_data="cart_clear_confirm")],
+            [InlineKeyboardButton(i18n.get_text("CHECKOUT", user_id=user_id), callback_data="cart_checkout")],
             [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main")],
         ]
         return InlineKeyboardMarkup(keyboard)
@@ -1055,12 +1070,10 @@ class CartHandler:
         return InlineKeyboardMarkup(keyboard)
 
     def _get_cart_actions_keyboard(self, user_id: int = None) -> InlineKeyboardMarkup:
-        """Get keyboard for cart actions"""
+        """Get keyboard for cart actions with each button on its own line"""
         keyboard = [
-            [
-                InlineKeyboardButton(i18n.get_text("CLEAR_CART", user_id=user_id), callback_data="cart_clear_confirm"),
-                InlineKeyboardButton(i18n.get_text("CHECKOUT", user_id=user_id), callback_data="cart_checkout"),
-            ],
+            [InlineKeyboardButton(i18n.get_text("CLEAR_CART", user_id=user_id), callback_data="cart_clear_confirm")],
+            [InlineKeyboardButton(i18n.get_text("CHECKOUT", user_id=user_id), callback_data="cart_checkout")],
             [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main")],
         ]
         return InlineKeyboardMarkup(keyboard)
@@ -1087,44 +1100,36 @@ class CartHandler:
         return InlineKeyboardMarkup(keyboard)
 
     def _get_delivery_method_keyboard(self, user_id: int = None) -> InlineKeyboardMarkup:
-        """Get keyboard for delivery method selection"""
+        """Get keyboard for delivery method selection with each button on its own line"""
         keyboard = [
-            [
-                InlineKeyboardButton(get_delivery_method_name("pickup", user_id), callback_data="delivery_pickup"),
-                InlineKeyboardButton(get_delivery_method_name("delivery", user_id), callback_data="delivery_delivery"),
-            ],
+            [InlineKeyboardButton(get_delivery_method_name("pickup", user_id), callback_data="delivery_pickup")],
+            [InlineKeyboardButton(get_delivery_method_name("delivery", user_id), callback_data="delivery_delivery")],
             [InlineKeyboardButton(i18n.get_text("BACK_TO_CART", user_id=user_id), callback_data="cart_view")],
         ]
         return InlineKeyboardMarkup(keyboard)
 
     def _get_delivery_address_choice_keyboard(self, user_id: int = None) -> InlineKeyboardMarkup:
-        """Get keyboard for delivery address choice (use saved or enter new)"""
+        """Get keyboard for delivery address choice with each button on its own line"""
         keyboard = [
-            [
-                InlineKeyboardButton(i18n.get_text("USE_SAVED_ADDRESS", user_id=user_id), callback_data="delivery_address_use_saved"),
-                InlineKeyboardButton(i18n.get_text("ENTER_NEW_ADDRESS", user_id=user_id), callback_data="delivery_address_new_address"),
-            ],
+            [InlineKeyboardButton(i18n.get_text("USE_SAVED_ADDRESS", user_id=user_id), callback_data="delivery_address_use_saved")],
+            [InlineKeyboardButton(i18n.get_text("ENTER_NEW_ADDRESS", user_id=user_id), callback_data="delivery_address_new_address")],
             [InlineKeyboardButton(i18n.get_text("BACK_TO_CART", user_id=user_id), callback_data="cart_view")],
         ]
         return InlineKeyboardMarkup(keyboard)
 
     def _get_order_confirmation_keyboard(self, user_id: int = None) -> InlineKeyboardMarkup:
-        """Get keyboard for order confirmation"""
+        """Get keyboard for order confirmation with each button on its own line"""
         keyboard = [
-            [
-                InlineKeyboardButton(i18n.get_text("CONFIRM_ORDER", user_id=user_id), callback_data="confirm_order"),
-                InlineKeyboardButton(i18n.get_text("CANCEL", user_id=user_id), callback_data="cart_view"),
-            ],
+            [InlineKeyboardButton(i18n.get_text("CONFIRM_ORDER", user_id=user_id), callback_data="confirm_order")],
+            [InlineKeyboardButton(i18n.get_text("CANCEL", user_id=user_id), callback_data="cart_view")],
         ]
         return InlineKeyboardMarkup(keyboard)
 
     def _get_order_success_keyboard(self, user_id: int = None) -> InlineKeyboardMarkup:
-        """Get keyboard for successful order"""
+        """Get keyboard for successful order with each button on its own line"""
         keyboard = [
-            [
-                InlineKeyboardButton(i18n.get_text("NEW_ORDER", user_id=user_id), callback_data="menu_main"),
-                InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main"),
-            ],
+            [InlineKeyboardButton(i18n.get_text("NEW_ORDER", user_id=user_id), callback_data="menu_main")],
+            [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main")],
         ]
         return InlineKeyboardMarkup(keyboard)
 

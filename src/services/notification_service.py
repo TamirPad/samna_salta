@@ -112,9 +112,26 @@ class NotificationService:
         items_text = ""
         for i, item in enumerate(order_data.get('items', []), 1):
             item_total = item.get("price", 0) * item.get("quantity", 1)
-            from src.utils.helpers import translate_product_name
-            translated_product_name = translate_product_name(item.get('product_name', 'Unknown'), item.get('options', {}), user_id)
-            items_text += f"{i}. {translated_product_name} x{item.get('quantity', 1)} - 💰 ₪{item_total:.2f}\n"
+            
+            # Use the new localization system
+            from src.utils.language_manager import language_manager
+            from src.db.operations import get_product_by_id, get_localized_name
+            
+            # Get localized product name
+            product_id = item.get('product_id')
+            if product_id:
+                product = get_product_by_id(product_id)
+                if product:
+                    user_language = language_manager.get_user_language(user_id) if user_id else "en"
+                    localized_product_name = get_localized_name(product, user_language)
+                else:
+                    localized_product_name = item.get('product_name', 'Unknown')
+            else:
+                # Fallback to old translation system for legacy data
+                from src.utils.helpers import translate_product_name
+                localized_product_name = translate_product_name(item.get('product_name', 'Unknown'), item.get('options', {}), user_id)
+            
+            items_text += f"{i}. {localized_product_name} x{item.get('quantity', 1)} - 💰 ₪{item_total:.2f}\n"
         
         # Format delivery info
         delivery_method = order_data.get('delivery_method', 'Unknown').title()

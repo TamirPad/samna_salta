@@ -169,7 +169,8 @@ class MenuHandler:
         """Show the main menu"""
         self.logger.debug("📋 SHOWING: Main menu")
         user_id = query.from_user.id
-        text = i18n.get_text("MENU_PROMPT", user_id=user_id)
+        from src.utils.text_formatter import format_title
+        text = format_title(i18n.get_text("MENU_PROMPT", user_id=user_id))
         reply_markup = get_dynamic_main_menu_keyboard(user_id)
         await self._safe_edit_message(query, text, reply_markup, "HTML")
 
@@ -191,8 +192,10 @@ class MenuHandler:
             else:
                 category_display_name = translate_category_name(category, user_id)
             
+            from src.utils.text_formatter import format_title
+            
             if not products:
-                text = i18n.get_text("CATEGORY_EMPTY", user_id=user_id).format(category=category_display_name)
+                text = format_title(i18n.get_text("CATEGORY_EMPTY", user_id=user_id).format(category=category_display_name))
                 keyboard = [
                     [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")]
                 ]
@@ -200,9 +203,9 @@ class MenuHandler:
                 await self._safe_edit_message(query, text, reply_markup, "HTML")
                 return
             
-            text = i18n.get_text("CATEGORY_TITLE", user_id=user_id).format(
+            text = format_title(i18n.get_text("CATEGORY_TITLE", user_id=user_id).format(
                 category=category_display_name, count=len(products)
-            )
+            ))
             reply_markup = get_category_menu_keyboard(category, user_id)
             await self._safe_edit_message(query, text, reply_markup, "HTML")
             
@@ -233,11 +236,23 @@ class MenuHandler:
             category_name = product.category or "other"
             image_url = get_product_image(product.image_url, category_name)
             
-            # Format product details with better spacing
-            text = i18n.get_text("PRODUCT_DETAILS_TITLE", user_id=user_id).format(name=product.name)
-            text += f"\n\n📄 <b>{i18n.get_text('PRODUCT_DESCRIPTION', user_id=user_id)}:</b>\n{product.description or i18n.get_text('NO_DESCRIPTION', user_id=user_id)}"
-            text += f"\n\n <b>{i18n.get_text('PRODUCT_PRICE', user_id=user_id)}:</b> ₪{product.price:.2f}"
-            text += f"\n📂 <b>{i18n.get_text('PRODUCT_CATEGORY', user_id=user_id)}:</b> {translate_category_name(product.category, user_id) if product.category else i18n.get_text('UNCATEGORIZED', user_id=user_id)}"
+            # Get user language for localization
+            user_language = language_manager.get_user_language(user_id)
+            
+            # Get localized product name and description
+            localized_name = get_localized_name(product, user_language)
+            localized_description = get_localized_description(product, user_language)
+            
+            from src.utils.text_formatter import format_product_info
+            
+            # Format product details with centering
+            category_name = translate_category_name(product.category, user_id) if product.category else i18n.get_text('UNCATEGORIZED', user_id=user_id)
+            text = format_product_info(
+                name=localized_name,
+                description=localized_description or i18n.get_text('NO_DESCRIPTION', user_id=user_id),
+                price=product.price,
+                category=category_name
+            )
             
             # Create keyboard with add to cart and back options
             keyboard = [

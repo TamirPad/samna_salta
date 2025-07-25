@@ -62,13 +62,13 @@ class OnboardingHandler:
                 if self._is_customer_profile_complete(existing_customer):
                     # Welcome back existing customer with beautiful main page
                     user_id = user.id
-                    welcome_message = f"""
-🌟 <b>{get_dynamic_welcome_for_returning_users(user_id=user_id)}</b>
+                    from src.utils.text_formatter import format_title
+                    
+                    welcome_message = f"""{format_title(f'🌟 {get_dynamic_welcome_for_returning_users(user_id=user_id)}')}
 
-👋 <b>{i18n.get_text('WELCOME_BACK', user_id=user_id).format(name=existing_customer.name)}</b>
+{format_title(f'👋 {i18n.get_text("WELCOME_BACK", user_id=user_id).format(name=existing_customer.name)}')}
 
-🍽️ <b>{i18n.get_text('WHAT_TO_ORDER_TODAY', user_id=user_id)}</b>
-                    """.strip()
+{format_title(f'🍽️ {i18n.get_text("WHAT_TO_ORDER_TODAY", user_id=user_id)}')}"""
                     await update.message.reply_text(
                         welcome_message,
                         reply_markup=self._get_main_page_keyboard(user_id),
@@ -87,13 +87,11 @@ class OnboardingHandler:
 
             # Start onboarding for new customer or incomplete profile with beautiful language selection
             user_id = user.id
-            welcome_text = f"""
-🎉 <b>{get_dynamic_welcome_message(user_id=user_id)}</b>
+            welcome_text = f"""{format_title(f'🎉 {get_dynamic_welcome_message(user_id=user_id)}')}
 
-🌟 <b>{i18n.get_text("WELCOME_HELP_MESSAGE", user_id=user_id)}</b>
+{format_title(f'🌟 {i18n.get_text("WELCOME_HELP_MESSAGE", user_id=user_id)}')}
 
-🌍 <b>{i18n.get_text("SELECT_LANGUAGE_PROMPT", user_id=user_id)}</b>
-            """.strip()
+{format_title(f'🌍 {i18n.get_text("SELECT_LANGUAGE_PROMPT", user_id=user_id)}')}"""
 
             await update.message.reply_text(
                 welcome_text,
@@ -383,30 +381,28 @@ class OnboardingHandler:
         return InlineKeyboardMarkup(keyboard)
 
     def _get_main_page_keyboard(self, user_id: int = None):
-        """Get professional main page keyboard with beautiful icons and layout"""
+        """Get professional main page keyboard with each button on its own line"""
         keyboard = [
-            # Main Actions Row
-            [
-                InlineKeyboardButton(
-                    i18n.get_text('BUTTON_MENU', user_id=user_id), 
-                    callback_data="main_menu"
-                ),
-                InlineKeyboardButton(
-                    i18n.get_text('BUTTON_MY_INFO', user_id=user_id), 
-                    callback_data="main_my_info"
-                ),
-            ],
-            # Orders Tracking Row
-            [
-                InlineKeyboardButton(
-                    i18n.get_text('BUTTON_ACTIVE_ORDERS', user_id=user_id), 
-                    callback_data="main_active_orders"
-                ),
-                InlineKeyboardButton(
-                    i18n.get_text('BUTTON_COMPLETED_ORDERS', user_id=user_id), 
-                    callback_data="main_completed_orders"
-                ),
-            ],
+            # Menu button
+            [InlineKeyboardButton(
+                i18n.get_text('BUTTON_MENU', user_id=user_id), 
+                callback_data="main_menu"
+            )],
+            # My Profile button
+            [InlineKeyboardButton(
+                i18n.get_text('BUTTON_MY_INFO', user_id=user_id), 
+                callback_data="main_my_info"
+            )],
+            # Track Orders button
+            [InlineKeyboardButton(
+                i18n.get_text('BUTTON_TRACK_ORDERS', user_id=user_id), 
+                callback_data="main_track_orders"
+            )],
+            # Contact Us button
+            [InlineKeyboardButton(
+                i18n.get_text('BUTTON_CONTACT_US', user_id=user_id), 
+                callback_data="main_contact_us"
+            )],
         ]
         return InlineKeyboardMarkup(keyboard)
 
@@ -427,6 +423,10 @@ class OnboardingHandler:
                 await self._show_menu(query)
             elif data == "main_page":
                 await self._show_main_page(query)
+            elif data == "main_track_orders":
+                await self._show_track_orders(query)
+            elif data == "main_contact_us":
+                await self._show_contact_us(query)
             elif data == "main_active_orders":
                 await self._show_customer_active_orders(query)
             elif data == "main_completed_orders":
@@ -470,12 +470,6 @@ class OnboardingHandler:
 
 💬 {i18n.get_text('CONTACT_SUPPORT_FOR_UPDATES', user_id=user_id)}
                 """.strip()
-                
-                # Add business contact information
-                from src.utils.helpers import get_business_info_for_customers
-                business_info = get_business_info_for_customers(user_id, compact=True)
-                if business_info:
-                    info_text += f"\n\n{i18n.get_text('BUSINESS_CONTACT_INFO', user_id=user_id)}\n{business_info}"
             else:
                 info_text = i18n.get_text("USER_INFO_NOT_FOUND", user_id=user_id)
 
@@ -747,6 +741,39 @@ class OnboardingHandler:
                 reply_markup=self._get_back_to_main_keyboard(user_id)
             )
 
+    async def _show_track_orders(self, query: CallbackQuery):
+        """Show track orders interface with options for active and completed orders"""
+        try:
+            user_id = query.from_user.id
+            
+            text = i18n.get_text("TRACK_ORDERS_TITLE", user_id=user_id)
+            keyboard = [
+                [InlineKeyboardButton(
+                    i18n.get_text("BUTTON_ACTIVE_ORDERS", user_id=user_id), 
+                    callback_data="main_active_orders"
+                )],
+                [InlineKeyboardButton(
+                    i18n.get_text("BUTTON_COMPLETED_ORDERS", user_id=user_id), 
+                    callback_data="main_completed_orders"
+                )],
+                [InlineKeyboardButton(
+                    i18n.get_text("BACK_TO_MAIN", user_id=user_id), 
+                    callback_data="main_page"
+                )],
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(
+                text, parse_mode="HTML", reply_markup=reply_markup
+            )
+            
+        except Exception as e:
+            self.logger.error("Error showing track orders: %s", e)
+            await query.edit_message_text(
+                i18n.get_text("CUSTOMER_ORDERS_ERROR", user_id=user_id),
+                reply_markup=self._get_back_to_main_keyboard(user_id)
+            )
+
     async def _show_customer_order_details(self, query: CallbackQuery):
         """Show details for a specific customer order"""
         try:
@@ -816,6 +843,36 @@ class OnboardingHandler:
             self.logger.error("Error showing customer order details: %s", e)
             await query.edit_message_text(
                 i18n.get_text("CUSTOMER_ORDERS_ERROR", user_id=user_id),
+                reply_markup=self._get_back_to_main_keyboard(user_id)
+            )
+
+    async def _show_contact_us(self, query: CallbackQuery):
+        """Show business contact information"""
+        try:
+            user_id = query.from_user.id
+            
+            # Get business contact information from settings
+            from src.utils.helpers import get_business_info_for_customers
+            business_info = get_business_info_for_customers(user_id, compact=False)
+            
+            if business_info:
+                text = f"{i18n.get_text('CONTACT_US_TITLE', user_id=user_id)}\n\n{business_info}"
+            else:
+                text = i18n.get_text("CONTACT_INFO_NOT_AVAILABLE", user_id=user_id)
+            
+            keyboard = [
+                [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="main_page")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                text, parse_mode="HTML", reply_markup=reply_markup
+            )
+            
+        except Exception as e:
+            self.logger.error("Error showing contact us: %s", e)
+            await query.edit_message_text(
+                i18n.get_text("UNEXPECTED_ERROR", user_id=user_id),
                 reply_markup=self._get_back_to_main_keyboard(user_id)
             )
 
