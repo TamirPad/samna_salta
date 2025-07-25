@@ -46,6 +46,13 @@ AWAITING_PRODUCT_EDIT_VALUE = 41
 AWAITING_PRODUCT_EDIT_CONFIRM = 42
 AWAITING_BUSINESS_FIELD_INPUT = 43
 
+# Add new conversation states for multilingual product creation
+AWAITING_PRODUCT_NAME_EN = 50
+AWAITING_PRODUCT_NAME_HE = 51
+AWAITING_PRODUCT_DESCRIPTION_EN = 52
+AWAITING_PRODUCT_DESCRIPTION_HE = 53
+AWAITING_PRODUCT_IMAGE_URL = 54
+
 logger = logging.getLogger(__name__)
 
 
@@ -262,8 +269,9 @@ class AdminHandler:
             await self._show_menu_management_dashboard(query)
         elif data == "admin_view_products":
             await self._show_all_products(query)
-        elif data == "admin_add_product":
-            await self._start_add_product(update, None)
+        # Note: admin_add_product is handled by the conversation handler
+        # elif data == "admin_add_product":
+        #     return await self._start_add_product(update, _)
         elif data == "admin_remove_products":
             await self._show_remove_products_list(query)
         
@@ -2493,18 +2501,30 @@ class AdminHandler:
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
 
     async def _start_add_product(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Start the step-by-step add product conversation"""
+        """Start the multilingual product creation process"""
         try:
-            query = update.callback_query
-            user_id = query.from_user.id
-            self.logger.info(f"🚀 Starting step-by-step product creation for user {user_id}")
-            self.logger.info(f"🚀 Setting conversation state to AWAITING_PRODUCT_NAME ({AWAITING_PRODUCT_NAME})")
+            user_id = update.effective_user.id
+            self.logger.info(f"🚀 Starting product creation for user {user_id}")
             
-            # Clear any existing conversation data
-            if context and hasattr(context, 'user_data'):
+            # Ensure context is properly initialized
+            if context is None:
+                self.logger.error("Context is None in _start_add_product")
+                if update.callback_query:
+                    await update.callback_query.answer("Error: Context not available")
+                return ConversationHandler.END
+            
+            # Clear any existing context data
+            if hasattr(context, 'user_data'):
                 context.user_data.clear()
+                self.logger.info(f"✅ Context user_data cleared for user {user_id}")
+            else:
+                self.logger.error("Context has no user_data attribute")
+                if update.callback_query:
+                    await update.callback_query.answer("Error: Context not properly initialized")
+                return ConversationHandler.END
             
-            text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_NAME", user_id=user_id)
+            # Ask for English name first
+            text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_NAME_EN", user_id=user_id)
             
             keyboard = [
                 [
@@ -2516,76 +2536,89 @@ class AdminHandler:
             ]
             
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
             
-            return AWAITING_PRODUCT_NAME
-            
-        except Exception as e:
-            self.logger.error("Error starting add product: %s", e)
-            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=update.callback_query.from_user.id))
-            return ConversationHandler.END
-
-    async def _handle_add_product_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle product details input for adding new product"""
-        try:
-            user_id = update.effective_user.id
-            text = update.message.text
-            # Parse product details from text
-            product_data = self._parse_product_input(text)
-            if not product_data:
-                await update.message.reply_text(
-                    i18n.get_text("ADMIN_PRODUCT_INVALID_INPUT", user_id=user_id)
-                )
-                return AWAITING_PRODUCT_DETAILS
-            # Create product
-            result = await self.admin_service.create_new_product(
-                name=product_data["name"],
-                description=product_data["description"],
-                category=product_data["category"],
-                price=product_data["price"]
-            )
-            if result["success"]:
-                # Show the updated product list
-                # Use a fake CallbackQuery for compatibility
-                class FakeQuery:
-                    def __init__(self, message, from_user):
-                        self.message = message
-                        self.from_user = from_user
-                        self.edit_message_text = message.reply_text
-                fake_query = FakeQuery(update.message, update.effective_user)
-                await self._show_all_products(fake_query)
-                return ConversationHandler.END
+            if update.callback_query:
+                await update.callback_query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
             else:
-                await update.message.reply_text(
-                    i18n.get_text("ADMIN_ADD_PRODUCT_ERROR", user_id=user_id).format(error=result["error"])
-                )
-            return ConversationHandler.END
+                await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+            return AWAITING_PRODUCT_NAME_EN
+            
         except Exception as e:
-            self.logger.error("Error handling add product input: %s", e)
+            self.logger.error("Error starting product creation: %s", e)
             await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
             return ConversationHandler.END
 
-    # Step-by-step product creation handlers
-    async def _handle_product_name_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle product name input"""
+    async def _handle_product_name_en_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle English product name input"""
         try:
             user_id = update.effective_user.id
-            name = update.message.text.strip()
             
-            self.logger.info(f"🔍 Handling product name input: '{name}' for user {user_id}")
-            self.logger.info(f"🔍 Current conversation state: {context.user_data.get('conversation_state', 'None')}")
+            # Ensure context is properly initialized
+            if context is None or not hasattr(context, 'user_data'):
+                self.logger.error("Context is not properly initialized in _handle_product_name_en_input")
+                await update.message.reply_text("Error: Context not available. Please try again.")
+                return ConversationHandler.END
             
-            if len(name) < 2:
+            name_en = update.message.text.strip()
+            
+            if len(name_en) < 2:
                 await update.message.reply_text(
                     i18n.get_text("ADMIN_ADD_PRODUCT_NAME_TOO_SHORT", user_id=user_id)
                 )
-                return AWAITING_PRODUCT_NAME
+                return AWAITING_PRODUCT_NAME_EN
             
-            # Store name in context
-            context.user_data["product_name"] = name
+            # Store English name
+            context.user_data["product_name_en"] = name_en
             
-            # Ask for description
-            text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_DESCRIPTION", user_id=user_id).format(name=name)
+            # Ask for Hebrew name
+            text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_NAME_HE", user_id=user_id).format(name_en=name_en)
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_SKIP_HEBREW", user_id=user_id),
+                        callback_data="admin_skip_hebrew_name"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("CANCEL", user_id=user_id),
+                        callback_data="admin_products_management"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+            return AWAITING_PRODUCT_NAME_HE
+            
+        except Exception as e:
+            self.logger.error("Error handling English name input: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _handle_product_name_he_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle Hebrew product name input"""
+        try:
+            user_id = update.effective_user.id
+            name_he = update.message.text.strip()
+            
+            if len(name_he) < 2:
+                await update.message.reply_text(
+                    i18n.get_text("ADMIN_ADD_PRODUCT_NAME_HE_TOO_SHORT", user_id=user_id)
+                )
+                return AWAITING_PRODUCT_NAME_HE
+            
+            # Store Hebrew name
+            context.user_data["product_name_he"] = name_he
+            name_en = context.user_data["product_name_en"]
+            
+            # Ask for English description
+            text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_DESCRIPTION_EN", user_id=user_id).format(
+                name_en=name_en, name_he=name_he
+            )
             
             keyboard = [
                 [
@@ -2599,68 +2632,157 @@ class AdminHandler:
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
             
-            return AWAITING_PRODUCT_DESCRIPTION
+            return AWAITING_PRODUCT_DESCRIPTION_EN
             
         except Exception as e:
-            self.logger.error("Error handling product name input: %s", e)
+            self.logger.error("Error handling Hebrew name input: %s", e)
             await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
             return ConversationHandler.END
 
-    async def _handle_product_description_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle product description input"""
+    async def _handle_product_description_en_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle English product description input"""
         try:
             user_id = update.effective_user.id
-            description = update.message.text.strip()
+            description_en = update.message.text.strip()
             
-            if len(description) < 5:
+            if len(description_en) < 5:
                 await update.message.reply_text(
                     i18n.get_text("ADMIN_ADD_PRODUCT_DESCRIPTION_TOO_SHORT", user_id=user_id)
                 )
-                return AWAITING_PRODUCT_DESCRIPTION
+                return AWAITING_PRODUCT_DESCRIPTION_EN
             
-            # Store description in context
-            context.user_data["product_description"] = description
-            name = context.user_data["product_name"]
+            # Store English description
+            context.user_data["product_description_en"] = description_en
             
-            # Ask for category
-            text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_CATEGORY", user_id=user_id).format(
-                name=name, description=description
+            # Ask for Hebrew description
+            text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_DESCRIPTION_HE", user_id=user_id).format(
+                description_en=description_en
             )
             
             keyboard = [
                 [
                     InlineKeyboardButton(
-                        i18n.get_text("ADMIN_ADD_PRODUCT_CATEGORY_BREAD", user_id=user_id),
-                        callback_data="admin_add_product_category_bread"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_ADD_PRODUCT_CATEGORY_SPICE", user_id=user_id),
-                        callback_data="admin_add_product_category_spice"
-                    ),
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_ADD_PRODUCT_CATEGORY_SPREAD", user_id=user_id),
-                        callback_data="admin_add_product_category_spread"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_ADD_PRODUCT_CATEGORY_BEVERAGE", user_id=user_id),
-                        callback_data="admin_add_product_category_beverage"
-                    ),
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_ADD_PRODUCT_CATEGORY_OTHER", user_id=user_id),
-                        callback_data="admin_add_product_category_other"
+                        i18n.get_text("ADMIN_SKIP_HEBREW", user_id=user_id),
+                        callback_data="admin_skip_hebrew_description"
                     )
                 ],
                 [
                     InlineKeyboardButton(
                         i18n.get_text("CANCEL", user_id=user_id),
-                        callback_data="admin_menu_management"
+                        callback_data="admin_products_management"
                     )
                 ]
             ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+            return AWAITING_PRODUCT_DESCRIPTION_HE
+            
+        except Exception as e:
+            self.logger.error("Error handling English description input: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _handle_product_description_he_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle Hebrew product description input"""
+        try:
+            user_id = update.effective_user.id
+            description_he = update.message.text.strip()
+            
+            if len(description_he) < 5:
+                await update.message.reply_text(
+                    i18n.get_text("ADMIN_ADD_PRODUCT_DESCRIPTION_HE_TOO_SHORT", user_id=user_id)
+                )
+                return AWAITING_PRODUCT_DESCRIPTION_HE
+            
+            # Store Hebrew description
+            context.user_data["product_description_he"] = description_he
+            
+            # Ask for image URL (optional)
+            text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_IMAGE_URL", user_id=user_id)
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_SKIP_IMAGE", user_id=user_id),
+                        callback_data="admin_skip_image_url"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("CANCEL", user_id=user_id),
+                        callback_data="admin_products_management"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+            return AWAITING_PRODUCT_IMAGE_URL
+            
+        except Exception as e:
+            self.logger.error("Error handling Hebrew description input: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _handle_product_image_url_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle product image URL input"""
+        try:
+            user_id = update.effective_user.id
+            image_url = update.message.text.strip()
+            
+            # Basic URL validation
+            if image_url and not (image_url.startswith('http://') or image_url.startswith('https://')):
+                await update.message.reply_text(
+                    i18n.get_text("ADMIN_ADD_PRODUCT_INVALID_URL", user_id=user_id)
+                )
+                return AWAITING_PRODUCT_IMAGE_URL
+            
+            # Store image URL
+            context.user_data["product_image_url"] = image_url if image_url else None
+            
+            # Show category selection
+            return await self._show_category_selection_for_new_product(update, context)
+            
+        except Exception as e:
+            self.logger.error("Error handling image URL input: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _show_category_selection_for_new_product(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show category selection for new product"""
+        try:
+            user_id = update.effective_user.id
+            
+            # Get available categories
+            categories = await self.admin_service.get_product_categories_list()
+            
+            text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_CATEGORY", user_id=user_id).format(
+                name_en=context.user_data["product_name_en"],
+                name_he=context.user_data.get("product_name_he", ""),
+                description_en=context.user_data["product_description_en"],
+                description_he=context.user_data.get("product_description_he", "")
+            )
+            
+            # Create category buttons
+            keyboard = []
+            for category in categories:
+                keyboard.append([
+                    InlineKeyboardButton(
+                        category.title(),
+                        callback_data=f"admin_add_product_category_{category}"
+                    )
+                ])
+            
+            # Add cancel button
+            keyboard.append([
+                InlineKeyboardButton(
+                    i18n.get_text("CANCEL", user_id=user_id),
+                    callback_data="admin_products_management"
+                )
+            ])
             
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
@@ -2668,7 +2790,7 @@ class AdminHandler:
             return AWAITING_PRODUCT_CATEGORY
             
         except Exception as e:
-            self.logger.error("Error handling product description input: %s", e)
+            self.logger.error("Error showing category selection: %s", e)
             await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
             return ConversationHandler.END
 
@@ -2679,47 +2801,33 @@ class AdminHandler:
             user_id = query.from_user.id
             data = query.data
             
-            # Extract category from callback data
-            category_map = {
-                "admin_add_product_category_bread": "bread",
-                "admin_add_product_category_spice": "spice", 
-                "admin_add_product_category_spread": "spread",
-                "admin_add_product_category_beverage": "beverage",
-                "admin_add_product_category_other": "other"
-            }
-            
-            category = category_map.get(data)
-            if not category:
-                await query.answer(i18n.get_text("ERROR_INVALID_CATEGORY", user_id=user_id))
-                return AWAITING_PRODUCT_CATEGORY
-            
-            # Store category in context
-            context.user_data["product_category"] = category
-            name = context.user_data["product_name"]
-            description = context.user_data["product_description"]
-            
-            # Ask for price
-            text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_PRICE", user_id=user_id).format(
-                name=name, description=description, category=category
-            )
-            
-            keyboard = [
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("CANCEL", user_id=user_id),
-                        callback_data="admin_products_management"
-                    )
+            if data.startswith("admin_add_product_category_"):
+                category = data.replace("admin_add_product_category_", "")
+                context.user_data["product_category"] = category
+                
+                # Ask for price
+                text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_PRICE", user_id=user_id).format(
+                    name_en=context.user_data["product_name_en"],
+                    category=category.title()
+                )
+                
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            i18n.get_text("CANCEL", user_id=user_id),
+                            callback_data="admin_products_management"
+                        )
+                    ]
                 ]
-            ]
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
-            
-            return AWAITING_PRODUCT_PRICE
-            
+                
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+                
+                return AWAITING_PRODUCT_PRICE
+                
         except Exception as e:
-            self.logger.error("Error handling product category selection: %s", e)
-            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=update.callback_query.from_user.id))
+            self.logger.error("Error handling category selection: %s", e)
+            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
             return ConversationHandler.END
 
     async def _handle_product_price_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2733,34 +2841,58 @@ class AdminHandler:
                 price = float(price_text)
                 if price <= 0:
                     await update.message.reply_text(
-                        i18n.get_text("ADMIN_ADD_PRODUCT_PRICE_TOO_LOW", user_id=user_id)
+                        i18n.get_text("ADMIN_ADD_PRODUCT_INVALID_PRICE", user_id=user_id)
                     )
                     return AWAITING_PRODUCT_PRICE
             except ValueError:
                 await update.message.reply_text(
-                    i18n.get_text("ADMIN_ADD_PRODUCT_PRICE_INVALID", user_id=user_id)
+                    i18n.get_text("ADMIN_ADD_PRODUCT_INVALID_PRICE", user_id=user_id)
                 )
                 return AWAITING_PRODUCT_PRICE
             
-            # Store price in context
+            # Store price
             context.user_data["product_price"] = price
-            name = context.user_data["product_name"]
-            description = context.user_data["product_description"]
-            category = context.user_data["product_category"]
             
             # Show confirmation
-            text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_CONFIRM", user_id=user_id).format(
-                name=name, description=description, category=category, price=f"{price:.2f}"
+            return await self._show_product_confirmation(update, context)
+            
+        except Exception as e:
+            self.logger.error("Error handling price input: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _show_product_confirmation(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show product creation confirmation"""
+        try:
+            user_id = update.effective_user.id
+            
+            # Prepare confirmation text
+            name_en = context.user_data["product_name_en"]
+            name_he = context.user_data.get("product_name_he", "")
+            description_en = context.user_data["product_description_en"]
+            description_he = context.user_data.get("product_description_he", "")
+            category = context.user_data["product_category"]
+            price = context.user_data["product_price"]
+            image_url = context.user_data.get("product_image_url")
+            
+            text = i18n.get_text("ADMIN_ADD_PRODUCT_CONFIRMATION", user_id=user_id).format(
+                name_en=name_en,
+                name_he=name_he if name_he else "N/A",
+                description_en=description_en,
+                description_he=description_he if description_he else "N/A",
+                category=category.title(),
+                price=price,
+                image_url=image_url if image_url else "N/A"
             )
             
             keyboard = [
                 [
                     InlineKeyboardButton(
-                        i18n.get_text("ADMIN_ADD_PRODUCT_CONFIRM_YES", user_id=user_id),
+                        i18n.get_text("ADMIN_CONFIRM_YES", user_id=user_id),
                         callback_data="admin_add_product_confirm_yes"
                     ),
                     InlineKeyboardButton(
-                        i18n.get_text("ADMIN_ADD_PRODUCT_CONFIRM_NO", user_id=user_id),
+                        i18n.get_text("ADMIN_CONFIRM_NO", user_id=user_id),
                         callback_data="admin_add_product_confirm_no"
                     )
                 ]
@@ -2772,7 +2904,7 @@ class AdminHandler:
             return AWAITING_PRODUCT_CONFIRMATION
             
         except Exception as e:
-            self.logger.error("Error handling product price input: %s", e)
+            self.logger.error("Error showing product confirmation: %s", e)
             await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
             return ConversationHandler.END
 
@@ -2784,24 +2916,36 @@ class AdminHandler:
             data = query.data
             
             if data == "admin_add_product_confirm_yes":
-                # Create the product
-                name = context.user_data["product_name"]
-                description = context.user_data["product_description"]
+                # Create the product with multilingual support
+                name_en = context.user_data["product_name_en"]
+                name_he = context.user_data.get("product_name_he", "")
+                description_en = context.user_data["product_description_en"]
+                description_he = context.user_data.get("product_description_he", "")
                 category = context.user_data["product_category"]
                 price = context.user_data["product_price"]
+                image_url = context.user_data.get("product_image_url")
                 
-                result = await self.admin_service.create_new_product(
-                    name=name,
-                    description=description,
+                # Use the primary name as the main name
+                primary_name = name_en if name_en else name_he
+                primary_description = description_en if description_en else description_he
+                
+                result = await self.admin_service.create_new_product_multilingual(
+                    name=primary_name,
+                    description=primary_description,
                     category=category,
-                    price=price
+                    price=price,
+                    image_url=image_url,
+                    name_en=name_en,
+                    name_he=name_he,
+                    description_en=description_en,
+                    description_he=description_he
                 )
                 
                 if result["success"]:
                     product = result["product"]
-                    success_text = i18n.get_text("ADMIN_ADD_PRODUCT_SUCCESS", user_id=user_id).format(
-                        name=product["name"],
-                        description=product["description"],
+                    success_text = i18n.get_text("ADMIN_ADD_PRODUCT_SUCCESS_MULTILINGUAL", user_id=user_id).format(
+                        name_en=product.get("name_en", product["name"]),
+                        name_he=product.get("name_he", "N/A"),
                         category=product["category"],
                         price=product["price"]
                     )
@@ -2836,7 +2980,93 @@ class AdminHandler:
             await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=update.callback_query.from_user.id))
             return ConversationHandler.END
 
+    async def _handle_skip_hebrew_name(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle skipping Hebrew name input"""
+        try:
+            query = update.callback_query
+            user_id = query.from_user.id
+            
+            # Set Hebrew name to empty
+            context.user_data["product_name_he"] = ""
+            name_en = context.user_data["product_name_en"]
+            
+            # Ask for English description
+            text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_DESCRIPTION_EN", user_id=user_id).format(
+                name_en=name_en, name_he=""
+            )
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("CANCEL", user_id=user_id),
+                        callback_data="admin_products_management"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+            return AWAITING_PRODUCT_DESCRIPTION_EN
+            
+        except Exception as e:
+            self.logger.error("Error handling skip Hebrew name: %s", e)
+            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
 
+    async def _handle_skip_hebrew_description(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle skipping Hebrew description input"""
+        try:
+            query = update.callback_query
+            user_id = query.from_user.id
+            
+            # Set Hebrew description to empty
+            context.user_data["product_description_he"] = ""
+            
+            # Ask for image URL
+            text = i18n.get_text("ADMIN_ADD_PRODUCT_STEP_IMAGE_URL", user_id=user_id)
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_SKIP_IMAGE", user_id=user_id),
+                        callback_data="admin_skip_image_url"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("CANCEL", user_id=user_id),
+                        callback_data="admin_products_management"
+                    )
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+            return AWAITING_PRODUCT_IMAGE_URL
+            
+        except Exception as e:
+            self.logger.error("Error handling skip Hebrew description: %s", e)
+            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _handle_skip_image_url(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle skipping image URL input"""
+        try:
+            query = update.callback_query
+            user_id = query.from_user.id
+            
+            # Set image URL to None
+            context.user_data["product_image_url"] = None
+            
+            # Show category selection
+            return await self._show_category_selection_for_new_product(update, context)
+            
+        except Exception as e:
+            self.logger.error("Error handling skip image URL: %s", e)
+            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
 
     async def _handle_product_callback(self, query: CallbackQuery, data: str) -> None:
         """Handle product-related callbacks"""
@@ -4396,7 +4626,7 @@ def register_admin_handlers(application: Application):
 
     # Admin callback handlers (excluding conversation patterns but including fallback handlers)
     application.add_handler(
-        CallbackQueryHandler(handler.handle_admin_callback, pattern="^admin_(?!add_product_category_|add_product_confirm_|edit_category_name_|edit_product_field_|edit_product_confirm_|edit_product_category_|product_edit_|edit_business_name$|edit_business_description$|edit_business_address$|edit_business_phone$|edit_business_email$|edit_business_website$|edit_business_hours$|edit_currency$|edit_delivery_charge$|cancel_business_edit$)")
+        CallbackQueryHandler(handler.handle_admin_callback, pattern="^admin_(?!add_product$|add_product_category_|add_product_confirm_|add_category$|edit_category_name_|edit_product_field_|edit_product_confirm_|edit_product_category_|product_edit_|edit_business_name$|edit_business_description$|edit_business_address$|edit_business_phone$|edit_business_email$|edit_business_website$|edit_business_hours$|edit_currency$|edit_delivery_charge$|cancel_business_edit$)")
     )
 
     # Admin conversation handler for status updates
@@ -4417,17 +4647,29 @@ def register_admin_handlers(application: Application):
 
     application.add_handler(conv_handler)
 
-    # Admin conversation handler for adding products (step-by-step)
+    # Admin conversation handler for adding products (multilingual step-by-step)
     add_product_handler = ConversationHandler(
         entry_points=[
             CallbackQueryHandler(handler._start_add_product, pattern="^admin_add_product$")
         ],
         states={
-            AWAITING_PRODUCT_NAME: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_product_name_input)
+            AWAITING_PRODUCT_NAME_EN: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_product_name_en_input)
             ],
-            AWAITING_PRODUCT_DESCRIPTION: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_product_description_input)
+            AWAITING_PRODUCT_NAME_HE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_product_name_he_input),
+                CallbackQueryHandler(handler._handle_skip_hebrew_name, pattern="^admin_skip_hebrew_name$")
+            ],
+            AWAITING_PRODUCT_DESCRIPTION_EN: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_product_description_en_input)
+            ],
+            AWAITING_PRODUCT_DESCRIPTION_HE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_product_description_he_input),
+                CallbackQueryHandler(handler._handle_skip_hebrew_description, pattern="^admin_skip_hebrew_description$")
+            ],
+            AWAITING_PRODUCT_IMAGE_URL: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_product_image_url_input),
+                CallbackQueryHandler(handler._handle_skip_image_url, pattern="^admin_skip_image_url$")
             ],
             AWAITING_PRODUCT_CATEGORY: [
                 CallbackQueryHandler(handler._handle_product_category_selection, pattern="^admin_add_product_category_")
@@ -4442,7 +4684,8 @@ def register_admin_handlers(application: Application):
         fallbacks=[
             CommandHandler("cancel", handler._reset_conversation),
             CallbackQueryHandler(handler._reset_conversation, pattern="^admin_dashboard$"),
-            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_back$")
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_back$"),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_products_management$")
         ],
         name="add_product_conversation",
         persistent=False,

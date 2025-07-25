@@ -825,6 +825,80 @@ class AdminService:
             logger.error("Error creating product: %s", e)
             return {"success": False, "error": f"Failed to create product: {str(e)}"}
 
+    async def create_new_product_multilingual(
+        self, 
+        name: str, 
+        description: str, 
+        category: str, 
+        price: float, 
+        image_url: Optional[str] = None,
+        name_en: Optional[str] = None,
+        name_he: Optional[str] = None,
+        description_en: Optional[str] = None,
+        description_he: Optional[str] = None
+    ) -> Dict:
+        """Create a new product with full multilingual support"""
+        try:
+            # Initialize multilingual content manager
+            ml_manager = MultilingualContentManager()
+            
+            # Validate inputs
+            if not name or len(name.strip()) < 2:
+                return {"success": False, "error": "Product name must be at least 2 characters long"}
+            
+            if not description or len(description.strip()) < 5:
+                return {"success": False, "error": "Product description must be at least 5 characters long"}
+            
+            if not category or len(category.strip()) < 2:
+                return {"success": False, "error": "Category must be at least 2 characters long"}
+            
+            if price <= 0:
+                return {"success": False, "error": "Price must be greater than 0"}
+            
+            # Validate image URL if provided
+            if image_url:
+                from src.utils.image_handler import validate_image_url
+                if not validate_image_url(image_url):
+                    return {"success": False, "error": "Invalid image URL format"}
+            
+            # Create product with multilingual support
+            product = create_product(
+                name=name.strip(),
+                description=description.strip(),
+                category=category.strip(),
+                price=price,
+                image_url=image_url,
+                name_en=name_en.strip() if name_en else None,
+                name_he=name_he.strip() if name_he else None,
+                description_en=description_en.strip() if description_en else None,
+                description_he=description_he.strip() if description_he else None
+            )
+            
+            if product:
+                logger.info("Successfully created multilingual product: %s", name)
+                return {
+                    "success": True,
+                    "product": {
+                        "id": product.id,
+                        "name": product.name,
+                        "description": product.description,
+                        "name_en": product.name_en,
+                        "name_he": product.name_he,
+                        "description_en": product.description_en,
+                        "description_he": product.description_he,
+                        "category": category,
+                        "price": product.price,
+                        "is_active": product.is_active,
+                        "image_url": product.image_url
+                    }
+                }
+            else:
+                return {"success": False, "error": "Product with this name already exists"}
+                
+        except Exception as e:
+            logger.error("Error creating multilingual product: %s", e)
+            return {"success": False, "error": f"Failed to create product: {str(e)}"}
+
     async def update_existing_product(self, product_id: int, **kwargs) -> Dict:
         """Update an existing product with multilingual support"""
         try:
