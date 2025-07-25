@@ -37,14 +37,14 @@ from src.states import (
 )
 
 # Category management states
-AWAITING_CATEGORY_NAME = 10
-AWAITING_CATEGORY_NAME_EDIT = 11
+AWAITING_CATEGORY_NAME = 30
+AWAITING_CATEGORY_NAME_EDIT = 31
 
 # Product edit wizard states
-AWAITING_PRODUCT_EDIT_FIELD = 20
-AWAITING_PRODUCT_EDIT_VALUE = 21
-AWAITING_PRODUCT_EDIT_CONFIRM = 22
-AWAITING_BUSINESS_FIELD_INPUT = 23
+AWAITING_PRODUCT_EDIT_FIELD = 40
+AWAITING_PRODUCT_EDIT_VALUE = 41
+AWAITING_PRODUCT_EDIT_CONFIRM = 42
+AWAITING_BUSINESS_FIELD_INPUT = 43
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +77,23 @@ class AdminHandler:
         # Show admin dashboard
         await self._show_admin_dashboard(update, None)
 
+    async def handle_myid_command(
+        self, update: Update, _: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        """Handle /myid command - show user ID for admin setup"""
+        user_id = update.effective_user.id
+        user_name = update.effective_user.first_name or "Unknown"
+        
+        message = f"🔍 <b>Your User Information:</b>\n\n"
+        message += f"👤 <b>Name:</b> {user_name}\n"
+        message += f"🆔 <b>User ID:</b> <code>{user_id}</code>\n\n"
+        message += f"💡 <b>To set up admin access:</b>\n"
+        message += f"1. Add your user ID to the admin list\n"
+        message += f"2. Or set ADMIN_CHAT_ID in your .env file\n"
+        message += f"3. Current admin IDs: 598829473"
+        
+        await update.message.reply_text(message, parse_mode="HTML")
+
     @error_handler("admin_dashboard")
     async def handle_admin_callback(
         self, update: Update, _: ContextTypes.DEFAULT_TYPE
@@ -92,6 +109,15 @@ class AdminHandler:
 
         data = query.data
         self.logger.info("👑 ADMIN CALLBACK: %s by User %s", data, user_id)
+        
+        # Check if user is admin first
+        is_admin = await self._is_admin_user(user_id)
+        self.logger.info(f"🔍 User {user_id} is admin: {is_admin}")
+        
+        if not is_admin:
+            await query.answer()
+            await query.message.reply_text(i18n.get_text("ADMIN_ACCESS_DENIED", user_id=user_id))
+            return
 
         if data == "admin_pending_orders":
             await self._show_pending_orders(query)
@@ -170,6 +196,9 @@ class AdminHandler:
             else:
                 return
             await self._show_pending_orders(query, page, page_size)
+        elif data == "admin_products_management":
+            self.logger.info(f"🔍 Products management callback received for user {query.from_user.id}")
+            await self._show_products_management(query)
         elif data.startswith("admin_products_"):
             if "_size_" in data and "_page_" in data:
                 parts = data.split("_")
@@ -227,9 +256,8 @@ class AdminHandler:
             order_id = int(data.split("_")[-1])
             await self._confirm_delete_order(query, order_id)
         elif data == "admin_menu_management":
+            self.logger.info(f"🔍 Menu management callback received for user {query.from_user.id}")
             await self._show_menu_management_dashboard(query)
-        elif data == "admin_products_management":
-            await self._show_products_management(query)
         elif data == "admin_view_products":
             await self._show_all_products(query)
         elif data == "admin_add_product":
@@ -1684,17 +1712,23 @@ class AdminHandler:
         config = self.container.get_config()
         admin_chat_id = getattr(config, 'admin', {}).get('chat_id', None)
         
+        self.logger.info(f"🔍 Admin check for user {telegram_id}, admin_chat_id: {admin_chat_id}")
+        
         if admin_chat_id:
             # Convert to int if it's a string
             try:
                 admin_id = int(admin_chat_id)
-                return telegram_id == admin_id
+                is_admin = telegram_id == admin_id
+                self.logger.info(f"🔍 User {telegram_id} admin check result: {is_admin}")
+                return is_admin
             except (ValueError, TypeError):
                 pass
         
         # Fallback: check if user ID matches common admin patterns
         # This is a simple fallback - in production you'd want a proper admin system
-        return str(telegram_id) in ['598829473']  # Add your admin user IDs here
+        is_admin = str(telegram_id) in ['598829473']  # Add your admin user IDs here
+        self.logger.info(f"🔍 User {telegram_id} fallback admin check result: {is_admin}")
+        return is_admin
 
     # Menu Management Methods
     async def _show_menu_management_dashboard(self, query: CallbackQuery) -> None:
@@ -1751,8 +1785,10 @@ class AdminHandler:
     async def _show_products_management(self, query: CallbackQuery) -> None:
         """Show products management dashboard"""
         try:
+            self.logger.info(f"🔍 Starting _show_products_management for user {query.from_user.id}")
             user_id = query.from_user.id
             products = await self.admin_service.get_all_products_for_admin()
+            self.logger.info(f"🔍 Retrieved {len(products)} products for products management")
             
             text = (
                 i18n.get_text("ADMIN_PRODUCTS_MANAGEMENT_TITLE", user_id=user_id) + "\n\n" +
@@ -1786,7 +1822,9 @@ class AdminHandler:
             ]
             
             reply_markup = InlineKeyboardMarkup(keyboard)
+            self.logger.info(f"🔍 About to edit message for products management")
             await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            self.logger.info(f"🔍 Successfully edited message for products management")
             
         except Exception as e:
             self.logger.error("Error showing products management: %s", e)

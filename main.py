@@ -23,7 +23,7 @@ from src.container import get_container
 from src.handlers.start import start_handler, OnboardingHandler, register_start_handlers
 from src.handlers.menu import MenuHandler
 from src.handlers.cart import CartHandler
-from src.handlers.admin import register_admin_handlers
+from src.handlers.admin import register_admin_handlers, AdminHandler
 from src.utils.logger import ProductionLogger
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from telegram import Update
@@ -92,6 +92,10 @@ def setup_bot():
     
     # Ping command
     application.add_handler(CommandHandler("ping", ping_handler))
+    
+    # My ID command for admin setup
+    admin_handler_instance = AdminHandler()
+    application.add_handler(CommandHandler("myid", admin_handler_instance.handle_myid_command))
     
     # Main page handlers (My Info, Menu navigation)
     onboarding_handler = OnboardingHandler()
