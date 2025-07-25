@@ -62,13 +62,12 @@ class OnboardingHandler:
                 if self._is_customer_profile_complete(existing_customer):
                     # Welcome back existing customer with beautiful main page
                     user_id = user.id
-                    from src.utils.text_formatter import format_title
                     
-                    welcome_message = f"""{format_title(f'🌟 {get_dynamic_welcome_for_returning_users(user_id=user_id)}')}
+                    welcome_message = f"""🌟 <b>{get_dynamic_welcome_for_returning_users(user_id=user_id)}</b>
 
-{format_title(f'👋 {i18n.get_text("WELCOME_BACK", user_id=user_id).format(name=existing_customer.name)}')}
+👋 <b>{i18n.get_text("WELCOME_BACK", user_id=user_id).format(name=existing_customer.name)}</b>
 
-{format_title(f'🍽️ {i18n.get_text("WHAT_TO_ORDER_TODAY", user_id=user_id)}')}"""
+🍽️ {i18n.get_text("WHAT_TO_ORDER_TODAY", user_id=user_id)}"""
                     await update.message.reply_text(
                         welcome_message,
                         reply_markup=self._get_main_page_keyboard(user_id),
@@ -87,11 +86,11 @@ class OnboardingHandler:
 
             # Start onboarding for new customer or incomplete profile with beautiful language selection
             user_id = user.id
-            welcome_text = f"""{format_title(f'🎉 {get_dynamic_welcome_message(user_id=user_id)}')}
+            welcome_text = f"""🎉 <b>{get_dynamic_welcome_message(user_id=user_id)}</b>
 
-{format_title(f'🌟 {i18n.get_text("WELCOME_HELP_MESSAGE", user_id=user_id)}')}
+🌟 {i18n.get_text("WELCOME_HELP_MESSAGE", user_id=user_id)}
 
-{format_title(f'🌍 {i18n.get_text("SELECT_LANGUAGE_PROMPT", user_id=user_id)}')}"""
+🌍 {i18n.get_text("SELECT_LANGUAGE_PROMPT", user_id=user_id)}"""
 
             await update.message.reply_text(
                 welcome_text,
