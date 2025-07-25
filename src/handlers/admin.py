@@ -53,6 +53,10 @@ AWAITING_PRODUCT_DESCRIPTION_EN = 52
 AWAITING_PRODUCT_DESCRIPTION_HE = 53
 AWAITING_PRODUCT_IMAGE_URL = 54
 
+# Add new states for category wizard
+AWAITING_CATEGORY_NAME_EN = 32
+AWAITING_CATEGORY_NAME_HE = 33
+
 logger = logging.getLogger(__name__)
 
 
@@ -2245,88 +2249,139 @@ class AdminHandler:
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
 
     async def _start_add_category(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-        """Start the add category conversation"""
-        try:
-            query = update.callback_query
-            user_id = query.from_user.id
-            self.logger.info(f"🔧 Starting add category conversation for user {user_id}")
-            
-            # Clear any existing conversation data
-            if context and hasattr(context, 'user_data'):
-                context.user_data.clear()
-            
-            text = i18n.get_text("ADMIN_CATEGORY_ADD_PROMPT", user_id=user_id)
-            
-            keyboard = [
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("CANCEL", user_id=user_id),
-                        callback_data="admin_category_management"
-                    )
-                ]
-            ]
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
-            
-            return AWAITING_CATEGORY_NAME
-            
-        except Exception as e:
-            self.logger.error("Error starting add category: %s", e)
-            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
-            return ConversationHandler.END
-
-    async def _handle_category_name_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle category name input with multilingual support"""
+        """Start the multilingual add category conversation"""
         try:
             user_id = update.effective_user.id
-            category_name = update.message.text.strip()
-            
-            if len(category_name) < 2:
+            self.logger.info(f"🚀 Starting category creation for user {user_id}")
+            if context is None:
+                self.logger.error("Context is None in _start_add_category")
+                if update.callback_query:
+                    await update.callback_query.answer("Error: Context not available")
+                return ConversationHandler.END
+            if hasattr(context, 'user_data'):
+                context.user_data.clear()
+                self.logger.info(f"✅ Context user_data cleared for user {user_id}")
+            else:
+                self.logger.error("Context has no user_data attribute")
+                if update.callback_query:
+                    await update.callback_query.answer("Error: Context not properly initialized")
+                return ConversationHandler.END
+            # Use a placeholder for English name
+            text = i18n.get_text("ADMIN_CATEGORY_ADD_STEP_NAME_EN", user_id=user_id)
+            placeholder = i18n.get_text("ADMIN_CATEGORY_NAME_EN_PLACEHOLDER", user_id=user_id)
+            keyboard = [[
+                InlineKeyboardButton(
+                    i18n.get_text("CANCEL", user_id=user_id),
+                    callback_data="admin_category_management"
+                )
+            ]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            if update.callback_query:
+                await update.callback_query.edit_message_text(f"{text}\n\n<code>{placeholder}</code>", parse_mode="HTML", reply_markup=reply_markup)
+            else:
+                await update.message.reply_text(f"{text}\n\n<code>{placeholder}</code>", parse_mode="HTML", reply_markup=reply_markup)
+            return AWAITING_CATEGORY_NAME_EN
+        except Exception as e:
+            self.logger.error("Error starting add category: %s", e)
+            if update.callback_query and update.callback_query.message:
+                await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _handle_category_name_en_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle English category name input"""
+        try:
+            user_id = update.effective_user.id
+            if context is None or not hasattr(context, 'user_data'):
+                self.logger.error("Context is not properly initialized in _handle_category_name_en_input")
+                await update.message.reply_text("Error: Context not available. Please try again.")
+                return ConversationHandler.END
+            name_en = update.message.text.strip()
+            if len(name_en) < 2:
                 await update.message.reply_text(
                     i18n.get_text("ADMIN_CATEGORY_NAME_TOO_SHORT", user_id=user_id)
                 )
-                return AWAITING_CATEGORY_NAME
-            
-            # Initialize multilingual content manager
-            ml_manager = MultilingualContentManager()
-            
-            # Detect language and prepare multilingual content
-            detected_lang = ml_manager.detect_language(category_name)
-            name_en = category_name if detected_lang == "en" else None
-            name_he = category_name if detected_lang == "he" else None
-            
+                return AWAITING_CATEGORY_NAME_EN
+            context.user_data["category_name_en"] = name_en
+            # Use a placeholder for Hebrew name
+            text = i18n.get_text("ADMIN_CATEGORY_ADD_STEP_NAME_HE", user_id=user_id).format(name_en=name_en)
+            placeholder = i18n.get_text("ADMIN_CATEGORY_NAME_HE_PLACEHOLDER", user_id=user_id)
+            keyboard = [
+                [InlineKeyboardButton(i18n.get_text("ADMIN_SKIP_HEBREW", user_id=user_id), callback_data="admin_skip_hebrew_category_name")],
+                [InlineKeyboardButton(i18n.get_text("CANCEL", user_id=user_id), callback_data="admin_category_management")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(f"{text}\n\n<code>{placeholder}</code>", parse_mode="HTML", reply_markup=reply_markup)
+            return AWAITING_CATEGORY_NAME_HE
+        except Exception as e:
+            self.logger.error("Error handling English category name input: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _handle_category_name_he_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle Hebrew category name input"""
+        try:
+            user_id = update.effective_user.id
+            if context is None or not hasattr(context, 'user_data'):
+                self.logger.error("Context is not properly initialized in _handle_category_name_he_input")
+                await update.message.reply_text("Error: Context not available. Please try again.")
+                return ConversationHandler.END
+            name_he = update.message.text.strip()
+            if len(name_he) < 2:
+                await update.message.reply_text(
+                    i18n.get_text("ADMIN_CATEGORY_NAME_TOO_SHORT", user_id=user_id)
+                )
+                return AWAITING_CATEGORY_NAME_HE
+            context.user_data["category_name_he"] = name_he
+            return await self._finalize_category_creation(update, context)
+        except Exception as e:
+            self.logger.error("Error handling Hebrew category name input: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _handle_skip_hebrew_category_name(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle skipping Hebrew category name input"""
+        try:
+            query = update.callback_query
+            user_id = query.from_user.id
+            context.user_data["category_name_he"] = ""
+            return await self._finalize_category_creation(update, context)
+        except Exception as e:
+            self.logger.error("Error handling skip Hebrew category name: %s", e)
+            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _finalize_category_creation(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Finalize category creation after collecting multilingual names"""
+        try:
+            user_id = update.effective_user.id if update.effective_user else None
+            name_en = context.user_data.get("category_name_en", "")
+            name_he = context.user_data.get("category_name_he", "")
             # Check if category already exists
             existing_categories = await self.admin_service.get_product_categories_list()
-            if category_name.lower() in [cat.lower() for cat in existing_categories]:
+            if name_en.lower() in [cat.lower() for cat in existing_categories] or (name_he and name_he.lower() in [cat.lower() for cat in existing_categories]):
                 await update.message.reply_text(
-                    i18n.get_text("ADMIN_CATEGORY_ALREADY_EXISTS", user_id=user_id).format(category=category_name)
+                    i18n.get_text("ADMIN_CATEGORY_ALREADY_EXISTS", user_id=user_id).format(category=name_en or name_he)
                 )
-                return AWAITING_CATEGORY_NAME
-            
-            # Create the category with multilingual support
+                return AWAITING_CATEGORY_NAME_EN
             result = await self.admin_service.create_category_multilingual(
-                name=category_name,
+                name=name_en or name_he,
                 name_en=name_en,
                 name_he=name_he
             )
-            
             if result["success"]:
-                success_text = i18n.get_text("ADMIN_CATEGORY_ADD_SUCCESS", user_id=user_id).format(
-                    category=category_name,
-                    language=detected_lang.upper()
-                )
-                
-                keyboard = [
-                    [
-                        InlineKeyboardButton(
-                            i18n.get_text("ADMIN_CATEGORY_BACK_TO_LIST", user_id=user_id),
-                            callback_data="admin_view_categories"
-                        )
-                    ]
-                ]
+                # Improved confirmation rendering
+                if name_he and name_en:
+                    category_display = f"{name_he} ({name_en})"
+                elif name_he:
+                    category_display = name_he
+                else:
+                    category_display = name_en
+                success_text = i18n.get_text("ADMIN_CATEGORY_ADD_SUCCESS", user_id=user_id)
+                category_label = i18n.get_text("ADMIN_CATEGORY_LABEL", user_id=user_id)
+                msg = f"✅ <b>{success_text}</b>\n\U0001F4C1 <b>{category_label}</b> {category_display}"
+                keyboard = [[InlineKeyboardButton(i18n.get_text("ADMIN_CATEGORY_BACK_TO_LIST", user_id=user_id), callback_data="admin_view_categories")]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
-                await update.message.reply_text(success_text, reply_markup=reply_markup)
+                await update.message.reply_text(msg, parse_mode="HTML", reply_markup=reply_markup)
                 return ConversationHandler.END
             else:
                 await update.message.reply_text(
@@ -2334,7 +2389,7 @@ class AdminHandler:
                 )
             return ConversationHandler.END
         except Exception as e:
-            self.logger.error("Error handling category name input: %s", e)
+            self.logger.error("Error finalizing category creation: %s", e)
             await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
             return ConversationHandler.END
 
@@ -4705,8 +4760,12 @@ def register_admin_handlers(application: Application):
             CallbackQueryHandler(handler._start_add_category, pattern="^admin_add_category$")
         ],
         states={
-            AWAITING_CATEGORY_NAME: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_category_name_input)
+            AWAITING_CATEGORY_NAME_EN: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_category_name_en_input)
+            ],
+            AWAITING_CATEGORY_NAME_HE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_category_name_he_input),
+                CallbackQueryHandler(handler._handle_skip_hebrew_category_name, pattern="^admin_skip_hebrew_category_name$")
             ],
         },
         fallbacks=[

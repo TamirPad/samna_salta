@@ -528,5 +528,11 @@
   "CART_PRICE_LABEL": "Price",
   "CART_SUBTOTAL_LABEL": "Subtotal",
   "BROWSE_MENU_SUGGESTION": "Browse our menu to add delicious items!",
-  "DELIVERY_ADDRESS_ONBOARDING_HELP": "Please provide your full delivery address including street, city, and postal code."
+  "DELIVERY_ADDRESS_ONBOARDING_HELP": "Please provide your full delivery address including street, city, and postal code.",
+  "ADMIN_CATEGORY_ADD_STEP_NAME_EN": "Please enter the category name in English:",
+  "ADMIN_CATEGORY_NAME_EN_PLACEHOLDER": "e.g. Vegetables",
+  "ADMIN_CATEGORY_ADD_STEP_NAME_HE": "Please enter the category name in Hebrew (optional):",
+  "ADMIN_CATEGORY_NAME_HE_PLACEHOLDER": "e.g. ירקות",
+  "ADMIN_SKIP_HEBREW": "Skip Hebrew",
+  "ADMIN_CATEGORY_BACK_TO_LIST": "Back to Category List"
 }

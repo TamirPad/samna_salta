@@ -528,5 +528,11 @@
   "PRODUCT_WHITE_COFFEE": "קפה לבן",
   "PRODUCT_HILBEH": "חילבה",
   "PRODUCT_BUREKAS_CHEESE": "בורקס גבינה",
-  "PRODUCT_JACHNUN": "ג'חנון"
+  "PRODUCT_JACHNUN": "ג'חנון",
+  "ADMIN_CATEGORY_ADD_STEP_NAME_EN": "הזן את שם הקטגוריה באנגלית:",
+  "ADMIN_CATEGORY_NAME_EN_PLACEHOLDER": "לדוג' Vegetables",
+  "ADMIN_CATEGORY_ADD_STEP_NAME_HE": "הזן את שם הקטגוריה בעברית (לא חובה):",
+  "ADMIN_CATEGORY_NAME_HE_PLACEHOLDER": "לדוג' ירקות",
+  "ADMIN_SKIP_HEBREW": "דלג על עברית",
+  "ADMIN_CATEGORY_BACK_TO_LIST": "חזרה לרשימת קטגוריות"
 }
