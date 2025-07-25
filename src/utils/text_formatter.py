@@ -4,6 +4,9 @@ Text formatting utilities for the Telegram bot
 
 from typing import Optional
 
+# Separator line for formatting - can be adjusted to control width across all functions
+SEPARATOR_LINE = "━━━━━━━━━━━━━━━"
+
 
 def center_text(text: str, prefix: str = "", suffix: str = "") -> str:
     """
@@ -54,7 +57,7 @@ def format_title(title: str) -> str:
     """
     # Use Unicode characters to create visual centering effect
     # The horizontal lines create a frame that makes the text appear centered
-    return f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n{title}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    return f"{SEPARATOR_LINE}\n{title}\n{SEPARATOR_LINE}"
 
 
 def format_section_header(header: str) -> str:
@@ -67,7 +70,7 @@ def format_section_header(header: str) -> str:
     Returns:
         Formatted header
     """
-    return f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📋 {header}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    return f"{SEPARATOR_LINE}\n📋 {header}\n{SEPARATOR_LINE}"
 
 
 def format_product_info(name: str, description: str, price: float, category: str = "") -> str:
@@ -119,7 +122,7 @@ def format_cart_item(index: int, name: str, quantity: int, price: float, total: 
     Returns:
         Formatted cart item
     """
-    return f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n<b>{index}.</b> 📦 <b>{name}</b>\n🔢 כמות: {quantity}\n💰 מחיר: ₪{price:.2f}\n💵 סה״כ: ₪{total:.2f}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    return f"{SEPARATOR_LINE}\n<b>{index}.</b> 📦 <b>{name}</b>\n🔢 כמות: {quantity}\n💰 מחיר: ₪{price:.2f}\n💵 סה״כ: ₪{total:.2f}\n{SEPARATOR_LINE}"
 
 
 def format_order_summary(items: list, total: float, delivery_method: str = "", delivery_address: str = "") -> str:
@@ -153,7 +156,7 @@ def format_order_summary(items: list, total: float, delivery_method: str = "", d
         lines.append("")
     
     # Total
-    lines.append(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n💸 <b>סה״כ: ₪{total:.2f}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append(f"{SEPARATOR_LINE}\n💸 <b>סה״כ: ₪{total:.2f}</b>\n{SEPARATOR_LINE}")
     
     # Delivery info
     if delivery_method:
@@ -210,7 +213,7 @@ def format_error_message(error_text: str) -> str:
     Returns:
         Formatted error message
     """
-    return f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n❌ {error_text}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    return f"{SEPARATOR_LINE}\n❌ {error_text}\n{SEPARATOR_LINE}"
 
 
 def format_success_message(success_text: str) -> str:
@@ -223,7 +226,7 @@ def format_success_message(success_text: str) -> str:
     Returns:
         Formatted success message
     """
-    return f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n✅ {success_text}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    return f"{SEPARATOR_LINE}\n✅ {success_text}\n{SEPARATOR_LINE}"
 
 
 def format_info_message(info_text: str) -> str:
@@ -236,4 +239,4 @@ def format_info_message(info_text: str) -> str:
     Returns:
         Formatted info message
     """
-    return f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nℹ️ {info_text}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" 
+    return f"{SEPARATOR_LINE}\nℹ️ {info_text}\n{SEPARATOR_LINE}" 
