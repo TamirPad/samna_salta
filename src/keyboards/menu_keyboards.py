@@ -108,7 +108,7 @@ def get_category_menu_keyboard(category: str, user_id: int = None):
             localized_name = get_localized_name(product, user_language)
             
             # Product button - clicking this shows product details
-            button_text = f"{localized_name}\n💰 ₪{product.price:.2f}"
+            button_text = f"{localized_name}\n - ₪{product.price:.2f} 💰"
             callback_data = f"product_{product.id}"
             
             row.append(InlineKeyboardButton(button_text, callback_data=callback_data))

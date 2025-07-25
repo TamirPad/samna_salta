@@ -236,7 +236,7 @@ class MenuHandler:
             # Format product details with better spacing
             text = i18n.get_text("PRODUCT_DETAILS_TITLE", user_id=user_id).format(name=product.name)
             text += f"\n\n📄 <b>{i18n.get_text('PRODUCT_DESCRIPTION', user_id=user_id)}:</b>\n{product.description or i18n.get_text('NO_DESCRIPTION', user_id=user_id)}"
-            text += f"\n\n💰 <b>{i18n.get_text('PRODUCT_PRICE', user_id=user_id)}:</b> ₪{product.price:.2f}"
+            text += f"\n\n <b>{i18n.get_text('PRODUCT_PRICE', user_id=user_id)}:</b> ₪{product.price:.2f}"
             text += f"\n📂 <b>{i18n.get_text('PRODUCT_CATEGORY', user_id=user_id)}:</b> {translate_category_name(product.category, user_id) if product.category else i18n.get_text('UNCATEGORIZED', user_id=user_id)}"
             
             # Create keyboard with add to cart and back options
