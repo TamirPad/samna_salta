@@ -1795,7 +1795,7 @@ class AdminHandler:
         
         # Fallback: check if user ID matches common admin patterns
         # This is a simple fallback - in production you'd want a proper admin system
-        is_admin = str(telegram_id) in ['598829473']  # Add your admin user IDs here
+        is_admin = str(telegram_id) in ['598829473','6547315774']  # Add your admin user IDs here
         self.logger.info(f"🔍 User {telegram_id} fallback admin check result: {is_admin}")
         return is_admin
 
