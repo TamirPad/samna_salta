@@ -2811,6 +2811,8 @@ class AdminHandler:
         try:
             user_id = update.effective_user.id
             
+            self.logger.info(f"📋 Starting category selection for user {user_id}")
+            
             # Get available categories
             categories = await self.admin_service.get_product_categories_list()
             
@@ -2840,13 +2842,23 @@ class AdminHandler:
             ])
             
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+            # Handle both callback queries and regular messages
+            if update.callback_query:
+                await update.callback_query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+                self.logger.info(f"✅ Category selection shown via callback for user {user_id}")
+            else:
+                await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
+                self.logger.info(f"✅ Category selection shown via message for user {user_id}")
             
             return AWAITING_PRODUCT_CATEGORY
             
         except Exception as e:
             self.logger.error("Error showing category selection: %s", e)
-            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            if update.callback_query:
+                await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            else:
+                await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
             return ConversationHandler.END
 
     async def _handle_product_category_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2954,13 +2966,21 @@ class AdminHandler:
             ]
             
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            
+            # Handle both callback queries and regular messages
+            if update.callback_query:
+                await update.callback_query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            else:
+                await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
             
             return AWAITING_PRODUCT_CONFIRMATION
             
         except Exception as e:
             self.logger.error("Error showing product confirmation: %s", e)
-            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            if update.callback_query:
+                await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            else:
+                await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
             return ConversationHandler.END
 
     async def _handle_product_confirmation(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3032,7 +3052,10 @@ class AdminHandler:
             
         except Exception as e:
             self.logger.error("Error handling product confirmation: %s", e)
-            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=update.callback_query.from_user.id))
+            if update.callback_query:
+                await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=update.callback_query.from_user.id))
+            else:
+                await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=update.effective_user.id))
             return ConversationHandler.END
 
     async def _handle_skip_hebrew_name(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3112,15 +3135,22 @@ class AdminHandler:
             query = update.callback_query
             user_id = query.from_user.id
             
+            self.logger.info(f"🔄 Skipping image URL for user {user_id}")
+            self.logger.info(f"🔍 Current context user_data: {context.user_data}")
+            
             # Set image URL to None
             context.user_data["product_image_url"] = None
             
             # Show category selection
+            self.logger.info(f"📋 Showing category selection for user {user_id}")
             return await self._show_category_selection_for_new_product(update, context)
             
         except Exception as e:
             self.logger.error("Error handling skip image URL: %s", e)
-            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            if update.callback_query:
+                await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            else:
+                await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
             return ConversationHandler.END
 
     async def _handle_product_callback(self, query: CallbackQuery, data: str) -> None:
@@ -4681,7 +4711,7 @@ def register_admin_handlers(application: Application):
 
     # Admin callback handlers (excluding conversation patterns but including fallback handlers)
     application.add_handler(
-        CallbackQueryHandler(handler.handle_admin_callback, pattern="^admin_(?!add_product$|add_product_category_|add_product_confirm_|add_category$|edit_category_name_|edit_product_field_|edit_product_confirm_|edit_product_category_|product_edit_|edit_business_name$|edit_business_description$|edit_business_address$|edit_business_phone$|edit_business_email$|edit_business_website$|edit_business_hours$|edit_currency$|edit_delivery_charge$|cancel_business_edit$)")
+        CallbackQueryHandler(handler.handle_admin_callback, pattern="^admin_(?!add_product$|add_product_category_|add_product_confirm_|add_category$|edit_category_name_|edit_product_field_|edit_product_confirm_|edit_product_category_|product_edit_|edit_business_name$|edit_business_description$|edit_business_address$|edit_business_phone$|edit_business_email$|edit_business_website$|edit_business_hours$|edit_currency$|edit_delivery_charge$|cancel_business_edit$|skip_hebrew_name$|skip_hebrew_description$|skip_image_url$|skip_hebrew_category_name$)")
     )
 
     # Admin conversation handler for status updates
@@ -4740,7 +4770,8 @@ def register_admin_handlers(application: Application):
             CommandHandler("cancel", handler._reset_conversation),
             CallbackQueryHandler(handler._reset_conversation, pattern="^admin_dashboard$"),
             CallbackQueryHandler(handler._reset_conversation, pattern="^admin_back$"),
-            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_products_management$")
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_products_management$"),
+            CallbackQueryHandler(handler._start_add_product, pattern="^admin_add_product$")
         ],
         name="add_product_conversation",
         persistent=False,
