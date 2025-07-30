@@ -1806,7 +1806,7 @@ class AdminHandler:
             user_id = query.from_user.id
             
             # Get product statistics
-            products = await self.admin_service.get_all_products_for_admin()
+            products = await self.admin_service.get_all_products_for_admin(user_id)
             total_products = len(products)
             active_products = len([p for p in products if p["is_active"]])
             inactive_products = total_products - active_products
@@ -1856,7 +1856,7 @@ class AdminHandler:
         try:
             self.logger.info(f"🔍 Starting _show_products_management for user {query.from_user.id}")
             user_id = query.from_user.id
-            products = await self.admin_service.get_all_products_for_admin()
+            products = await self.admin_service.get_all_products_for_admin(user_id)
             self.logger.info(f"🔍 Retrieved {len(products)} products for products management")
             
             text = (
@@ -1903,7 +1903,7 @@ class AdminHandler:
         """Show all products for admin management with pagination"""
         try:
             user_id = query.from_user.id
-            products = await self.admin_service.get_all_products_for_admin()
+            products = await self.admin_service.get_all_products_for_admin(user_id)
             
             if not products:
                 text = i18n.get_text("ADMIN_NO_PRODUCTS", user_id=user_id)
@@ -2098,7 +2098,7 @@ class AdminHandler:
             categories = await self.admin_service.get_product_categories_list()
             
             # Get total products count for summary
-            products = await self.admin_service.get_all_products_for_admin()
+            products = await self.admin_service.get_all_products_for_admin(user_id)
             total_products = len(products)
             
             text = (
@@ -2142,7 +2142,7 @@ class AdminHandler:
         """Show all categories for admin management"""
         try:
             user_id = query.from_user.id
-            categories = await self.admin_service.get_product_categories_list()
+            categories = await self.admin_service.get_product_categories_multilingual(user_id)
             
             if not categories:
                 text = i18n.get_text("ADMIN_NO_CATEGORIES", user_id=user_id)
@@ -2164,22 +2164,18 @@ class AdminHandler:
                 for category in categories:
                     # Get all products in category (including inactive ones) for accurate count
                     from src.db.operations import get_all_products_by_category
-                    products = get_all_products_by_category(category)
+                    products = get_all_products_by_category(category["english_name"])  # Use English name for lookup
                     product_count = len(products)
                     
-                    # Translate category name based on user's language
-                    from src.utils.i18n import translate_category_name
-                    translated_category = translate_category_name(category, user_id=user_id)
-                    
                     category_text = i18n.get_text("ADMIN_CATEGORY_BUTTON_FORMAT", user_id=user_id).format(
-                        name=translated_category,
+                        name=category["name"],  # Use multilingual display name
                         count=product_count
                     )
                     
                     keyboard.append([
                         InlineKeyboardButton(
                             category_text,
-                            callback_data=f"admin_edit_category_{category}"
+                            callback_data=f"admin_edit_category_{category['english_name']}"  # Use English name for callback
                         )
                     ])
                 
@@ -3204,7 +3200,7 @@ class AdminHandler:
         """Show detailed product information"""
         try:
             user_id = query.from_user.id
-            products = await self.admin_service.get_all_products_for_admin()
+            products = await self.admin_service.get_all_products_for_admin(user_id)
             product = next((p for p in products if p["id"] == product_id), None)
             
             if not product:
@@ -3275,7 +3271,7 @@ class AdminHandler:
             # Extract product_id from callback data: admin_product_edit_{product_id}
             product_id = int(query.data.split("_")[-1])
             
-            products = await self.admin_service.get_all_products_for_admin()
+            products = await self.admin_service.get_all_products_for_admin(user_id)
             product = next((p for p in products if p["id"] == product_id), None)
             
             if not product:
@@ -3310,7 +3306,7 @@ class AdminHandler:
             # Extract product_id from callback data: admin_product_edit_{product_id}
             product_id = int(query.data.split("_")[-1])
             
-            products = await self.admin_service.get_all_products_for_admin()
+            products = await self.admin_service.get_all_products_for_admin(user_id)
             product = next((p for p in products if p["id"] == product_id), None)
             
             if not product:
@@ -3422,7 +3418,7 @@ class AdminHandler:
             context.user_data["editing_product_id"] = product_id
             
             # Get current product info and store in context
-            products = await self.admin_service.get_all_products_for_admin()
+            products = await self.admin_service.get_all_products_for_admin(user_id)
             product = next((p for p in products if p["id"] == product_id), None)
             
             if not product:
@@ -3679,7 +3675,7 @@ class AdminHandler:
             product_id = context.user_data.get("editing_product_id")
             
             # Get current product info
-            products = await self.admin_service.get_all_products_for_admin()
+            products = await self.admin_service.get_all_products_for_admin(user_id)
             product = next((p for p in products if p["id"] == product_id), None)
             
             if not product:
@@ -3806,7 +3802,7 @@ class AdminHandler:
             elif data == "admin_edit_product_confirm_no":
                 # Go back to edit options
                 product_id = context.user_data.get("editing_product_id")
-                products = await self.admin_service.get_all_products_for_admin()
+                products = await self.admin_service.get_all_products_for_admin(user_id)
                 product = next((p for p in products if p["id"] == product_id), None)
                 
                 if product:
@@ -3863,7 +3859,7 @@ class AdminHandler:
         """Show remove product confirmation"""
         try:
             user_id = query.from_user.id
-            products = await self.admin_service.get_all_products_for_admin()
+            products = await self.admin_service.get_all_products_for_admin(user_id)
             product = next((p for p in products if p["id"] == product_id), None)
             
             if not product:
@@ -3900,7 +3896,7 @@ class AdminHandler:
         """Show deactivate product confirmation"""
         try:
             user_id = query.from_user.id
-            products = await self.admin_service.get_all_products_for_admin()
+            products = await self.admin_service.get_all_products_for_admin(user_id)
             product = next((p for p in products if p["id"] == product_id), None)
             
             if not product:
@@ -3939,7 +3935,7 @@ class AdminHandler:
             user_id = query.from_user.id
             self.logger.info("🔍 Showing hard delete confirmation for product ID %d", product_id)
             
-            products = await self.admin_service.get_all_products_for_admin()
+            products = await self.admin_service.get_all_products_for_admin(user_id)
             product = next((p for p in products if p["id"] == product_id), None)
             
             if not product:
@@ -3984,7 +3980,7 @@ class AdminHandler:
         """Toggle product active/inactive status"""
         try:
             user_id = query.from_user.id
-            products = await self.admin_service.get_all_products_for_admin()
+            products = await self.admin_service.get_all_products_for_admin(user_id)
             product = next((p for p in products if p["id"] == product_id), None)
             
             if not product:
@@ -4119,7 +4115,7 @@ class AdminHandler:
         """Show list of products for removal"""
         try:
             user_id = query.from_user.id
-            products = await self.admin_service.get_all_products_for_admin()
+            products = await self.admin_service.get_all_products_for_admin(user_id)
             
             if not products:
                 text = i18n.get_text("ADMIN_NO_PRODUCTS", user_id=user_id)

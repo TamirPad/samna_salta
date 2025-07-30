@@ -91,8 +91,8 @@ def get_localized_category_name(category: MenuCategory, language: str = "en") ->
     elif language == "en" and category.name_en:
         return category.name_en
     else:
-        # Fallback to original name field
-        return category.name
+        # Fallback to English name
+        return category.name_en or "Uncategorized"
 
 
 def get_localized_category_description(category: MenuCategory, language: str = "en") -> str:
@@ -625,14 +625,14 @@ def init_default_products():
         # Create categories and store them in a dict for easy lookup
         categories = {}
         for cat_data in categories_data:
-            existing_cat = session.query(MenuCategory).filter(MenuCategory.name == cat_data["name"]).first()
+            existing_cat = session.query(MenuCategory).filter(MenuCategory.name_en == cat_data["name_en"]).first()
             if existing_cat:
-                categories[cat_data["name"]] = existing_cat
+                categories[cat_data["name_en"]] = existing_cat
             else:
                 category = MenuCategory(**cat_data)
                 session.add(category)
                 session.flush()  # Get the ID
-                categories[cat_data["name"]] = category
+                categories[cat_data["name_en"]] = category
 
         # Default products configuration with image URLs and Hebrew names
         products = [
@@ -831,7 +831,7 @@ def get_all_products_admin() -> list[dict]:
     """Get all products (including inactive) for admin management with multilingual support"""
     session = get_db_session()
     try:
-        products = session.query(Product, MenuCategory.name.label('category_name')).join(MenuCategory).order_by(MenuCategory.name, Product.name).all()
+        products = session.query(Product, MenuCategory.name_en.label('category_name')).join(MenuCategory).order_by(MenuCategory.name_en, Product.name).all()
         
         result = []
         for product, category_name in products:
@@ -892,7 +892,7 @@ def get_product_dict_by_id(product_id: int) -> Optional[Dict]:
             "name_he": product.name_he,
             "description_en": product.description_en,
             "description_he": product.description_he,
-            "category": product.category_rel.name if product.category_rel else "Uncategorized",
+            "category": product.category_rel.name_en if product.category_rel else "Uncategorized",
             "price": product.price,
             "is_active": product.is_active,
             "created_at": product.created_at,
@@ -924,7 +924,7 @@ def create_product(
             return None
         
         # Get category by name
-        category_obj = session.query(MenuCategory).filter(MenuCategory.name == category).first()
+        category_obj = session.query(MenuCategory).filter(MenuCategory.name_en == category).first()
         if not category_obj:
             logger.warning("Category '%s' not found", category)
             return None
@@ -971,7 +971,7 @@ def update_product(product_id: int, **kwargs) -> bool:
                 setattr(product, field, value)
             elif field == 'category':
                 # Handle category by name
-                category_obj = session.query(MenuCategory).filter(MenuCategory.name == value).first()
+                category_obj = session.query(MenuCategory).filter(MenuCategory.name_en == value).first()
                 if category_obj:
                     product.category_id = category_obj.id
                 else:

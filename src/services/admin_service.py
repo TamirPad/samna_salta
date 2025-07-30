@@ -735,23 +735,49 @@ class AdminService:
             return []
 
     # Menu Management Methods
-    async def get_all_products_for_admin(self) -> List[Dict]:
-        """Get all products (including inactive) for admin management"""
+    async def get_all_products_for_admin(self, user_id: int = None) -> List[Dict]:
+        """Get all products (including inactive) for admin management with multilingual support"""
         try:
+            from src.utils.language_manager import language_manager
+            
+            # Get user language for localization
+            user_language = language_manager.get_user_language(user_id) if user_id else "en"
+            
             products = get_all_products_admin()
             
             # The database function now returns dictionaries directly
             result = []
             for product in products:
+                # Use appropriate language for product name
+                if user_language == "he" and product.get("name_he"):
+                    display_name = product["name_he"]
+                elif user_language == "en" and product.get("name_en"):
+                    display_name = product["name_en"]
+                else:
+                    display_name = product["name"]  # Fallback to original name
+                
+                # Use appropriate language for description
+                if user_language == "he" and product.get("description_he"):
+                    display_description = product["description_he"]
+                elif user_language == "en" and product.get("description_en"):
+                    display_description = product["description_en"]
+                else:
+                    display_description = product["description"] or ""
+                
                 result.append({
                     "id": product["id"],
-                    "name": product["name"],
-                    "description": product["description"] or "",
+                    "name": display_name,
+                    "description": display_description,
                     "category": product["category"] or "Uncategorized",
                     "price": product["price"],
                     "is_active": product["is_active"],
                     "created_at": product["created_at"],
-                    "updated_at": product["updated_at"]
+                    "updated_at": product["updated_at"],
+                    # Include all multilingual fields for admin reference
+                    "name_en": product.get("name_en"),
+                    "name_he": product.get("name_he"),
+                    "description_en": product.get("description_en"),
+                    "description_he": product.get("description_he")
                 })
             
             logger.info("Retrieved %d products for admin", len(result))
@@ -1030,6 +1056,47 @@ class AdminService:
             logger.error("Error getting product categories: %s", e)
             return []
 
+    async def get_product_categories_multilingual(self, user_id: int = None) -> List[Dict]:
+        """Get all categories with multilingual support for admin menu"""
+        try:
+            from src.db.operations import get_db_session
+            from src.db.models import MenuCategory
+            from src.utils.language_manager import language_manager
+            
+            # Get user language for localization
+            user_language = language_manager.get_user_language(user_id) if user_id else "en"
+            
+            session = get_db_session()
+            try:
+                categories = session.query(MenuCategory).all()
+                
+                result = []
+                for category in categories:
+                    # Use appropriate language for category name
+                    if user_language == "he" and category.name_he:
+                        display_name = category.name_he
+                    elif user_language == "en" and category.name_en:
+                        display_name = category.name_en
+                    else:
+                        display_name = category.name_en or "Uncategorized"
+                    
+                    result.append({
+                        "id": category.id,
+                        "name": display_name,
+                        "name_en": category.name_en,
+                        "name_he": category.name_he,
+                        "description": category.description,
+                        "english_name": category.name_en  # Keep English name for callback data
+                    })
+                
+                logger.info("Retrieved %d categories with multilingual support", len(result))
+                return result
+            finally:
+                session.close()
+        except Exception as e:
+            logger.error("Error getting product categories with multilingual support: %s", e)
+            return []
+
 
 
     async def get_products_by_category_admin(self, category: str) -> List[Dict]:
@@ -1148,7 +1215,7 @@ class AdminService:
                 return {
                     "success": True,
                     "category": {
-                        "name": category.name,
+                        "name": category.name_en,
                         "name_en": category.name_en,
                         "name_he": category.name_he,
                         "description": category.description

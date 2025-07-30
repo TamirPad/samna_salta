@@ -17,6 +17,10 @@ def get_dynamic_main_menu_keyboard(user_id: int = None):
     """Get dynamic main menu keyboard that shows categories first."""
     try:
         from src.db.operations import get_db_manager
+        from src.utils.language_manager import language_manager
+        
+        # Get user language for localization
+        user_language = language_manager.get_user_language(user_id) if user_id else "en"
         
         # Use session context to ensure relationships are loaded properly
         with get_db_manager().get_session_context() as session:
@@ -32,8 +36,15 @@ def get_dynamic_main_menu_keyboard(user_id: int = None):
             # Group products by category
             categories = {}
             for product in products:
-                # Access category name safely
-                category_name = product.category or "other"
+                # Get category name based on user language
+                if product.category_rel:
+                    if user_language == "he":
+                        category_name = product.category_rel.name_he
+                    else:
+                        category_name = product.category_rel.name_en
+                else:
+                    category_name = "other"
+                
                 if category_name not in categories:
                     categories[category_name] = []
                 categories[category_name].append(product)

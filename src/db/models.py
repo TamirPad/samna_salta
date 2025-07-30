@@ -153,7 +153,7 @@ class ProductOption(Base):
             return self.name_he
         elif language == "en" and self.name_en:
             return self.name_en
-        return self.name
+        return self.name_en or self.name  # Fallback to English name, then old name
 
     def get_localized_display_name(self, language: str = "en") -> str:
         """Get localized display name for the option"""
@@ -205,7 +205,7 @@ class ProductSize(Base):
             return self.name_he
         elif language == "en" and self.name_en:
             return self.name_en
-        return self.name
+        return self.name_en or self.name  # Fallback to English name, then old name
 
     def get_localized_display_name(self, language: str = "en") -> str:
         """Get localized display name for the size"""
@@ -253,7 +253,7 @@ class OrderStatus(Base):
             return self.name_he
         elif language == "en" and self.name_en:
             return self.name_en
-        return self.name
+        return self.name_en or self.name  # Fallback to English name, then old name
 
     def get_localized_display_name(self, language: str = "en") -> str:
         """Get localized display name for the status"""
@@ -308,7 +308,7 @@ class DeliveryMethod(Base):
             return self.name_he
         elif language == "en" and self.name_en:
             return self.name_en
-        return self.name
+        return self.name_en or self.name  # Fallback to English name, then old name
 
     def get_localized_display_name(self, language: str = "en") -> str:
         """Get localized display name for the delivery method"""
@@ -362,7 +362,7 @@ class PaymentMethod(Base):
             return self.name_he
         elif language == "en" and self.name_en:
             return self.name_en
-        return self.name
+        return self.name_en or self.name  # Fallback to English name, then old name
 
     def get_localized_display_name(self, language: str = "en") -> str:
         """Get localized display name for the payment method"""
