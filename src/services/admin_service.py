@@ -1039,10 +1039,10 @@ class AdminService:
             
             result = []
             for product in products:
-                # Get category name safely
+                # Get category name safely using multilingual fields
                 category_name = "Uncategorized"
                 if hasattr(product, 'category_rel') and product.category_rel:
-                    category_name = product.category_rel.name
+                    category_name = product.category_rel.name_en  # Use English name
                 elif hasattr(product, 'category'):
                     category_name = product.category or "Uncategorized"
                 
@@ -1087,7 +1087,7 @@ class AdminService:
 
     # Category Management Methods
     async def create_category(self, category_name: str) -> Dict:
-        """Create a new category"""
+        """Create a new category with multilingual support"""
         try:
             # Validate input
             if not category_name or len(category_name.strip()) < 2:
@@ -1098,10 +1098,11 @@ class AdminService:
             if category_name.lower() in [cat.lower() for cat in existing_categories]:
                 return {"success": False, "error": f"Category '{category_name}' already exists"}
             
-            # Create category directly using the new function
+            # Create category with multilingual support (same name for both languages initially)
             from src.db.operations import create_category
             category = create_category(
-                name=category_name.strip(),
+                name_en=category_name.strip(),
+                name_he=category_name.strip(),  # Same as English for now
                 description=f"Category for {category_name}",
                 display_order=len(existing_categories) + 1
             )
@@ -1110,7 +1111,7 @@ class AdminService:
                 logger.info("Successfully created category: %s", category_name)
                 return {
                     "success": True,
-                    "category": category_name.strip(),
+                    "category": category_name,
                     "message": f"Category '{category_name}' created successfully"
                 }
             else:
@@ -1186,13 +1187,17 @@ class AdminService:
             
             session = get_db_session()
             try:
-                # Find the category to update
-                category_obj = session.query(MenuCategory).filter(MenuCategory.name == old_category).first()
+                # Find the category to update (search in both name_en and name_he)
+                category_obj = session.query(MenuCategory).filter(
+                    (MenuCategory.name_en == old_category) | (MenuCategory.name_he == old_category)
+                ).first()
                 if not category_obj:
                     return {"success": False, "error": f"Category '{old_category}' not found"}
                 
-                # Update the category name
-                category_obj.name = new_category.strip()
+                # Update the category name - update both multilingual fields
+                new_category_name = new_category.strip()
+                category_obj.name_en = new_category_name  # Update English name
+                category_obj.name_he = new_category_name  # Update Hebrew name (same as English for now)
                 category_obj.updated_at = datetime.utcnow()
                 session.commit()
                 
@@ -1211,7 +1216,7 @@ class AdminService:
                 return {
                     "success": True,
                     "old_category": old_category,
-                    "new_category": new_category.strip(),
+                    "new_category": new_category_name,
                     "updated_products": len(products),
                     "message": f"Category updated from '{old_category}' to '{new_category}' ({len(products)} products)"
                 }
@@ -1232,7 +1237,7 @@ class AdminService:
         try:
             # Use the new delete_category function
             from src.db.operations import delete_category
-            success = delete_category(category)
+            success = delete_category(category)  # Pass English name
             
             if success:
                 logger.info("Successfully deleted category: %s", category)

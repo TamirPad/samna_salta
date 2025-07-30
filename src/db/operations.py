@@ -1069,38 +1069,41 @@ def delete_product(product_id: int) -> bool:
 
 @retry_on_database_error()
 def get_product_categories() -> list[str]:
-    """Get all unique product categories that have active products"""
+    """Get all unique product categories that have active products (returns English names)"""
     session = get_db_session()
     try:
         # Get categories that have active products
         categories = session.query(MenuCategory).join(Product).filter(
             Product.is_active == True
         ).distinct().all()
-        return [cat.name for cat in categories]
+        return [cat.name_en for cat in categories]  # Return English names
     finally:
         session.close()
 
 
 @retry_on_database_error()
 def get_all_categories() -> list[str]:
-    """Get all categories (including those without products) - for admin use"""
+    """Get all categories (including those without products) - for admin use (returns English names)"""
     session = get_db_session()
     try:
         # Get all categories
         categories = session.query(MenuCategory).filter(
             MenuCategory.is_active == True
-        ).order_by(MenuCategory.display_order, MenuCategory.name).all()
-        return [cat.name for cat in categories]
+        ).order_by(MenuCategory.display_order, MenuCategory.name_en).all()
+        return [cat.name_en for cat in categories]  # Return English names
     finally:
         session.close()
 
 
 @retry_on_database_error()
 def get_category_by_name(name: str) -> Optional[MenuCategory]:
-    """Get category by name"""
+    """Get category by name (searches in both name_en and name_he fields)"""
     session = get_db_session()
     try:
-        return session.query(MenuCategory).filter(MenuCategory.name == name).first()
+        # Search in both English and Hebrew name fields
+        return session.query(MenuCategory).filter(
+            (MenuCategory.name_en == name) | (MenuCategory.name_he == name)
+        ).first()
     finally:
         session.close()
 
@@ -1110,8 +1113,10 @@ def get_products_by_category(category: str) -> list[Product]:
     """Get all active products in a specific category"""
     session = get_db_session()
     try:
-        # First get the category by name
-        category_obj = session.query(MenuCategory).filter(MenuCategory.name == category).first()
+        # First get the category by name (searches in both name_en and name_he)
+        category_obj = session.query(MenuCategory).filter(
+            (MenuCategory.name_en == category) | (MenuCategory.name_he == category)
+        ).first()
         if not category_obj:
             return []
         
@@ -1129,8 +1134,10 @@ def get_all_products_by_category(category: str) -> list[Product]:
     """Get all products in a specific category (including inactive ones)"""
     session = get_db_session()
     try:
-        # First get the category by name
-        category_obj = session.query(MenuCategory).filter(MenuCategory.name == category).first()
+        # First get the category by name (searches in both name_en and name_he)
+        category_obj = session.query(MenuCategory).filter(
+            (MenuCategory.name_en == category) | (MenuCategory.name_he == category)
+        ).first()
         if not category_obj:
             return []
         
@@ -1854,81 +1861,81 @@ def get_database_status() -> dict:
 
 @retry_on_database_error()
 def create_category(
-    name: str, 
+    name_en: str, 
+    name_he: str,
     description: str = None, 
     display_order: int = None, 
     image_url: str = None,
-    name_en: Optional[str] = None,
-    name_he: Optional[str] = None,
     description_en: Optional[str] = None,
     description_he: Optional[str] = None
 ) -> Optional[MenuCategory]:
-    """Create a new menu category"""
+    """Create a new category with multilingual support"""
     session = get_db_session()
     try:
-        # Check if category already exists
-        existing_category = session.query(MenuCategory).filter(MenuCategory.name == name).first()
-        if existing_category:
-            logger.warning("Category '%s' already exists", name)
+        # Check if category already exists (check both English and Hebrew names)
+        existing_cat = session.query(MenuCategory).filter(
+            (MenuCategory.name_en == name_en) | (MenuCategory.name_he == name_he)
+        ).first()
+        
+        if existing_cat:
+            logger.warning("Category already exists")
             return None
         
-        # Create new category with multilingual support
-        category_data = {
-            "name": name.strip(),
-            "description": description.strip() if description else None,
-            "display_order": display_order,
-            "image_url": image_url,
-            "is_active": True,
-            "name_en": name_en,
-            "name_he": name_he,
-            "description_en": description_en,
-            "description_he": description_he
-        }
+        # Create new category
+        category = MenuCategory(
+            name_en=name_en,
+            name_he=name_he,
+            description=description,
+            display_order=display_order,
+            image_url=image_url,
+            description_en=description_en,
+            description_he=description_he
+        )
         
-        category = MenuCategory(**category_data)
         session.add(category)
         session.commit()
         
-        logger.info("Successfully created category: %s", name)
+        logger.info("Successfully created category: %s (EN) / %s (HE)", name_en, name_he)
         return category
         
-    except SQLAlchemyError as e:
+    except Exception as e:
         session.rollback()
-        logger.error("Failed to create category '%s': %s", name, e)
+        logger.error("Failed to create category '%s'/'%s': %s", name_en, name_he, e)
         return None
     finally:
         session.close()
 
 
 @retry_on_database_error()
-def delete_category(name: str) -> bool:
-    """Delete a menu category and all its products"""
+def delete_category(name_en: str, name_he: str = None) -> bool:
+    """Delete a category by English name (and optionally Hebrew name)"""
     session = get_db_session()
     try:
-        # Find the category
-        category = session.query(MenuCategory).filter(MenuCategory.name == name).first()
+        # Find category by English name, or by both if Hebrew name provided
+        if name_he:
+            category = session.query(MenuCategory).filter(
+                (MenuCategory.name_en == name_en) & (MenuCategory.name_he == name_he)
+            ).first()
+        else:
+            category = session.query(MenuCategory).filter(MenuCategory.name_en == name_en).first()
+        
         if not category:
-            logger.warning("Category '%s' not found", name)
+            logger.warning("Category not found")
             return False
         
-        # Get all products in this category
-        products = session.query(Product).filter(Product.category_id == category.id).all()
-        product_count = len(products)
+        # Count products in this category
+        product_count = session.query(Product).filter(Product.category_id == category.id).count()
         
-        # Delete all products in the category first
-        for product in products:
-            session.delete(product)
-        
-        # Delete the category
+        # Delete the category (products will be orphaned)
         session.delete(category)
         session.commit()
         
-        logger.info("Successfully deleted category '%s' with %d products", name, product_count)
+        logger.info("Successfully deleted category '%s' with %d products", name_en, product_count)
         return True
         
-    except SQLAlchemyError as e:
+    except Exception as e:
         session.rollback()
-        logger.error("Failed to delete category '%s': %s", name, e)
+        logger.error("Failed to delete category '%s': %s", name_en, e)
         return False
     finally:
         session.close()

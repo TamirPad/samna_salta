@@ -73,7 +73,6 @@ class MenuCategory(Base):
     __tablename__ = "menu_categories"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     display_order: Mapped[Optional[int]] = mapped_column(Integer, default=0, nullable=True)
     is_active: Mapped[Optional[bool]] = mapped_column(Boolean, default=True, nullable=True)
@@ -86,8 +85,8 @@ class MenuCategory(Base):
     )
     
     # Multilingual support
-    name_en: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    name_he: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    name_en: Mapped[str] = mapped_column(String(100), nullable=False)  # Make required
+    name_he: Mapped[str] = mapped_column(String(100), nullable=False)  # Make required
     description_en: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     description_he: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
@@ -97,7 +96,7 @@ class MenuCategory(Base):
     @property
     def display_name(self) -> str:
         """Get display name for the category"""
-        return self.name.title()
+        return self.name_en.title()  # Use English as default
 
     def get_localized_name(self, language: str = "en") -> str:
         """Get localized name for the category"""
@@ -105,7 +104,8 @@ class MenuCategory(Base):
             return self.name_he
         elif language == "en" and self.name_en:
             return self.name_en
-        return self.name  # Fallback to default name
+        # Fallback to English if Hebrew is not available
+        return self.name_en or "Uncategorized"
 
     def get_localized_description(self, language: str = "en") -> str:
         """Get localized description for the category"""
@@ -116,7 +116,7 @@ class MenuCategory(Base):
         return self.description or ""  # Fallback to default description
 
     def __str__(self) -> str:
-        return f"<MenuCategory(id={self.id}, name='{self.name}')>"
+        return f"<MenuCategory(id={self.id}, name_en='{self.name_en}', name_he='{self.name_he}')>"
 
 
 class ProductOption(Base):
@@ -428,7 +428,10 @@ class Product(Base):
     @property
     def category(self) -> Optional[str]:
         """Get category name for backward compatibility"""
-        return self.category_rel.name if self.category_rel else None
+        if self.category_rel:
+            # Use English name as the default category name for backward compatibility
+            return self.category_rel.name_en
+        return None
     
     @category.setter
     def category(self, value: Optional[str]):
