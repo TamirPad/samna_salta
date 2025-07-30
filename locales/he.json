@@ -288,7 +288,7 @@
   "ADMIN_CATEGORY_MANAGEMENT_VIEW": "📋 צפה בכל הקטגוריות",
   "ADMIN_CATEGORY_MANAGEMENT_ADD": "➕ הוסף קטגוריה חדשה",
   "ADMIN_CATEGORY_MANAGEMENT_BACK": "⬅️ חזור לניהול תפריט",
-  "ADMIN_CATEGORY_BUTTON_FORMAT": "📂 {name} ({count} מוצרים)",
+  "ADMIN_CATEGORY_BUTTON_FORMAT": "{name} ({count} מוצרים)",
   "CATEGORY_BREAD": "מאפים",
   "CATEGORY_SPICE": "תבלין",
   "CATEGORY_BEVERAGE": "משקה",

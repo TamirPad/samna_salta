@@ -65,7 +65,7 @@ def get_dynamic_main_menu_keyboard(user_id: int = None):
                     'white_coffee': '🤍',
                     'hilbeh': '🫘',
                     'other': '📂'
-                }.get(category.lower(), '🍽️')
+                }.get(category.lower(), '')
                 
                 button_text = f"{category_emoji} {translated_category} ({len(category_products)})"
                 callback_data = f"category_{category}"

@@ -302,7 +302,7 @@
   "ADMIN_CATEGORY_MANAGEMENT_VIEW": "📋 View All Categories",
   "ADMIN_CATEGORY_MANAGEMENT_ADD": "➕ Add New Category",
   "ADMIN_CATEGORY_MANAGEMENT_BACK": "⬅️ Back to Menu Management",
-  "ADMIN_CATEGORY_BUTTON_FORMAT": "📂 {name} ({count} products)",
+  "ADMIN_CATEGORY_BUTTON_FORMAT": "{name} ({count} products)",
   "CATEGORY_BREAD": "Bread",
   "CATEGORY_SPICE": "Spice",
   "CATEGORY_BEVERAGE": "Beverage",
