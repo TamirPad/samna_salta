@@ -598,67 +598,6 @@ class OrderItem(Base):
         return f"<OrderItem(id={self.id}, order_id={self.order_id}, product_id={self.product_id}, quantity={self.quantity})>"
 
 
-class CoreBusiness(Base):
-    """Core business configuration model"""
-
-    __tablename__ = "core_business"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, server_default="1")
-    name: Mapped[str] = mapped_column(String(200), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    logo_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    banner_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    contact_phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
-    contact_email: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    coordinates: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # PostgreSQL point type
-    delivery_radius_km: Mapped[Optional[float]] = mapped_column(Float, default=5.0, nullable=True)
-    is_active: Mapped[Optional[bool]] = mapped_column(Boolean, default=True, nullable=True)
-    settings: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, default={}, nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=True
-    )
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), onupdate=func.now(), nullable=True
-    )
-
-
-class AnalyticsDailySales(Base):
-    """Daily sales analytics model"""
-
-    __tablename__ = "analytics_daily_sales"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, unique=True)
-    total_orders: Mapped[Optional[int]] = mapped_column(Integer, default=0, nullable=True)
-    total_revenue: Mapped[Optional[float]] = mapped_column(Float, default=0.0, nullable=True)
-    total_items_sold: Mapped[Optional[int]] = mapped_column(Integer, default=0, nullable=True)
-    average_order_value: Mapped[Optional[float]] = mapped_column(Float, default=0.0, nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=True
-    )
-
-
-class AnalyticsProductPerformance(Base):
-    """Product performance analytics model"""
-
-    __tablename__ = "analytics_product_performance"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    product_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("menu_products.id"), nullable=True
-    )
-    total_orders: Mapped[Optional[int]] = mapped_column(Integer, default=0, nullable=True)
-    total_quantity_sold: Mapped[Optional[int]] = mapped_column(Integer, default=0, nullable=True)
-    total_revenue: Mapped[Optional[float]] = mapped_column(Float, default=0.0, nullable=True)
-    last_updated: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=True
-    )
-
-    # Relationships
-    product: Mapped[Optional["Product"]] = relationship("Product")
-
-
 class BusinessSettings(Base):
     """Business settings model for storing editable business details"""
 

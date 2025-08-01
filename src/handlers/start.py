@@ -251,7 +251,7 @@ class OnboardingHandler:
                 await update.message.reply_text(
                     i18n.get_text("WELCOME_BACK_UPDATED", language=user_language).format(name=result["customer"].name) + "\n\n" +
                     i18n.get_text("INFO_UPDATED", language=user_language) + "\n\n" +
-                    i18n.get_text("WELCOME", language=user_language) + "\n\n" +
+                    get_dynamic_welcome_for_returning_users(user_id=user_id) + "\n\n" +
                     i18n.get_text("WHAT_TO_ORDER_TODAY", language=user_language),
                     reply_markup=self._get_main_page_keyboard(user_id),
                     parse_mode="HTML"
@@ -314,7 +314,7 @@ class OnboardingHandler:
             await update.message.reply_text(
                 i18n.get_text("REGISTRATION_COMPLETE", user_id=user_id) + "\n\n" +
                 i18n.get_text("DELIVERY_ADDRESS_SAVED_ONBOARDING", user_id=user_id).format(address=address) + "\n\n" +
-                i18n.get_text("WELCOME", user_id=user_id) + "\n\n" +
+                get_dynamic_welcome_message(user_id=user_id) + "\n\n" +
                 i18n.get_text("WHAT_TO_ORDER_TODAY", user_id=user_id),
                 reply_markup=self._get_main_page_keyboard(user_id),
                 parse_mode="HTML"
