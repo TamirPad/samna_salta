@@ -1203,11 +1203,10 @@ class AdminService:
             # Create category with multilingual support
             from src.db.operations import create_category
             category = create_category(
-                name=name.strip(),
+                name_en=name_en or name.strip(),
+                name_he=name_he or name.strip(),
                 description=description or f"Category for {name}",
-                display_order=len(existing_categories) + 1,
-                name_en=name_en,
-                name_he=name_he
+                display_order=len(existing_categories) + 1
             )
             
             if category:
