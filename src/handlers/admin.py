@@ -2372,12 +2372,10 @@ class AdminHandler:
                     category_display = name_he
                 else:
                     category_display = name_en
-                success_text = i18n.get_text("ADMIN_CATEGORY_ADD_SUCCESS", user_id=user_id)
-                category_label = i18n.get_text("ADMIN_CATEGORY_LABEL", user_id=user_id)
-                msg = f"✅ <b>{success_text}</b>\n\U0001F4C1 <b>{category_label}</b> {category_display}"
+                success_text = i18n.get_text("ADMIN_CATEGORY_ADD_SUCCESS", user_id=user_id).format(category=category_display)
                 keyboard = [[InlineKeyboardButton(i18n.get_text("ADMIN_CATEGORY_BACK_TO_LIST", user_id=user_id), callback_data="admin_view_categories")]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
-                await update.message.reply_text(msg, parse_mode="HTML", reply_markup=reply_markup)
+                await update.message.reply_text(success_text, parse_mode="HTML", reply_markup=reply_markup)
                 return ConversationHandler.END
             else:
                 await update.message.reply_text(
