@@ -42,7 +42,11 @@ class MenuHandler:
             # Check if the current message is a photo message
             if query.message.photo:
                 # For photo messages, we need to delete and send a new text message
-                await query.message.delete()
+                try:
+                    await query.message.delete()
+                except Exception as delete_error:
+                    self.logger.warning("Failed to delete photo message: %s", delete_error)
+                
                 await query.message.reply_text(
                     text=text,
                     reply_markup=reply_markup,
@@ -56,18 +60,42 @@ class MenuHandler:
                     parse_mode=parse_mode
                 )
         except BadRequest as e:
-            if "There is no text in the message to edit" in str(e):
+            error_message = str(e)
+            if "There is no text in the message to edit" in error_message or "Message to edit not found" in error_message:
                 # Fallback: delete and send new message
                 try:
                     await query.message.delete()
-                except:
-                    pass  # Message might already be deleted
+                except Exception as delete_error:
+                    self.logger.warning("Failed to delete message during fallback: %s", delete_error)
+                
                 await query.message.reply_text(
                     text=text,
                     reply_markup=reply_markup,
                     parse_mode=parse_mode
                 )
             else:
+                # For other BadRequest errors, try to send a new message
+                self.logger.warning("BadRequest in safe_edit_message: %s", error_message)
+                try:
+                    await query.message.reply_text(
+                        text=text,
+                        reply_markup=reply_markup,
+                        parse_mode=parse_mode
+                    )
+                except Exception as reply_error:
+                    self.logger.error("Failed to send fallback message: %s", reply_error)
+                    raise e
+        except Exception as e:
+            # For any other exception, try to send a new message
+            self.logger.error("Exception in safe_edit_message: %s", e)
+            try:
+                await query.message.reply_text(
+                    text=text,
+                    reply_markup=reply_markup,
+                    parse_mode=parse_mode
+                )
+            except Exception as reply_error:
+                self.logger.error("Failed to send fallback message: %s", reply_error)
                 raise e
 
     async def handle_menu_callback(self, update: Update, _: ContextTypes.DEFAULT_TYPE):
@@ -125,6 +153,16 @@ class MenuHandler:
                 exc_info=True,
             )
             error_text = ErrorMessages.MENU_ERROR_OCCURRED
+            await self._safe_edit_message(query, error_text)
+        except Exception as e:
+            self.logger.error(
+                "💥 UNEXPECTED MENU CALLBACK ERROR: User %s, Data: %s, Error: %s",
+                user_id,
+                data,
+                e,
+                exc_info=True,
+            )
+            error_text = i18n.get_text("MENU_ERROR_OCCURRED", user_id=user_id)
             await self._safe_edit_message(query, error_text)
 
 
@@ -236,6 +274,10 @@ class MenuHandler:
             category_name = product.category or "other"
             image_url = get_product_image(product.image_url, category_name)
             
+            # Validate image URL before trying to send it
+            from src.utils.image_handler import validate_image_url
+            is_valid_image = validate_image_url(image_url)
+            
             # Get user language for localization
             user_language = language_manager.get_user_language(user_id)
             
@@ -283,21 +325,34 @@ class MenuHandler:
             
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            # Send photo with caption if image URL exists, otherwise send text
-            if image_url and image_url != get_product_image(None, category_name):
+            # Send photo with caption if image URL exists and is likely to be a direct image, otherwise send text
+            # Check if we have a valid image URL that's different from the default
+            default_image = get_product_image(None, category_name)
+            has_valid_image = (image_url and 
+                             image_url != default_image and 
+                             is_valid_image)
+            
+            if has_valid_image:
                 try:
-                    await query.message.delete()  # Delete the previous text message
+                    # Try to send photo first
                     await query.message.reply_photo(
                         photo=image_url,
                         caption=text,
                         parse_mode="HTML",
                         reply_markup=reply_markup
                     )
+                    # If successful, delete the original message
+                    try:
+                        await query.message.delete()
+                    except Exception as delete_error:
+                        self.logger.warning("Failed to delete original message: %s", delete_error)
                 except Exception as photo_error:
                     self.logger.warning("Failed to send photo, falling back to text: %s", photo_error)
-                    await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+                    # Fallback to text message - use safe edit method
+                    await self._safe_edit_message(query, text, reply_markup, "HTML")
             else:
-                await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+                # No image, invalid image, or default image, send text message
+                await self._safe_edit_message(query, text, reply_markup, "HTML")
             
         except Exception as e:
             self.logger.error("Error showing product details: %s", e)

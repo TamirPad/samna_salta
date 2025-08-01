@@ -2789,6 +2789,8 @@ class AdminHandler:
                 )
                 return AWAITING_PRODUCT_IMAGE_URL
             
+
+            
             # Store image URL
             context.user_data["product_image_url"] = image_url if image_url else None
             
@@ -3591,6 +3593,8 @@ class AdminHandler:
                 await update.message.reply_text(validation_result["error"])
                 return AWAITING_PRODUCT_EDIT_VALUE
             
+
+            
             # Store new value in context
             context.user_data["new_value"] = new_value
             
@@ -3654,6 +3658,7 @@ class AdminHandler:
                         "valid": False,
                         "error": i18n.get_text("ADMIN_EDIT_PRODUCT_IMAGE_INVALID", user_id=user_id)
                     }
+
             
             return {"valid": True}
             
