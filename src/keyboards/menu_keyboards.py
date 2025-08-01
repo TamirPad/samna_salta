@@ -36,14 +36,15 @@ def get_dynamic_main_menu_keyboard(user_id: int = None):
             # Group products by category
             categories = {}
             for product in products:
+                # Skip products without a proper category
+                if not product.category_rel:
+                    continue
+                    
                 # Get category name based on user language
-                if product.category_rel:
-                    if user_language == "he":
-                        category_name = product.category_rel.name_he
-                    else:
-                        category_name = product.category_rel.name_en
+                if user_language == "he":
+                    category_name = product.category_rel.name_he
                 else:
-                    category_name = "other"
+                    category_name = product.category_rel.name_en
                 
                 if category_name not in categories:
                     categories[category_name] = []
@@ -54,6 +55,10 @@ def get_dynamic_main_menu_keyboard(user_id: int = None):
             
             # Add category buttons (each on its own line)
             for category, category_products in categories.items():
+                # Skip "other" category if it's empty or has no valid products
+                if category.lower() == "other" and len(category_products) == 0:
+                    continue
+                    
                 # Create professional category button with beautiful icons and product count
                 translated_category = translate_category_name(category, user_id)
                 category_emoji = {
@@ -63,8 +68,7 @@ def get_dynamic_main_menu_keyboard(user_id: int = None):
                     'hawaij_soup': '🍲',
                     'hawaij_coffee': '☕',
                     'white_coffee': '🤍',
-                    'hilbeh': '🫘',
-                    'other': '📂'
+                    'hilbeh': '🫘'
                 }.get(category.lower(), '')
                 
                 button_text = f"{category_emoji} {translated_category} ({len(category_products)})"
