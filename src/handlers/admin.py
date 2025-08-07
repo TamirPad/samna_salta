@@ -1565,7 +1565,7 @@ class AdminHandler:
             return None
 
         details = [
-            i18n.get_text("ADMIN_ORDER_DETAILS_TITLE", user_id=user_id).format(number=order_info["order_number"], id=order_info["order_id"]),
+            i18n.get_text("ADMIN_ORDER_DETAILS_TITLE", user_id=user_id).format(id=order_info["order_id"]),
             i18n.get_text("ADMIN_CUSTOMER_LABEL", user_id=user_id).format(name=order_info["customer_name"]),
             i18n.get_text("ADMIN_PHONE_LABEL", user_id=user_id).format(phone=order_info["customer_phone"]),
             i18n.get_text("ADMIN_STATUS_LABEL", user_id=user_id).format(status=order_info["status"].capitalize()),

@@ -783,7 +783,7 @@ class OnboardingHandler:
             
             # Format order details
             details = [
-                i18n.get_text("CUSTOMER_ORDER_DETAILS_TITLE", user_id=user_id).format(number=order["order_number"]),
+                i18n.get_text("CUSTOMER_ORDER_DETAILS_TITLE", user_id=user_id).format(number=order["order_id"]),
                 "",
                 i18n.get_text("CUSTOMER_ORDER_STATUS", user_id=user_id).format(status=order["status"].capitalize()),
                 i18n.get_text("CUSTOMER_ORDER_TOTAL", user_id=user_id).format(total=order["total"]),

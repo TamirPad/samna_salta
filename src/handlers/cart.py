@@ -619,12 +619,13 @@ class CartHandler:
                 # Clear cart after successful order
                 cart_service.clear_cart(user_id)
                 
-                order_number = order_result.get("order_number")
+                order_obj = order_result.get("order")
+                order_id = getattr(order_obj, "id", None)
                 order_total = order_result.get("total")
                 
                 # Send success message to customer
                 success_message = i18n.get_text("ORDER_CONFIRMED_SUCCESS", user_id=user_id).format(
-                    order_number=order_number,
+                    order_number=order_id,
                     order_total=order_total
                 )
                 
@@ -635,7 +636,7 @@ class CartHandler:
                     reply_markup=self._get_order_success_keyboard(user_id)
                 )
                 
-                self.logger.info("✅ ORDER CREATED: #%s for user %s", order_number, user_id)
+                self.logger.info("✅ ORDER CREATED: id=%s for user %s", order_id, user_id)
                 
             else:
                 error_msg = order_result.get("error", i18n.get_text("ERROR_UNKNOWN_OCCURRED", user_id=user_id))

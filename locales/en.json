@@ -120,7 +120,7 @@
   "ADMIN_COMPLETED_ORDERS": "✅ Completed Orders",
   "ADMIN_ANALYTICS": "📊 Analytics",
   "ADMIN_ERROR_MESSAGE": "An error occurred. Please try again or contact support.",
-  "ADMIN_ORDER_DETAILS_TITLE": "<b>Order #{number} (ID: {id})</b>",
+  "ADMIN_ORDER_DETAILS_TITLE": "<b>Order #{id}</b>",
   "ADMIN_CUSTOMER_LABEL": "<b>Customer:</b> {name}",
   "ADMIN_PHONE_LABEL": "<b>Phone:</b> {phone}",
   "ADMIN_STATUS_LABEL": "<b>Status:</b> {status}",

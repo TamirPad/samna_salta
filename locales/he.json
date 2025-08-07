@@ -122,7 +122,7 @@
   "ADMIN_COMPLETED_ORDERS": "✅ הזמנות שהושלמו",
   "ADMIN_ANALYTICS": "📊 אנליטיקה",
   "ADMIN_ERROR_MESSAGE": "אירעה שגיאה. נסה שוב או צור קשר עם התמיכה.",
-  "ADMIN_ORDER_DETAILS_TITLE": "<b>הזמנה #{number} (ID: {id})</b>",
+  "ADMIN_ORDER_DETAILS_TITLE": "<b>הזמנה #{id}</b>",
   "ADMIN_CUSTOMER_LABEL": "<b>לקוח:</b> {name}",
   "ADMIN_PHONE_LABEL": "<b>טלפון:</b> {phone}",
   "ADMIN_STATUS_LABEL": "<b>סטטוס:</b> {status}",
