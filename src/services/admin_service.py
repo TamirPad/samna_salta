@@ -432,7 +432,9 @@ class AdminService:
                     "customer_phone": order.customer.phone if order.customer else "Unknown",
                     "total": order.total,
                     "status": order.status,
-                    "created_at": order.created_at
+                    "created_at": order.created_at,
+                    "delivery_method": getattr(order, "delivery_method", None),
+                    "delivery_address": getattr(order, "delivery_address", None),
                 })
             
             logger.info("Retrieved %d active orders", len(result))
@@ -456,7 +458,9 @@ class AdminService:
                     "customer_phone": order.customer.phone if order.customer else "Unknown",
                     "total": order.total,
                     "status": order.status,
-                    "created_at": order.created_at
+                    "created_at": order.created_at,
+                    "delivery_method": getattr(order, "delivery_method", None),
+                    "delivery_address": getattr(order, "delivery_address", None),
                 })
             
             logger.info("Retrieved %d total orders", len(result))
@@ -483,6 +487,8 @@ class AdminService:
                 "total": order.total,
                 "status": order.status,
                 "created_at": order.created_at,
+                "delivery_method": getattr(order, "delivery_method", None),
+                "delivery_address": getattr(order, "delivery_address", None),
                 "items": []
             }
             

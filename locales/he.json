@@ -126,6 +126,8 @@
   "ADMIN_CUSTOMER_LABEL": "<b>לקוח:</b> {name}",
   "ADMIN_PHONE_LABEL": "<b>טלפון:</b> {phone}",
   "ADMIN_STATUS_LABEL": "<b>סטטוס:</b> {status}",
+  "ADMIN_DELIVERY_METHOD_LABEL": "<b>שיטת משלוח:</b> {method}",
+  "ADMIN_DELIVERY_ADDRESS_LABEL_OPT": "<b>כתובת:</b> {address}",
   "ADMIN_TOTAL_LABEL": "<b>סה״כ:</b> ₪{amount:.2f}",
   "ADMIN_CREATED_LABEL": "<b>נוצר:</b> {datetime}",
   "ADMIN_ITEMS_LABEL": "<b>פריטים:</b>",

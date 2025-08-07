@@ -124,6 +124,8 @@
   "ADMIN_CUSTOMER_LABEL": "<b>Customer:</b> {name}",
   "ADMIN_PHONE_LABEL": "<b>Phone:</b> {phone}",
   "ADMIN_STATUS_LABEL": "<b>Status:</b> {status}",
+  "ADMIN_DELIVERY_METHOD_LABEL": "<b>Delivery Method:</b> {method}",
+  "ADMIN_DELIVERY_ADDRESS_LABEL_OPT": "<b>Address:</b> {address}",
   "ADMIN_TOTAL_LABEL": "<b>Total:</b> ₪{amount:.2f}",
   "ADMIN_CREATED_LABEL": "<b>Created:</b> {datetime}",
   "ADMIN_ITEMS_LABEL": "<b>Items:</b>",

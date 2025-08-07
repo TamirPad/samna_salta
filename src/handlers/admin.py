@@ -1569,11 +1569,16 @@ class AdminHandler:
             i18n.get_text("ADMIN_CUSTOMER_LABEL", user_id=user_id).format(name=order_info["customer_name"]),
             i18n.get_text("ADMIN_PHONE_LABEL", user_id=user_id).format(phone=order_info["customer_phone"]),
             i18n.get_text("ADMIN_STATUS_LABEL", user_id=user_id).format(status=order_info["status"].capitalize()),
+            i18n.get_text("ADMIN_DELIVERY_METHOD_LABEL", user_id=user_id).format(method=(order_info.get("delivery_method") or "Unknown").capitalize()),
             i18n.get_text("ADMIN_TOTAL_LABEL", user_id=user_id).format(amount=order_info["total"]),
             i18n.get_text("ADMIN_CREATED_LABEL", user_id=user_id).format(
                 datetime=(order_info["created_at"] or datetime.utcnow()).strftime('%Y-%m-%d %H:%M')
             ),
         ]
+        # Show address only for delivery
+        if (order_info.get("delivery_method") or "").lower() == "delivery":
+            address = order_info.get("delivery_address") or i18n.get_text("UNKNOWN_ADDRESS", user_id=user_id) if hasattr(i18n, 'get_text') else (order_info.get("delivery_address") or "Unknown")
+            details.insert(5, i18n.get_text("ADMIN_DELIVERY_ADDRESS_LABEL_OPT", user_id=user_id).format(address=address))
         if order_info.get("items"):
             details.append(f"\n{i18n.get_text('ADMIN_ITEMS_LABEL', user_id=user_id)}")
             for item in order_info["items"]:
