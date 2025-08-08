@@ -256,6 +256,12 @@ class AdminHandler:
         elif data.startswith("admin_order_"):
             order_id = int(data.split("_")[-1])
             await self._show_order_details(query, order_id)
+        elif data.startswith("admin_invoice_pdf_"):
+            order_id = int(data.split("_")[-1])
+            await self._send_order_invoice_pdf(query, order_id, receipt=False)
+        elif data.startswith("admin_receipt_pdf_"):
+            order_id = int(data.split("_")[-1])
+            await self._send_order_invoice_pdf(query, order_id, receipt=True)
         elif data.startswith("admin_customer_orders_"):
             customer_id = int(data.split("_")[-1])
             await self._show_customer_orders(query, customer_id)
@@ -1722,6 +1728,74 @@ class AdminHandler:
             self.logger.error("💥 ORDER DETAILS ERROR: %s", e)
             await query.message.reply_text(i18n.get_text("ORDER_DETAILS_ERROR"))
 
+    async def _send_order_invoice_pdf(self, query: CallbackQuery, order_id: int, receipt: bool = False) -> None:
+        """Generate invoice/receipt PDF and send it back to the admin chat."""
+        try:
+            await query.answer()
+            user_id = query.from_user.id
+            # Fetch full order information
+            order_info = await self.admin_service.get_order_by_id(order_id)
+            if not order_info:
+                await query.edit_message_text(i18n.get_text("ADMIN_ORDER_NOT_FOUND", user_id=user_id))
+                return
+            # Prepare order dict for invoice service
+            from src.db.operations import get_business_settings_dict
+            business = get_business_settings_dict()
+            # Enrich items with unit_price if missing
+            items = []
+            # Exclude synthetic Delivery pseudo-line from items to avoid double counting
+            delivery_label = i18n.get_text("DELIVERY_ITEM_NAME", user_id=user_id)
+            for it in order_info.get("items", []):
+                if (it.get("product_name") or "").strip() == delivery_label:
+                    # handled via delivery_charge totals section
+                    continue
+                unit = it.get("unit_price")
+                if unit is None:
+                    qty = it.get("quantity", 1)
+                    total_price = float(it.get("total_price", 0))
+                    unit = total_price / qty if qty else total_price
+                items.append({
+                    "product_name": it.get("product_name"),
+                    "quantity": it.get("quantity", 1),
+                    "unit_price": unit,
+                    "total_price": it.get("total_price", unit * it.get("quantity", 1))
+                })
+            order_payload = {
+                "order_id": order_info.get("order_id"),
+                "order_number": order_info.get("order_number"),
+                "customer_name": order_info.get("customer_name"),
+                "customer_phone": order_info.get("customer_phone"),
+                "delivery_method": order_info.get("delivery_method"),
+                "delivery_address": order_info.get("delivery_address"),
+                "delivery_instructions": order_info.get("delivery_instructions"),
+                "items": items,
+                "subtotal": float(order_info.get("subtotal", 0) or (float(order_info.get("total", 0)) - float(order_info.get("delivery_charge", 0) or 0))),
+                "delivery_charge": float(order_info.get("delivery_charge", 0) or 0),
+                "total": float(order_info.get("total", 0)),
+                "created_at": order_info.get("created_at"),
+            }
+            from src.services.invoice_service import build_invoice_pdf
+            result = await build_invoice_pdf(order_payload, business, receipt=receipt, user_id=user_id)
+            pdf_bytes = result.get("pdf")
+            html = result.get("html")
+            from src.container import get_container
+            container = get_container()
+            bot = container.get_bot()
+            if pdf_bytes:
+                await bot.send_document(
+                    chat_id=query.message.chat_id,
+                    document=pdf_bytes,
+                    filename=f"invoice_{order_id}.pdf" if not receipt else f"receipt_{order_id}.pdf",
+                    caption=f"Order #{order_id} invoice" if not receipt else f"Order #{order_id} receipt"
+                )
+            else:
+                # Fallback: send HTML as a file or message
+                await bot.send_message(chat_id=query.message.chat_id, text="PDF not available; sending printable HTML below.", parse_mode="HTML")
+                await bot.send_message(chat_id=query.message.chat_id, text=html)
+        except Exception as e:
+            self.logger.error("💥 INVOICE PDF ERROR: %s", e)
+            await query.answer(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id), show_alert=True)
+
     async def _get_formatted_order_details(self, order_id: int, user_id: int = None) -> str | None:
         """Helper to get and format order details."""
         order_info = await self.admin_service.get_order_by_id(order_id)
@@ -1799,6 +1873,12 @@ class AdminHandler:
             for status in statuses
         ]
         
+        # Add invoice/receipt actions
+        keyboard.append([
+            InlineKeyboardButton("📄 Invoice (PDF)", callback_data=f"admin_invoice_pdf_{order_id}"),
+            InlineKeyboardButton("🧾 Receipt 58mm", callback_data=f"admin_receipt_pdf_{order_id}")
+        ])
+
         # Add delete order button
         keyboard.append([
             InlineKeyboardButton(

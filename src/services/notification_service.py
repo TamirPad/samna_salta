@@ -7,6 +7,7 @@ from typing import Dict, List, Optional
 
 from src.config import get_config
 from src.utils.i18n import i18n
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ class NotificationService:
         self.admin_chat_id = self.config.admin_chat_id
         self.bot_token = self.config.bot_token
 
-    async def send_admin_notification(self, message: str, order_id: Optional[int] = None) -> bool:
+    async def send_admin_notification(self, message: str, order_id: Optional[int] = None, reply_markup: Optional[InlineKeyboardMarkup] = None) -> bool:
         """Send notification to admin"""
         try:
             if not self.admin_chat_id:
@@ -37,7 +38,8 @@ class NotificationService:
                 await bot.send_message(
                     chat_id=self.admin_chat_id,
                     text=message,
-                    parse_mode="HTML"
+                    parse_mode="HTML",
+                    reply_markup=reply_markup
                 )
                 logger.info("Admin notification sent to %s", self.admin_chat_id)
                 return True
@@ -76,7 +78,16 @@ class NotificationService:
     async def notify_new_order(self, order_data: Dict) -> bool:
         """Notify admin about new order"""
         message = self._format_order_notification(order_data)
-        return await self.send_admin_notification(message)
+        # Add inline buttons for invoice/receipt PDF
+        order_id = order_data.get('order_id') or order_data.get('order_number')
+        buttons = [
+            [
+                InlineKeyboardButton("📄 Invoice (PDF)", callback_data=f"admin_invoice_pdf_{order_id}"),
+                InlineKeyboardButton("🧾 Receipt 58mm", callback_data=f"admin_receipt_pdf_{order_id}")
+            ]
+        ]
+        markup = InlineKeyboardMarkup(buttons)
+        return await self.send_admin_notification(message, order_id=order_id, reply_markup=markup)
 
     async def notify_order_status_update(self, order_id: str, new_status: str, customer_chat_id: int, delivery_method: str = "pickup") -> bool:
         """Notify customer about order status update"""

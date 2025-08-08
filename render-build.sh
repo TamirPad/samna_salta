@@ -27,6 +27,16 @@ python --version
 echo "✅ Dependencies installed:"
 poetry show --tree
 
+# Install Playwright browsers for PDF generation (ignore failures to keep build going)
+echo "🧩 Installing Playwright Chromium for PDF generation..."
+if poetry run python -c "import playwright" 2>/dev/null; then
+  set +e
+  poetry run playwright install chromium || true
+  set -e
+else
+  echo "Playwright not installed; PDF generation will fall back to HTML."
+fi
+
 # Run deployment verification (optional - can be disabled if causing issues)
 echo "🔍 Running deployment verification..."
 if python scripts/verify_deployment.py; then
