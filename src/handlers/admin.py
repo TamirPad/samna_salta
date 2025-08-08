@@ -2367,9 +2367,14 @@ class AdminHandler:
             # Check if category already exists
             existing_categories = await self.admin_service.get_product_categories_list()
             if name_en.lower() in [cat.lower() for cat in existing_categories] or (name_he and name_he.lower() in [cat.lower() for cat in existing_categories]):
-                await update.message.reply_text(
-                    i18n.get_text("ADMIN_CATEGORY_ALREADY_EXISTS", user_id=user_id).format(category=name_en or name_he)
-                )
+                text = i18n.get_text("ADMIN_CATEGORY_ALREADY_EXISTS", user_id=user_id).format(category=name_en or name_he)
+                if update.callback_query:
+                    try:
+                        await update.callback_query.edit_message_text(text, parse_mode="HTML")
+                    except Exception:
+                        await update.callback_query.message.reply_text(text, parse_mode="HTML")
+                else:
+                    await update.message.reply_text(text, parse_mode="HTML")
                 return AWAITING_CATEGORY_NAME_EN
             result = await self.admin_service.create_category_multilingual(
                 name=name_en or name_he,
@@ -2387,16 +2392,34 @@ class AdminHandler:
                 success_text = i18n.get_text("ADMIN_CATEGORY_ADD_SUCCESS", user_id=user_id).format(category=category_display)
                 keyboard = [[InlineKeyboardButton(i18n.get_text("ADMIN_CATEGORY_BACK_TO_LIST", user_id=user_id), callback_data="admin_view_categories")]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
-                await update.message.reply_text(success_text, parse_mode="HTML", reply_markup=reply_markup)
+                if update.callback_query:
+                    try:
+                        await update.callback_query.edit_message_text(success_text, parse_mode="HTML", reply_markup=reply_markup)
+                    except Exception:
+                        await update.callback_query.message.reply_text(success_text, parse_mode="HTML", reply_markup=reply_markup)
+                else:
+                    await update.message.reply_text(success_text, parse_mode="HTML", reply_markup=reply_markup)
                 return ConversationHandler.END
             else:
-                await update.message.reply_text(
-                    i18n.get_text("ADMIN_CATEGORY_ADD_ERROR", user_id=user_id).format(error=result["error"])
-                )
+                error_text = i18n.get_text("ADMIN_CATEGORY_ADD_ERROR", user_id=user_id).format(error=result["error"])
+                if update.callback_query:
+                    try:
+                        await update.callback_query.edit_message_text(error_text, parse_mode="HTML")
+                    except Exception:
+                        await update.callback_query.message.reply_text(error_text, parse_mode="HTML")
+                else:
+                    await update.message.reply_text(error_text, parse_mode="HTML")
             return ConversationHandler.END
         except Exception as e:
             self.logger.error("Error finalizing category creation: %s", e)
-            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            fallback_text = i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id)
+            if update.callback_query:
+                try:
+                    await update.callback_query.edit_message_text(fallback_text, parse_mode="HTML")
+                except Exception:
+                    await update.callback_query.message.reply_text(fallback_text, parse_mode="HTML")
+            else:
+                await update.message.reply_text(fallback_text)
             return ConversationHandler.END
 
     async def _start_edit_category_name(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
