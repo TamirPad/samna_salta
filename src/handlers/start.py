@@ -45,6 +45,68 @@ class OnboardingHandler:
         self.cart_service = self.container.get_cart_service()
         self.logger = logging.getLogger(self.__class__.__name__)
 
+    async def _update_single_window(self, update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, reply_markup=None, parse_mode: str = "HTML"):
+        """Always keep a single bot message visible by editing the last bot message when possible.
+        - If invoked from a callback query, edit that message (or its caption) or delete and send a new one.
+        - If invoked from a user text message, edit the last stored bot message; if missing, send a new one.
+        Stores the last bot message id in context.user_data['last_bot_message_id'].
+        """
+        try:
+            if update.callback_query:
+                query = update.callback_query
+                msg = query.message
+                try:
+                    if getattr(msg, "text", None):
+                        await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+                        context.user_data["last_bot_message_id"] = msg.message_id
+                        return
+                    # Photo/caption message
+                    if getattr(msg, "caption", None) is not None or getattr(msg, "photo", None):
+                        # Try editing caption first
+                        try:
+                            await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+                            context.user_data["last_bot_message_id"] = msg.message_id
+                            return
+                        except Exception:
+                            pass
+                    # Fallback: delete and send new
+                    try:
+                        await msg.delete()
+                    except Exception:
+                        pass
+                    sent = await msg.reply_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+                    context.user_data["last_bot_message_id"] = sent.message_id
+                    return
+                except Exception:
+                    # Last resort
+                    sent = await msg.reply_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+                    context.user_data["last_bot_message_id"] = sent.message_id
+                    return
+
+            # Message-based flow (user typed input)
+            chat_id = update.effective_chat.id
+            last_id = context.user_data.get("last_bot_message_id")
+            if last_id:
+                # Try editing previous bot message
+                try:
+                    await context.bot.edit_message_text(chat_id=chat_id, message_id=last_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+                    return
+                except Exception:
+                    # Try editing caption (in case the last message was a photo)
+                    try:
+                        await context.bot.edit_message_caption(chat_id=chat_id, message_id=last_id, caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+                        return
+                    except Exception:
+                        # Delete and send a new message
+                        try:
+                            await context.bot.delete_message(chat_id=chat_id, message_id=last_id)
+                        except Exception:
+                            pass
+            sent = await update.effective_chat.send_message(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+            context.user_data["last_bot_message_id"] = sent.message_id
+        except Exception as e:
+            self.logger.error("_update_single_window failed: %s", e)
+
     async def start_command(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> int:
         """Handle /start command - begin onboarding process"""
         user = update.effective_user
@@ -68,20 +130,12 @@ class OnboardingHandler:
 👋 <b>{i18n.get_text("WELCOME_BACK", user_id=user_id).format(name=existing_customer.name)}</b>
 
 🍽️ {i18n.get_text("WHAT_TO_ORDER_TODAY", user_id=user_id)}"""
-                    await update.message.reply_text(
-                        welcome_message,
-                        reply_markup=self._get_main_page_keyboard(user_id),
-                        parse_mode="HTML"
-                    )
+                    await self._update_single_window(update, _, welcome_message, self._get_main_page_keyboard(user_id))
                     return END
                 else:
                     # Customer exists but profile is incomplete - restart onboarding
                     self.logger.info("Customer %s has incomplete profile, restarting onboarding", user.id)
-                    await update.message.reply_text(
-                        i18n.get_text("PROFILE_INCOMPLETE", user_id=user.id) + "\n\n" +
-                        i18n.get_text("PLEASE_COMPLETE_PROFILE", user_id=user.id),
-                        parse_mode="HTML"
-                    )
+                    await self._update_single_window(update, _, i18n.get_text("PROFILE_INCOMPLETE", user_id=user.id) + "\n\n" + i18n.get_text("PLEASE_COMPLETE_PROFILE", user_id=user.id))
                     # Continue to language selection
 
             # Start onboarding for new customer or incomplete profile with beautiful language selection
@@ -92,11 +146,7 @@ class OnboardingHandler:
 
 🌍 {i18n.get_text("SELECT_LANGUAGE_PROMPT", user_id=user_id)}"""
 
-            await update.message.reply_text(
-                welcome_text,
-                reply_markup=self._get_language_selection_keyboard(),
-                parse_mode="HTML"
-            )
+            await self._update_single_window(update, _, welcome_text, self._get_language_selection_keyboard())
             return ONBOARDING_LANGUAGE
 
         except Exception as e:
@@ -133,11 +183,7 @@ class OnboardingHandler:
                 from src.utils.language_manager import language_manager
                 language_manager._user_languages[user_id] = "en"
                 
-                await query.edit_message_text(
-                    i18n.get_text("LANGUAGE_CHANGED", language="en") + "\n\n" +
-                    i18n.get_text("PLEASE_ENTER_NAME", language="en"),
-                    parse_mode="HTML"
-                )
+                await self._update_single_window(update, context, i18n.get_text("LANGUAGE_CHANGED", language="en") + "\n\n" + i18n.get_text("PLEASE_ENTER_NAME", language="en"))
                 return ONBOARDING_NAME
             elif data == "language_he":
                 # Store language preference in context for later use
@@ -146,20 +192,11 @@ class OnboardingHandler:
                 from src.utils.language_manager import language_manager
                 language_manager._user_languages[user_id] = "he"
                 
-                await query.edit_message_text(
-                    i18n.get_text("LANGUAGE_CHANGED", language="he") + "\n\n" +
-                    i18n.get_text("PLEASE_ENTER_NAME", language="he"),
-                    parse_mode="HTML"
-                )
+                await self._update_single_window(update, context, i18n.get_text("LANGUAGE_CHANGED", language="he") + "\n\n" + i18n.get_text("PLEASE_ENTER_NAME", language="he"))
                 return ONBOARDING_NAME
             else:
                 # Invalid language selection
-                await query.edit_message_text(
-                    i18n.get_text("INVALID_CHOICE", user_id=user_id) + "\n\n" +
-                    i18n.get_text("SELECT_LANGUAGE_PROMPT", user_id=user_id),
-                    reply_markup=self._get_language_selection_keyboard(),
-                    parse_mode="HTML"
-                )
+                await self._update_single_window(update, context, i18n.get_text("INVALID_CHOICE", user_id=user_id) + "\n\n" + i18n.get_text("SELECT_LANGUAGE_PROMPT", user_id=user_id), self._get_language_selection_keyboard())
                 return ONBOARDING_LANGUAGE
 
         except Exception as e:
@@ -182,20 +219,13 @@ class OnboardingHandler:
             
             # Basic validation
             if len(name) < 2:
-                await update.message.reply_text(
-                    i18n.get_text("NAME_TOO_SHORT", language=user_language),
-                    parse_mode="HTML"
-                )
+                await self._update_single_window(update, context, i18n.get_text("NAME_TOO_SHORT", language=user_language))
                 return ONBOARDING_NAME
 
             # Store name in context
             context.user_data["full_name"] = name
 
-            await update.message.reply_text(
-                i18n.get_text("NICE_TO_MEET", language=user_language).format(name=name) + "\n\n" +
-                i18n.get_text("PLEASE_SHARE_PHONE", language=user_language),
-                parse_mode="HTML"
-            )
+            await self._update_single_window(update, context, i18n.get_text("NICE_TO_MEET", language=user_language).format(name=name) + "\n\n" + i18n.get_text("PLEASE_SHARE_PHONE", language=user_language))
             return ONBOARDING_PHONE
 
         except Exception as e:
@@ -227,20 +257,14 @@ class OnboardingHandler:
             validation = self.cart_service.validate_customer_data(full_name, phone)
             if not validation["valid"]:
                 error_msg = ", ".join(validation["errors"])
-                await update.message.reply_text(
-                    i18n.get_text("VALIDATION_ERROR", language=user_language).format(error=error_msg) + "\n\n" + i18n.get_text("PLEASE_TRY_AGAIN", language=user_language),
-                    parse_mode="HTML"
-                )
+                await self._update_single_window(update, context, i18n.get_text("VALIDATION_ERROR", language=user_language).format(error=error_msg) + "\n\n" + i18n.get_text("PLEASE_TRY_AGAIN", language=user_language))
                 return ONBOARDING_PHONE
             
             # Register customer
             result = self.cart_service.register_customer(user_id, full_name, phone, user_language)
             
             if not result["success"]:
-                await update.message.reply_text(
-                    i18n.get_text("VALIDATION_ERROR", language=user_language).format(error=result["error"]) + "\n\n" + i18n.get_text("PLEASE_TRY_AGAIN", language=user_language),
-                    parse_mode="HTML"
-                )
+                await self._update_single_window(update, context, i18n.get_text("VALIDATION_ERROR", language=user_language).format(error=result["error"]) + "\n\n" + i18n.get_text("PLEASE_TRY_AGAIN", language=user_language))
                 return ONBOARDING_PHONE
 
             # Store customer data in context
@@ -248,29 +272,15 @@ class OnboardingHandler:
             context.user_data["phone_number"] = phone
 
             if result["is_returning"]:
-                await update.message.reply_text(
-                    i18n.get_text("WELCOME_BACK_UPDATED", language=user_language).format(name=result["customer"].name) + "\n\n" +
-                    i18n.get_text("INFO_UPDATED", language=user_language) + "\n\n" +
-                    get_dynamic_welcome_for_returning_users(user_id=user_id) + "\n\n" +
-                    i18n.get_text("WHAT_TO_ORDER_TODAY", language=user_language),
-                    reply_markup=self._get_main_page_keyboard(user_id),
-                    parse_mode="HTML"
-                )
+                await self._update_single_window(update, context, i18n.get_text("WELCOME_BACK_UPDATED", language=user_language).format(name=result["customer"].name) + "\n\n" + i18n.get_text("INFO_UPDATED", language=user_language) + "\n\n" + get_dynamic_welcome_for_returning_users(user_id=user_id) + "\n\n" + i18n.get_text("WHAT_TO_ORDER_TODAY", language=user_language), self._get_main_page_keyboard(user_id))
                 next_state = END
             else:
-                await update.message.reply_text(
-                    i18n.get_text("THANK_YOU_PHONE", language=user_language).format(name=result["customer"].name) + "\n\n" +
-                    i18n.get_text("PLEASE_ENTER_DELIVERY_ADDRESS_ONBOARDING", language=user_language) + "\n\n" +
-                    i18n.get_text("DELIVERY_ADDRESS_ONBOARDING_HELP", language=user_language),
-                    parse_mode="HTML"
-                )
+                await self._update_single_window(update, context, i18n.get_text("THANK_YOU_PHONE", language=user_language).format(name=result["customer"].name) + "\n\n" + i18n.get_text("PLEASE_ENTER_DELIVERY_ADDRESS_ONBOARDING", language=user_language) + "\n\n" + i18n.get_text("DELIVERY_ADDRESS_ONBOARDING_HELP", language=user_language))
                 next_state = ONBOARDING_DELIVERY_ADDRESS
 
         except Exception as e:
             self.logger.error("Error in handle_phone: %s", e, exc_info=True)
-            await update.message.reply_text(
-                i18n.get_text("VALIDATION_ERROR", language=user_language).format(error=str(e)) + "\n\n" + i18n.get_text("ENTER_VALID_PHONE", language=user_language)
-            )
+            await self._update_single_window(update, context, i18n.get_text("VALIDATION_ERROR", language=user_language).format(error=str(e)) + "\n\n" + i18n.get_text("ENTER_VALID_PHONE", language=user_language))
             next_state = ONBOARDING_PHONE
 
         return next_state
@@ -298,10 +308,7 @@ class OnboardingHandler:
             
             # Validate address
             if len(address) < 5:
-                await update.message.reply_text(
-                    i18n.get_text("ADDRESS_TOO_SHORT", user_id=user_id),
-                    parse_mode="HTML"
-                )
+                await self._update_single_window(update, context, i18n.get_text("ADDRESS_TOO_SHORT", user_id=user_id))
                 return ONBOARDING_DELIVERY_ADDRESS
 
             # Update customer with delivery address
@@ -311,14 +318,7 @@ class OnboardingHandler:
             )
 
             user_id = update.effective_user.id
-            await update.message.reply_text(
-                i18n.get_text("REGISTRATION_COMPLETE", user_id=user_id) + "\n\n" +
-                i18n.get_text("DELIVERY_ADDRESS_SAVED_ONBOARDING", user_id=user_id).format(address=address) + "\n\n" +
-                get_dynamic_welcome_message(user_id=user_id) + "\n\n" +
-                i18n.get_text("WHAT_TO_ORDER_TODAY", user_id=user_id),
-                reply_markup=self._get_main_page_keyboard(user_id),
-                parse_mode="HTML"
-            )
+            await self._update_single_window(update, context, i18n.get_text("REGISTRATION_COMPLETE", user_id=user_id) + "\n\n" + i18n.get_text("DELIVERY_ADDRESS_SAVED_ONBOARDING", user_id=user_id).format(address=address) + "\n\n" + get_dynamic_welcome_message(user_id=user_id) + "\n\n" + i18n.get_text("WHAT_TO_ORDER_TODAY", user_id=user_id), self._get_main_page_keyboard(user_id))
             return END
 
         except Exception as e:
@@ -331,10 +331,7 @@ class OnboardingHandler:
     ) -> int:
         """Cancel onboarding process"""
         user_id = update.effective_user.id
-        await update.message.reply_text(
-            i18n.get_text("ONBOARDING_CANCELLED", user_id=user_id),
-            parse_mode="HTML"
-        )
+        await self._update_single_window(update, _, i18n.get_text("ONBOARDING_CANCELLED", user_id=user_id))
         return END
 
     @error_handler("unknown_command")
@@ -342,30 +339,22 @@ class OnboardingHandler:
         self, update: Update, _: ContextTypes.DEFAULT_TYPE
     ):
         """Handle unknown commands during onboarding"""
-        await update.message.reply_text(
-            i18n.get_text("UNKNOWN_COMMAND_ONBOARDING"),
-            parse_mode="HTML"
-        )
+        await self._update_single_window(update, _, i18n.get_text("UNKNOWN_COMMAND_ONBOARDING"))
 
     @error_handler("unknown_message")
     async def handle_unknown_message(
         self, update: Update, _: ContextTypes.DEFAULT_TYPE
     ):
         """Handle unknown messages during onboarding"""
-        await update.message.reply_text(
-            i18n.get_text("UNKNOWN_MESSAGE_ONBOARDING"),
-            parse_mode="HTML"
-        )
+        await self._update_single_window(update, _, i18n.get_text("UNKNOWN_MESSAGE_ONBOARDING"))
 
     async def _send_error_message(self, update, message: str):
         """Send error message to user"""
         try:
             if update.callback_query:
-                await update.callback_query.edit_message_text(
-                    message, parse_mode="HTML"
-                )
+                await self._update_single_window(update, None, message)
             else:
-                await update.message.reply_text(message, parse_mode="HTML")
+                await self._update_single_window(update, None, message)
         except Exception as e:
             self.logger.error("Failed to send error message: %s", e)
 
@@ -794,7 +783,7 @@ class OnboardingHandler:
             
             # Format order details
             details = [
-                i18n.get_text("CUSTOMER_ORDER_DETAILS_TITLE", user_id=user_id).format(number=order["order_number"]),
+                i18n.get_text("CUSTOMER_ORDER_DETAILS_TITLE", user_id=user_id).format(number=order["order_id"]),
                 "",
                 i18n.get_text("CUSTOMER_ORDER_STATUS", user_id=user_id).format(status=order["status"].capitalize()),
                 i18n.get_text("CUSTOMER_ORDER_TOTAL", user_id=user_id).format(total=order["total"]),

@@ -8,7 +8,7 @@ Properly defined models with correct Base class and type annotations.
 from datetime import datetime
 from typing import Any, List, Optional, Type
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, BigInteger, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, BigInteger, String, Text, Index
 from sqlalchemy.orm import (
     DeclarativeMeta,
     Mapped,
@@ -535,6 +535,12 @@ class Order(Base):
     """Order model"""
 
     __tablename__ = "orders"
+    __table_args__ = (
+        # Match provided DB schema indexes
+        Index("idx_orders_customer", "customer_id"),
+        Index("idx_orders_status", "status"),
+        Index("idx_orders_created", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     customer_id: Mapped[Optional[int]] = mapped_column(

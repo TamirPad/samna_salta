@@ -84,6 +84,7 @@ class NotificationService:
         status_messages = {
             "confirmed": i18n.get_text("ORDER_STATUS_CONFIRMED", user_id=customer_chat_id),
             "preparing": i18n.get_text("ORDER_STATUS_PREPARING", user_id=customer_chat_id),
+            "missing": i18n.get_text("ORDER_STATUS_MISSING_ITEMS", user_id=customer_chat_id),
             "ready": i18n.get_text("ORDER_STATUS_READY", user_id=customer_chat_id),
             "delivered": i18n.get_text("ORDER_STATUS_DELIVERED", user_id=customer_chat_id),
             "cancelled": i18n.get_text("ORDER_STATUS_CANCELLED", user_id=customer_chat_id)
@@ -91,6 +92,9 @@ class NotificationService:
         
         # Get the appropriate message for the status
         message = status_messages.get(new_status.lower(), i18n.get_text("ORDER_STATUS_UNKNOWN", user_id=customer_chat_id).format(status=new_status))
+        # Clarify that "missing" means order continues, items need replacement/adjustment
+        if new_status.lower() == "missing":
+            message += "\n\n" + i18n.get_text("ORDER_STATUS_MISSING_ITEMS", user_id=customer_chat_id)
         
         # Add delivery-specific information for ready orders
         if new_status.lower() == "ready":
@@ -99,7 +103,7 @@ class NotificationService:
             else:
                 message += "\n\n" + i18n.get_text("PICKUP_READY_INFO", user_id=customer_chat_id)
         
-        # Add order number to the message
+        # Add order id to the message (always prefer DB id for user-visible number)
         full_message = f"{i18n.get_text('CUSTOMER_ORDER_UPDATE_HEADER', user_id=customer_chat_id)}\n\n📋 <b>{i18n.get_text('ORDER_NUMBER_LABEL', user_id=customer_chat_id)} #{order_id}</b>\n\n{message}"
         
         return await self.send_customer_notification(customer_chat_id, full_message)
@@ -144,7 +148,7 @@ class NotificationService:
         return f"""
 {i18n.get_text("ADMIN_NEW_ORDER_TITLE", user_id=user_id)}
 
-{i18n.get_text("ADMIN_ORDER_NUMBER", user_id=user_id).format(order_number=order_data.get('order_number', 'Unknown'))}
+{i18n.get_text("ADMIN_ORDER_NUMBER", user_id=user_id).format(order_number=order_data.get('order_id', order_data.get('order_number', 'Unknown')))}
 {i18n.get_text("ADMIN_CUSTOMER_INFO", user_id=user_id).format(customer_name=order_data.get('customer_name', 'Unknown'), customer_phone=order_data.get('customer_phone', 'Unknown'))}
 {delivery_info}
 

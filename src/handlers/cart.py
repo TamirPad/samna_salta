@@ -97,16 +97,43 @@ class CartHandler:
         self.logger = logger
 
     async def _safe_edit_message(self, query, text, **kwargs):
-        """Safely edit message text, falling back to reply if no text content"""
+        """Safely update the existing message (text or caption); delete and send new message as last resort"""
         try:
-            if query.message and query.message.text:
+            if query.message:
+                # Prefer editing text messages
+                if getattr(query.message, "text", None):
+                    await query.edit_message_text(text, **kwargs)
+                    return
+
+                # If current message is media (photo/caption), replace it with a plain text message
+                if getattr(query.message, "caption", None) is not None or getattr(query.message, "photo", None):
+                    try:
+                        await query.message.delete()
+                    except Exception:
+                        pass
+                    await query.message.reply_text(text, **kwargs)
+                    return
+
+                # Fallback attempt to edit as text
                 await query.edit_message_text(text, **kwargs)
-            else:
-                # If no text content, send a new message
-                await query.message.reply_text(text, **kwargs)
+                return
         except Exception as e:
-            self.logger.warning("Failed to edit message, sending new message: %s", e)
-            await query.message.reply_text(text, **kwargs)
+            # If we cannot edit text/caption, try updating only the reply markup first
+            self.logger.warning("Failed to edit message content, attempting to update keyboard: %s", e)
+            try:
+                if query.message and kwargs.get("reply_markup"):
+                    await query.edit_message_reply_markup(reply_markup=kwargs.get("reply_markup"))
+                    return
+            except Exception:
+                pass
+
+        # Absolute last resort: delete the original message (to avoid duplicates) and send a new one
+        try:
+            if query.message:
+                await query.message.delete()
+        except Exception:
+            pass
+        await query.message.reply_text(text, **kwargs)
 
     async def handle_add_to_cart(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle adding items to cart"""
@@ -120,7 +147,8 @@ class CartHandler:
             # Parse product info from callback data
             product_info = self._parse_product_from_callback(callback_data)
             if not product_info:
-                await query.edit_message_text(
+                await self._safe_edit_message(
+                    query,
                     "❌ Invalid product selection. Please try again.",
                     parse_mode="HTML",
                     reply_markup=self._get_back_to_menu_keyboard(),
@@ -231,7 +259,8 @@ class CartHandler:
 
 {browse_suggestion}"""
 
-                await query.edit_message_text(
+                await self._safe_edit_message(
+                    query,
                     empty_cart_message,
                     parse_mode="HTML",
                     reply_markup=self._get_professional_empty_cart_keyboard(user_id),
@@ -277,7 +306,8 @@ class CartHandler:
             message += f"\n\n{total_text}"
             message += f"\n\n{what_next_text}"
 
-            await query.edit_message_text(
+            await self._safe_edit_message(
+                query,
                 message,
                 parse_mode="HTML",
                 reply_markup=self._get_simplified_cart_keyboard(cart_items, user_id),
@@ -297,7 +327,8 @@ class CartHandler:
             self.logger.info("🗑️ CLEAR CART CONFIRMATION: User %s", user_id)
 
             # Show confirmation dialog
-            await query.edit_message_text(
+            await self._safe_edit_message(
+                query,
                 i18n.get_text("CLEAR_CART_CONFIRMATION", user_id=user_id),
                 parse_mode="HTML",
                 reply_markup=self._get_clear_cart_confirmation_keyboard(user_id),
@@ -322,14 +353,16 @@ class CartHandler:
 
             if success:
                 self.logger.info("✅ CART CLEARED: User %s", user_id)
-                await query.edit_message_text(
+                await self._safe_edit_message(
+                    query,
                     i18n.get_text("CART_CLEARED_SUCCESS", user_id=user_id),
                     parse_mode="HTML",
                     reply_markup=self._get_professional_empty_cart_keyboard(user_id),
                 )
             else:
                 self.logger.error("❌ CART CLEAR FAILED: User %s", user_id)
-                await query.edit_message_text(
+                await self._safe_edit_message(
+                    query,
                     i18n.get_text("FAILED_CLEAR_CART", user_id=user_id),
                     parse_mode="HTML",
                     reply_markup=self._get_back_to_menu_keyboard(user_id),
@@ -353,7 +386,8 @@ class CartHandler:
             cart_items = cart_service.get_items(user_id)
 
             if not cart_items:
-                await query.edit_message_text(
+                await self._safe_edit_message(
+                    query,
                     i18n.get_text("CART_EMPTY_CHECKOUT", user_id=user_id),
                     parse_mode="HTML",
                     reply_markup=self._get_professional_empty_cart_keyboard(user_id),
@@ -382,7 +416,8 @@ class CartHandler:
             message += i18n.get_text("CART_TOTAL", user_id=user_id).format(total=cart_total) + "\n\n"
             message += i18n.get_text("SELECT_DELIVERY_METHOD", user_id=user_id)
 
-            await query.edit_message_text(
+            await self._safe_edit_message(
+                query,
                 message,
                 parse_mode="HTML",
                 reply_markup=self._get_delivery_method_keyboard(user_id),
@@ -409,7 +444,8 @@ class CartHandler:
             success = cart_service.set_delivery_method(user_id, delivery_method)
             
             if not success:
-                await query.edit_message_text(
+                await self._safe_edit_message(
+                    query,
                     i18n.get_text("FAILED_SET_DELIVERY", user_id=user_id),
                     parse_mode="HTML",
                     reply_markup=self._get_back_to_cart_keyboard(user_id),
@@ -423,14 +459,16 @@ class CartHandler:
                 if customer and customer.delivery_address:
                     # Customer has a saved address - ask if they want to use it
                     message = i18n.get_text("DELIVERY_ADDRESS_CURRENT", user_id=user_id).format(address=customer.delivery_address)
-                    await query.edit_message_text(
+                    await self._safe_edit_message(
+                        query,
                         message,
                         parse_mode="HTML",
                         reply_markup=self._get_delivery_address_choice_keyboard(user_id),
                     )
                 else:
                     # No saved address - ask for new address
-                    await query.edit_message_text(
+                    await self._safe_edit_message(
+                        query,
                         i18n.get_text("DELIVERY_ADDRESS_REQUIRED", user_id=user_id),
                         parse_mode="HTML",
                     )
@@ -466,21 +504,24 @@ class CartHandler:
                     cart_service.set_delivery_address(user_id, customer.delivery_address)
                     await self._show_order_confirmation(query, cart_service, user_id)
                 else:
-                    await query.edit_message_text(
+                    await self._safe_edit_message(
+                        query,
                         i18n.get_text("NO_SAVED_ADDRESS", user_id=user_id),
                         parse_mode="HTML",
                         reply_markup=self._get_back_to_cart_keyboard(user_id),
                     )
             elif choice == "new_address":
                 # Ask for new address
-                await query.edit_message_text(
+                await self._safe_edit_message(
+                    query,
                     i18n.get_text("DELIVERY_ADDRESS_PROMPT", user_id=user_id),
                     parse_mode="HTML",
                 )
                 # Set context to expect address input
                 context.user_data["expecting_delivery_address"] = True
             else:
-                await query.edit_message_text(
+                await self._safe_edit_message(
+                    query,
                     i18n.get_text("INVALID_CHOICE", user_id=user_id),
                     parse_mode="HTML",
                     reply_markup=self._get_back_to_cart_keyboard(user_id),
@@ -563,7 +604,8 @@ class CartHandler:
             # Get cart items
             cart_items = cart_service.get_items(user_id)
             if not cart_items:
-                await query.edit_message_text(
+                await self._safe_edit_message(
+                    query,
                     i18n.get_text("CART_EMPTY_ORDER"),
                     parse_mode="HTML"
                 )
@@ -577,27 +619,30 @@ class CartHandler:
                 # Clear cart after successful order
                 cart_service.clear_cart(user_id)
                 
-                order_number = order_result.get("order_number")
+                order_obj = order_result.get("order")
+                order_id = getattr(order_obj, "id", None)
                 order_total = order_result.get("total")
                 
                 # Send success message to customer
                 success_message = i18n.get_text("ORDER_CONFIRMED_SUCCESS", user_id=user_id).format(
-                    order_number=order_number,
+                    order_number=order_id,
                     order_total=order_total
                 )
                 
-                await query.edit_message_text(
+                await self._safe_edit_message(
+                    query,
                     success_message,
                     parse_mode="HTML",
                     reply_markup=self._get_order_success_keyboard(user_id)
                 )
                 
-                self.logger.info("✅ ORDER CREATED: #%s for user %s", order_number, user_id)
+                self.logger.info("✅ ORDER CREATED: id=%s for user %s", order_id, user_id)
                 
             else:
                 error_msg = order_result.get("error", i18n.get_text("ERROR_UNKNOWN_OCCURRED", user_id=user_id))
                 self.logger.error("❌ ORDER CREATION FAILED: %s", error_msg)
-                await query.edit_message_text(
+                await self._safe_edit_message(
+                    query,
                     i18n.get_text("ORDER_CREATION_FAILED", user_id=user_id).format(error_msg=error_msg),
                     parse_mode="HTML",
                     reply_markup=self._get_back_to_cart_keyboard(user_id)
@@ -605,7 +650,8 @@ class CartHandler:
                 
         except Exception as e:
             self.logger.error("❌ ORDER CREATION ERROR: %s", e)
-            await query.edit_message_text(
+            await self._safe_edit_message(
+                query,
                 i18n.get_text("ORDER_CREATION_ERROR", user_id=user_id),
                 parse_mode="HTML",
                 reply_markup=self._get_back_to_cart_keyboard(user_id)
@@ -807,7 +853,8 @@ class CartHandler:
             cart_items = cart_service.get_items(user_id)
 
             if not cart_items:
-                await query.edit_message_text(
+                await self._safe_edit_message(
+                    query,
                     i18n.get_text("CART_EMPTY_READY", user_id=user_id),
                     parse_mode="HTML",
                     reply_markup=self._get_professional_empty_cart_keyboard(user_id),
@@ -821,7 +868,8 @@ class CartHandler:
             message = i18n.get_text("CART_EDIT_MODE_TITLE", user_id=user_id) + "\n\n"
             message += i18n.get_text("CART_EDIT_MODE_INSTRUCTIONS", user_id=user_id)
 
-            await query.edit_message_text(
+            await self._safe_edit_message(
+                query,
                 message,
                 parse_mode="HTML",
                 reply_markup=self._get_cart_items_keyboard_with_back(cart_items, user_id),

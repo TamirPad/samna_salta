@@ -48,7 +48,7 @@ def create_acid_constraints():
         # Order status validation
         """
         ALTER TABLE orders ADD CONSTRAINT IF NOT EXISTS check_order_status 
-        CHECK (status IN ('pending', 'confirmed', 'preparing', 'ready', 'delivered', 'cancelled'))
+        CHECK (status IN ('pending', 'confirmed', 'preparing', 'missing', 'ready', 'delivered', 'cancelled'))
         """,
         
         # Product price validation
