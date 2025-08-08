@@ -35,8 +35,8 @@ class LanguageManager:
         except Exception as e:
             logger.error("Error getting user language from database: %s", e)
         
-        # Default to English
-        return "en"
+        # Default to Hebrew
+        return "he"
     
     def set_user_language(self, user_id: int, language: str) -> bool:
         """Set user's preferred language in database and cache"""

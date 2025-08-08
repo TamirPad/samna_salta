@@ -11,8 +11,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Default translations
-DEFAULT_LANGUAGE = "en"
-FALLBACK_LANGUAGE = "en"
+DEFAULT_LANGUAGE = "he"
+FALLBACK_LANGUAGE = "he"
 
 # Import language manager
 from src.utils.language_manager import language_manager
