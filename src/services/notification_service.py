@@ -157,6 +157,9 @@ class NotificationService:
         # Add delivery address if it's delivery
         if order_data.get('delivery_method') == 'delivery' and order_data.get('delivery_address'):
             delivery_info += f"\n{i18n.get_text('ADMIN_DELIVERY_ADDRESS', user_id=user_id).format(address=order_data.get('delivery_address'))}"
+        # Add delivery instructions if present
+        if order_data.get('delivery_method') == 'delivery' and order_data.get('delivery_instructions'):
+            delivery_info += f"\n{i18n.get_text('DELIVERY_INSTRUCTIONS_LABEL', user_id=user_id)}: {order_data.get('delivery_instructions')}"
         
         return f"""
 {i18n.get_text("ADMIN_NEW_ORDER_TITLE", user_id=user_id)}

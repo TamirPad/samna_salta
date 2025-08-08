@@ -1744,6 +1744,9 @@ class AdminHandler:
         if (order_info.get("delivery_method") or "").lower() == "delivery":
             address = order_info.get("delivery_address") or i18n.get_text("UNKNOWN_ADDRESS", user_id=user_id) if hasattr(i18n, 'get_text') else (order_info.get("delivery_address") or "Unknown")
             details.insert(5, i18n.get_text("ADMIN_DELIVERY_ADDRESS_LABEL_OPT", user_id=user_id).format(address=address))
+            # Append delivery instructions if present
+            if order_info.get("delivery_instructions"):
+                details.insert(6, f"{i18n.get_text('DELIVERY_INSTRUCTIONS_LABEL', user_id=user_id)}: {order_info.get('delivery_instructions')}")
         if order_info.get("items"):
             details.append(f"\n{i18n.get_text('ADMIN_ITEMS_LABEL', user_id=user_id)}")
             for item in order_info["items"]:

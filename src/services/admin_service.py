@@ -489,6 +489,7 @@ class AdminService:
                 "created_at": order.created_at,
                 "delivery_method": getattr(order, "delivery_method", None),
                 "delivery_address": getattr(order, "delivery_address", None),
+                "delivery_instructions": getattr(order, "delivery_instructions", None),
                 "items": []
             }
             

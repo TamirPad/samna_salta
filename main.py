@@ -140,10 +140,13 @@ def setup_bot():
     application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_method, pattern="^delivery_(pickup|delivery)$"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_area_selection, pattern="^delivery_area_\d+$"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_confirm_order, pattern="^confirm_order"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_add_delivery_instructions, pattern="^delivery_instructions_add$"))
     # Register admin handlers BEFORE any catch-all text handlers to ensure conversations receive messages
     register_admin_handlers(application)
     
     # Capture quick signup text inputs globally (lower priority group to not steal convo messages)
+    # Capture delivery instructions text before the quick-signup handler (same group OK due to flags)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, cart_handler.handle_delivery_instructions_input), group=5)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, cart_handler.handle_quick_signup_input), group=5)
     
     return application
