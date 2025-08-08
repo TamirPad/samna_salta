@@ -499,6 +499,7 @@
   "ADMIN_CUSTOMER_TOTAL_SPENT": "<b>Total Spent:</b> ₪{amount:.2f}",
   "ADMIN_CUSTOMER_AVG_ORDER": "<b>Average Order Value:</b> ₪{avg:.2f}",
   "ADMIN_BACK_TO_CUSTOMERS": "⬅️ Back to Customers",
+  "CUSTOMER_ORDER_HISTORY": "📦 Customer Order History",
   "CUSTOMER_DETAILS_ERROR": "Error loading customer details. Please try again.",
   "QUICK_ADD_SUCCESS": "{name} added to cart successfully!",
   "QUICK_ADD_ERROR": "Failed to add {name}: {error}",

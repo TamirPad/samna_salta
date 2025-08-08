@@ -256,6 +256,9 @@ class AdminHandler:
         elif data.startswith("admin_order_"):
             order_id = int(data.split("_")[-1])
             await self._show_order_details(query, order_id)
+        elif data.startswith("admin_customer_orders_"):
+            customer_id = int(data.split("_")[-1])
+            await self._show_customer_orders(query, customer_id)
         elif data.startswith("admin_customer_"):
             customer_id = int(data.split("_")[-1])
             await self._show_customer_details(query, customer_id)
@@ -1660,9 +1663,10 @@ class AdminHandler:
             
             customer_text = "\n".join(details)
             
-            # Create keyboard with back button
+            # Create keyboard with back button and order history
             keyboard = [
-                [InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_CUSTOMERS", user_id=user_id), callback_data="admin_customers")]
+                [InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_CUSTOMERS", user_id=user_id), callback_data="admin_customers")],
+                [InlineKeyboardButton(i18n.get_text("CUSTOMER_ORDER_HISTORY", user_id=user_id), callback_data=f"admin_customer_orders_{customer_id}")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -1673,6 +1677,28 @@ class AdminHandler:
         except BusinessLogicError as e:
             self.logger.error("💥 CUSTOMER DETAILS ERROR: %s", e)
             await query.message.reply_text(i18n.get_text("CUSTOMER_DETAILS_ERROR"))
+
+    async def _show_customer_orders(self, query: CallbackQuery, customer_id: int) -> None:
+        """Show order history for a specific customer."""
+        try:
+            user_id = query.from_user.id
+            from src.db.operations import get_all_orders
+            orders = get_all_orders()
+            customer_orders = [o for o in orders if o.customer_id == customer_id]
+            if not customer_orders:
+                await query.edit_message_text(i18n.get_text("ADMIN_NO_ORDERS_FOUND", user_id=user_id), reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_CUSTOMERS", user_id=user_id), callback_data="admin_customers")]]))
+                return
+            # Build a simple list with IDs, totals and dates
+            lines = [i18n.get_text("ADMIN_COMPLETED_ORDERS_TITLE", user_id=user_id)]
+            for o in sorted(customer_orders, key=lambda x: x.created_at or datetime.utcnow(), reverse=True):
+                created = o.created_at.strftime('%Y-%m-%d %H:%M') if o.created_at else '—'
+                lines.append(f"#{o.id} • ₪{o.total:.2f} • {created} • {o.status}")
+            text = "\n".join(lines)
+            kb = [[InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_CUSTOMERS", user_id=user_id), callback_data="admin_customers")]]
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb))
+        except Exception as e:
+            self.logger.error("💥 CUSTOMER ORDERS ERROR: %s", e)
+            await query.answer(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id), show_alert=True)
 
     async def _show_order_details(self, query: CallbackQuery, order_id: int) -> None:
         """Show details for a specific order."""

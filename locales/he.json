@@ -365,6 +365,7 @@
   "ADMIN_CUSTOMER_TOTAL_SPENT": "💰 <b>סה\"כ הוצאות:</b> ₪{amount:.2f}",
   "ADMIN_CUSTOMER_AVG_ORDER": "📊 <b>ממוצע הזמנה:</b> ₪{avg:.2f}",
   "ADMIN_BACK_TO_CUSTOMERS": "⬅️ חזור ללקוחות",
+  "CUSTOMER_ORDER_HISTORY": "📦 היסטוריית הזמנות הלקוח",
   "CUSTOMER_DETAILS_ERROR": "❌ שגיאה בטעינת פרטי לקוח.",
   "ADMIN_MENU_MANAGEMENT": "🍽️ ניהול תפריט",
   "ADMIN_MENU_MANAGEMENT_TITLE": "🍽️ <b>ניהול תפריט</b>",
