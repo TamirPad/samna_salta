@@ -485,10 +485,13 @@ class AdminService:
                 "customer_name": order.customer.name if order.customer else "Unknown",
                 "customer_phone": order.customer.phone if order.customer else "Unknown",
                 "total": order.total,
+                "subtotal": getattr(order, "subtotal", 0.0),
+                "delivery_charge": getattr(order, "delivery_charge", 0.0),
                 "status": order.status,
                 "created_at": order.created_at,
                 "delivery_method": getattr(order, "delivery_method", None),
                 "delivery_address": getattr(order, "delivery_address", None),
+                "delivery_instructions": getattr(order, "delivery_instructions", None),
                 "items": []
             }
             

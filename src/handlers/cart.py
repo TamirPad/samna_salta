@@ -723,7 +723,7 @@ class CartHandler:
             )
             
             # Show order confirmation
-            await self._show_order_confirmation_text(update.message, cart_service, user_id)
+            await self._show_order_confirmation_text(update.message, cart_service, user_id, instructions=instructions)
 
         except Exception as e:
             self.logger.error("Exception in handle_delivery_address_input: %s", e)
@@ -786,7 +786,9 @@ class CartHandler:
             
             # Create order using order service
             order_service = self.container.get_order_service()
-            order_result = await order_service.create_order(user_id, cart_items)
+            # Pass delivery instructions captured during confirmation if any
+            instructions = context.user_data.get("delivery_instructions_value")
+            order_result = await order_service.create_order(user_id, cart_items, delivery_instructions=instructions)
             
             if order_result.get("success"):
                 # Clear cart after successful order
@@ -1520,6 +1522,7 @@ class CartHandler:
         """Get keyboard for order confirmation with each button on its own line"""
         keyboard = [
             [InlineKeyboardButton(i18n.get_text("CONFIRM_ORDER", user_id=user_id), callback_data="confirm_order")],
+            [InlineKeyboardButton(i18n.get_text("ADD_DELIVERY_INSTRUCTIONS", user_id=user_id), callback_data="delivery_instructions_add")],
             [InlineKeyboardButton(i18n.get_text("CANCEL", user_id=user_id), callback_data="cart_view")],
         ]
         return InlineKeyboardMarkup(keyboard)
@@ -1545,7 +1548,7 @@ class CartHandler:
         from src.keyboards.menu_keyboards import get_clear_cart_confirmation_keyboard
         return get_clear_cart_confirmation_keyboard(user_id)
 
-    async def _show_order_confirmation(self, query, cart_service, user_id):
+    async def _show_order_confirmation(self, query, cart_service, user_id, instructions: str | None = None):
         """Show order confirmation for callback queries"""
         try:
             # Get updated cart info
@@ -1580,6 +1583,14 @@ class CartHandler:
                     message += i18n.get_text("DELIVERY_ADDRESS_LABEL", user_id=user_id).format(
                         address=addr
                     ) + "\n"
+                # Show delivery instructions if provided in-session
+                if instructions:
+                    try:
+                        import html
+                        safe_instr = html.escape(instructions)
+                    except Exception:
+                        safe_instr = instructions
+                    message += f"{i18n.get_text('DELIVERY_INSTRUCTIONS_LABEL', user_id=user_id)}: {safe_instr}\n"
             
             
             for i, item in enumerate(cart_items, 1):
@@ -1645,7 +1656,7 @@ class CartHandler:
                 reply_markup=self._get_back_to_cart_keyboard(user_id),
             )
 
-    async def _show_order_confirmation_text(self, message, cart_service, user_id):
+    async def _show_order_confirmation_text(self, message, cart_service, user_id, instructions: str | None = None):
         """Show order confirmation for text messages"""
         try:
             # Get updated cart info
@@ -1680,6 +1691,13 @@ class CartHandler:
                     confirmation_message += i18n.get_text("DELIVERY_ADDRESS_LABEL", user_id=user_id).format(
                         address=addr
                     ) + "\n"
+                if instructions:
+                    try:
+                        import html
+                        safe_instr = html.escape(instructions)
+                    except Exception:
+                        safe_instr = instructions
+                    confirmation_message += f"{i18n.get_text('DELIVERY_INSTRUCTIONS_LABEL', user_id=user_id)}: {safe_instr}\n"
             
             confirmation_message += "\n"
             
@@ -1746,6 +1764,45 @@ class CartHandler:
                 parse_mode="HTML",
                 reply_markup=self._get_back_to_cart_keyboard(user_id),
             )
+
+    async def handle_add_delivery_instructions(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Prompt user to enter delivery instructions and capture them via next text message."""
+        try:
+            query = update.callback_query
+            await query.answer()
+            user_id = query.from_user.id
+            # Mark expectation in context
+            context.user_data["expecting_delivery_instructions"] = True
+            await self._safe_edit_message(
+                query,
+                i18n.get_text("ENTER_DELIVERY_INSTRUCTIONS", user_id=user_id),
+                parse_mode="HTML",
+            )
+        except Exception as e:
+            self.logger.error("Exception in handle_add_delivery_instructions: %s", e)
+            await handle_error(update, e, "add delivery instructions")
+
+    async def handle_delivery_instructions_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Capture delivery instructions text when expected and store on user_data."""
+        try:
+            user_id = update.effective_user.id
+            if not context.user_data.get("expecting_delivery_instructions"):
+                return
+            raw_text = (update.message.text or "").strip()
+            # Sanitize and limit length
+            instructions = raw_text[:250]
+            context.user_data["delivery_instructions_value"] = instructions
+            context.user_data.pop("expecting_delivery_instructions", None)
+            await update.message.reply_text(
+                i18n.get_text("DELIVERY_INSTRUCTIONS_SAVED", user_id=user_id),
+                parse_mode="HTML",
+            )
+            # Refresh confirmation so user can proceed
+            cart_service = self.container.get_cart_service()
+            await self._show_order_confirmation_text(update.message, cart_service, user_id)
+        except Exception as e:
+            self.logger.error("Exception in handle_delivery_instructions_input: %s", e)
+            await handle_error(update, e, "delivery instructions input")
 
     def _get_localized_product_name(self, item: Dict, user_id: int) -> str:
         """Get localized product name for display"""

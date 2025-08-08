@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class OrderService:
     """Service for customer order operations"""
 
-    async def create_order(self, telegram_id: int, cart_items: List[Dict]) -> Dict:
+    async def create_order(self, telegram_id: int, cart_items: List[Dict], delivery_instructions: Optional[str] = None) -> Dict:
         """Create a new order from cart items"""
         try:
             # Get customer
@@ -86,7 +86,9 @@ class OrderService:
                 items=cart_items,
                 delivery_method=delivery_method,
                 delivery_address=delivery_address,
-                delivery_charge=delivery_charge
+                delivery_charge=delivery_charge,
+                delivery_instructions=delivery_instructions,
+                delivery_area_id=(cart.delivery_area_id if cart else None)
             )
             
             if order:
@@ -109,6 +111,7 @@ class OrderService:
                         "delivery_charge": delivery_charge,
                         "delivery_method": order.delivery_method,
                         "delivery_address": order.delivery_address,
+                        "delivery_instructions": delivery_instructions,
                         "customer_telegram_id": telegram_id,
                         "created_at": order.created_at.strftime("%Y-%m-%d %H:%M:%S") if order.created_at else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     }

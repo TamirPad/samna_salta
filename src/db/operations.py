@@ -1768,6 +1768,8 @@ def create_order_with_items(
     delivery_method: str = "pickup",
     delivery_address: Optional[str] = None,
     delivery_charge: float = 0.0,
+    delivery_instructions: Optional[str] = None,
+    delivery_area_id: Optional[int] = None,
 ) -> Optional[Order]:
     """Create a new order with order items from cart items"""
     try:
@@ -1784,6 +1786,8 @@ def create_order_with_items(
                 total=subtotal + (delivery_charge or 0.0),
                 delivery_method=delivery_method,
                 delivery_address=delivery_address or "",
+                delivery_instructions=(delivery_instructions or None),
+                delivery_area_id=delivery_area_id,
                 status="pending"
             )
             session.add(order)
