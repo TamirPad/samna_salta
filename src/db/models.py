@@ -330,6 +330,28 @@ class DeliveryMethod(Base):
         return f"<DeliveryMethod(id={self.id}, name='{self.name}')>"
 
 
+class DeliveryArea(Base):
+    """Delivery area model (admin-defined areas for delivery selection)"""
+
+    __tablename__ = "delivery_areas"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name_en: Mapped[str] = mapped_column(String(100), nullable=False)
+    name_he: Mapped[str] = mapped_column(String(100), nullable=False)
+    charge: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+
+    def get_localized_name(self, language: str = "he") -> str:
+        if language == "he":
+            return self.name_he or self.name_en
+        return self.name_en or self.name_he
+
+    def __str__(self) -> str:
+        return f"<DeliveryArea(id={self.id}, name_he='{self.name_he}', charge={self.charge})>"
+
 class PaymentMethod(Base):
     """Payment method model"""
 
@@ -480,6 +502,7 @@ class Cart(Base):
         String(20), default="pickup", nullable=True
     )
     delivery_address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    delivery_area_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("delivery_areas.id"), nullable=True)
 
     # Relationships
     customer: Mapped[Optional["Customer"]] = relationship(
@@ -488,6 +511,7 @@ class Cart(Base):
         foreign_keys=[customer_id],
     )
     cart_items: Mapped[List["CartItem"]] = relationship("CartItem", back_populates="cart", cascade="all, delete-orphan")
+    delivery_area: Mapped[Optional["DeliveryArea"]] = relationship("DeliveryArea")
 
     def __str__(self) -> str:
         return f"<Cart(id={self.id}, customer_id={self.customer_id})>"
@@ -561,6 +585,7 @@ class Order(Base):
     subtotal: Mapped[float] = mapped_column(Float, nullable=False, server_default="0.0")
     delivery_charge: Mapped[float] = mapped_column(Float, nullable=False, server_default="0.0")
     delivery_method: Mapped[str] = mapped_column(String(20), default="pickup", nullable=False)
+    delivery_area_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("delivery_areas.id"), nullable=True)
     total: Mapped[float] = mapped_column(Float, nullable=False, server_default="0.0")
 
     # Relationships
@@ -568,6 +593,7 @@ class Order(Base):
     order_items: Mapped[List["OrderItem"]] = relationship(
         "OrderItem", back_populates="order", cascade="all, delete-orphan"
     )
+    delivery_area: Mapped[Optional["DeliveryArea"]] = relationship("DeliveryArea")
 
     def __str__(self) -> str:
         return f"<Order(id={self.id}, customer_id={self.customer_id}, order_number='{self.order_number}')>"

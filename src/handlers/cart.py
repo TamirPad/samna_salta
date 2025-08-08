@@ -500,6 +500,25 @@ class CartHandler:
                 return
 
             if delivery_method == "delivery":
+                # First, prompt for delivery area (pre-step) before address
+                from src.db.operations import get_active_delivery_areas
+                areas = get_active_delivery_areas()
+                if areas:
+                    from src.utils.language_manager import language_manager
+                    lang = language_manager.get_user_language(user_id)
+                    buttons = []
+                    for area in areas:
+                        name = area.name_he if lang == "he" else area.name_en
+                        buttons.append([InlineKeyboardButton(name, callback_data=f"delivery_area_{area.id}")])
+                    # Add back button
+                    buttons.append([InlineKeyboardButton(i18n.get_text("BACK_TO_CART", user_id=user_id), callback_data="cart_view")])
+                    await self._safe_edit_message(
+                        query,
+                        i18n.get_text("SELECT_DELIVERY_AREA", user_id=user_id),
+                        parse_mode="HTML",
+                        reply_markup=InlineKeyboardMarkup(buttons),
+                    )
+                    return
                 # Check if customer has a delivery address
                 customer = cart_service.get_customer(user_id)
                 
@@ -591,6 +610,66 @@ class CartHandler:
         except Exception as e:
             self.logger.error("Exception in handle_delivery_address_choice: %s", e)
             await handle_error(update, e, "delivery address choice")
+
+    async def handle_delivery_area_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle delivery area selection and set area + price accordingly"""
+        try:
+            query = update.callback_query
+            await query.answer()
+
+            user_id = query.from_user.id
+            area_id = int(query.data.replace("delivery_area_", ""))
+
+            # Persist area on cart and set delivery method
+            cart_service = self.container.get_cart_service()
+            items = cart_service.get_items(user_id)
+            if not items:
+                await self._safe_edit_message(
+                    query,
+                    i18n.get_text("CART_EMPTY", user_id=user_id),
+                    parse_mode="HTML",
+                    reply_markup=self._get_back_to_cart_keyboard(user_id),
+                )
+                return
+
+            # Save area on cart
+            cart_service.update_cart(
+                user_id,
+                items,
+                delivery_method="delivery",
+                delivery_area_id=area_id,
+            )
+
+            # After selecting area, resume the regular delivery flow:
+            # if the customer has a saved address, offer to use it or enter a new one;
+            # otherwise, prompt for a new address.
+            customer = cart_service.get_customer(user_id)
+            if customer and getattr(customer, "delivery_address", None):
+                message = i18n.get_text("DELIVERY_ADDRESS_CURRENT", user_id=user_id).format(
+                    address=customer.delivery_address
+                )
+                await self._safe_edit_message(
+                    query,
+                    message,
+                    parse_mode="HTML",
+                    reply_markup=self._get_delivery_address_choice_keyboard(user_id),
+                )
+            else:
+                await self._safe_edit_message(
+                    query,
+                    i18n.get_text("DELIVERY_ADDRESS_REQUIRED", user_id=user_id),
+                    parse_mode="HTML",
+                )
+                await query.message.reply_text(
+                    i18n.get_text("DELIVERY_ADDRESS_PROMPT", user_id=user_id),
+                    parse_mode="HTML",
+                    reply_markup=ForceReply(selective=True),
+                )
+                context.user_data["expecting_delivery_address"] = True
+                context.user_data["qs_stage"] = "address"
+        except Exception as e:
+            self.logger.error("Exception in handle_delivery_area_selection: %s", e)
+            await handle_error(update, e, "delivery area selection")
 
     async def handle_delivery_address_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         self.logger.info(f"[DEBUG] handle_delivery_address_input called for user {update.effective_user.id} with text: {getattr(update.message, 'text', None)}")

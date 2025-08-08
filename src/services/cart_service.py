@@ -244,10 +244,11 @@ class CartService:
         items: List[Dict],
         delivery_method: Optional[str] = None,
         delivery_address: Optional[str] = None,
+        delivery_area_id: Optional[int] = None,
     ) -> bool:
         """Update cart with new items and delivery info"""
         try:
-            success = update_cart(telegram_id, items, delivery_method, delivery_address)
+            success = update_cart(telegram_id, items, delivery_method, delivery_address, delivery_area_id)
             if success:
                 logger.info("Successfully updated cart for user %s", telegram_id)
             else:

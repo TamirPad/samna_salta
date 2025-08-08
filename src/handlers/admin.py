@@ -57,6 +57,11 @@ AWAITING_PRODUCT_IMAGE_URL = 54
 AWAITING_CATEGORY_NAME_EN = 32
 AWAITING_CATEGORY_NAME_HE = 33
 
+# Delivery area wizard states
+AWAITING_DELIVERY_AREA_NAME_EN = 60
+AWAITING_DELIVERY_AREA_NAME_HE = 61
+AWAITING_DELIVERY_AREA_CHARGE = 62
+
 logger = logging.getLogger(__name__)
 
 
@@ -271,6 +276,8 @@ class AdminHandler:
         elif data == "admin_menu_management":
             self.logger.info(f"🔍 Menu management callback received for user {query.from_user.id}")
             await self._show_menu_management_dashboard(query)
+        elif data == "admin_deliveries":
+            await self._show_deliveries_dashboard(query)
         elif data == "admin_view_products":
             await self._show_all_products(query)
         # Note: admin_add_product is handled by the conversation handler
@@ -307,6 +314,12 @@ class AdminHandler:
             await self._show_category_management(query)
         elif data == "admin_business_settings":
             await self._show_business_settings(query)
+        elif data == "admin_deliveries":
+            await self._show_deliveries_dashboard(query)
+        elif data == "admin_delivery_areas":
+            await self._show_delivery_areas(query)
+        elif data == "admin_add_delivery_area":
+            await self._start_add_delivery_area(update, _)
         elif data == "admin_edit_business_settings":
             await self._start_edit_business_settings(query)
         elif (data.startswith("admin_edit_business_") or 
@@ -377,6 +390,13 @@ class AdminHandler:
                     callback_data="admin_menu_management"
                 )
             ],
+            # 🚚 Deliveries Section
+            [
+                InlineKeyboardButton(
+                    i18n.get_text('ADMIN_DELIVERIES', user_id=user_id), 
+                    callback_data="admin_deliveries"
+                )
+            ],
             # ⚙️ Business Settings Section
             [
                 InlineKeyboardButton(
@@ -396,6 +416,12 @@ class AdminHandler:
     async def _show_admin_dashboard_from_callback(self, query: CallbackQuery) -> None:
         """Show admin dashboard from callback query"""
         try:
+            # Ensure latest translations are loaded (avoids placeholders if locales changed)
+            try:
+                from src.utils.i18n import i18n
+                i18n.reload()
+            except Exception:
+                pass
             self.logger.info("📊 LOADING ADMIN DASHBOARD FROM CALLBACK")
             
             # Get user_id from query
@@ -441,6 +467,120 @@ class AdminHandler:
         except Exception as e:
             self.logger.critical("💥 UNHANDLED DASHBOARD ERROR: %s", e, exc_info=True)
             await query.answer(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
+    async def _show_deliveries_dashboard(self, query: CallbackQuery) -> None:
+        """Show deliveries dashboard"""
+        try:
+            user_id = query.from_user.id
+            text = i18n.get_text("ADMIN_DELIVERIES_TITLE", user_id=user_id)
+            keyboard = [
+                [InlineKeyboardButton(i18n.get_text("ADMIN_DELIVERY_AREAS", user_id=user_id), callback_data="admin_delivery_areas")],
+                [InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_dashboard")],
+            ]
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+        except Exception as e:
+            self.logger.error("Error showing deliveries dashboard: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
+
+    async def _show_delivery_areas(self, query: CallbackQuery) -> None:
+        """List all active delivery areas"""
+        try:
+            user_id = query.from_user.id
+            from src.db.operations import get_active_delivery_areas
+            areas = get_active_delivery_areas()
+            if not areas:
+                text = i18n.get_text("ADMIN_NO_DELIVERY_AREAS", user_id=user_id)
+            else:
+                lines = [i18n.get_text("ADMIN_DELIVERY_AREAS_TITLE", user_id=user_id), ""]
+                for i, area in enumerate(areas, start=1):
+                    charge = area.charge if area.charge is not None else "-"
+                    lines.append(f"{i}. {area.name_he} / {area.name_en} — {i18n.get_text('ADMIN_DELIVERY_CHARGE', user_id=user_id)}: {charge}")
+                text = "\n".join(lines)
+            keyboard = [
+                [InlineKeyboardButton(i18n.get_text("ADMIN_ADD_DELIVERY_AREA", user_id=user_id), callback_data="admin_add_delivery_area")],
+                [InlineKeyboardButton(i18n.get_text("ADMIN_BACK", user_id=user_id), callback_data="admin_deliveries")],
+            ]
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+        except Exception as e:
+            self.logger.error("Error showing delivery areas: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
+
+    async def _handle_delivery_area_name_en(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        try:
+            user_id = update.effective_user.id
+            name_en = update.message.text.strip()
+            if len(name_en) < 2:
+                await update.message.reply_text(i18n.get_text("ADMIN_DELIVERY_AREA_NAME_EN_TOO_SHORT", user_id=user_id))
+                return AWAITING_DELIVERY_AREA_NAME_EN
+            context.user_data["delivery_area_name_en"] = name_en
+            text = i18n.get_text("ADMIN_DELIVERY_AREA_STEP_NAME_HE", user_id=user_id).format(name_en=name_en)
+            await update.message.reply_text(text)
+            return AWAITING_DELIVERY_AREA_NAME_HE
+        except Exception as e:
+            self.logger.error("Error handling delivery area name EN: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _handle_delivery_area_name_he(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        try:
+            user_id = update.effective_user.id
+            name_he = update.message.text.strip()
+            if len(name_he) < 2:
+                await update.message.reply_text(i18n.get_text("ADMIN_DELIVERY_AREA_NAME_HE_TOO_SHORT", user_id=user_id))
+                return AWAITING_DELIVERY_AREA_NAME_HE
+            context.user_data["delivery_area_name_he"] = name_he
+            text = i18n.get_text("ADMIN_DELIVERY_AREA_STEP_CHARGE", user_id=user_id)
+            await update.message.reply_text(text)
+            return AWAITING_DELIVERY_AREA_CHARGE
+        except Exception as e:
+            self.logger.error("Error handling delivery area name HE: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _handle_delivery_area_charge(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        try:
+            user_id = update.effective_user.id
+            raw = update.message.text.strip()
+            charge = None
+            if raw:
+                try:
+                    charge = float(raw)
+                    if charge < 0:
+                        await update.message.reply_text(i18n.get_text("ADMIN_DELIVERY_AREA_CHARGE_NEGATIVE", user_id=user_id))
+                        return AWAITING_DELIVERY_AREA_CHARGE
+                except ValueError:
+                    await update.message.reply_text(i18n.get_text("ADMIN_DELIVERY_AREA_CHARGE_INVALID", user_id=user_id))
+                    return AWAITING_DELIVERY_AREA_CHARGE
+            name_en = context.user_data.get("delivery_area_name_en")
+            name_he = context.user_data.get("delivery_area_name_he")
+            # Persist
+            from src.db.operations import create_delivery_area
+            ok = create_delivery_area(name_en=name_en, name_he=name_he, charge=charge)
+            if ok:
+                await update.message.reply_text(i18n.get_text("ADMIN_DELIVERY_AREA_CREATED", user_id=user_id))
+            else:
+                await update.message.reply_text(i18n.get_text("ADMIN_DELIVERY_AREA_CREATE_ERROR", user_id=user_id))
+            context.user_data.clear()
+            return ConversationHandler.END
+        except Exception as e:
+            self.logger.error("Error handling delivery area charge: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+    async def _start_add_delivery_area(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """Start delivery area wizard: ask for English name"""
+        try:
+            query = update.callback_query
+            user_id = query.from_user.id
+            if context and hasattr(context, 'user_data'):
+                context.user_data.clear()
+            text = i18n.get_text("ADMIN_DELIVERY_AREA_STEP_NAME_EN", user_id=user_id)
+            keyboard = [[InlineKeyboardButton(i18n.get_text("ADMIN_BACK", user_id=user_id), callback_data="admin_delivery_areas")]]
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+            return AWAITING_DELIVERY_AREA_NAME_EN
+        except Exception as e:
+            self.logger.error("Error starting add delivery area: %s", e)
+            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=update.callback_query.from_user.id))
+            return ConversationHandler.END
 
     async def _show_admin_dashboard(
         self, update: Update, _: ContextTypes.DEFAULT_TYPE | None
@@ -5007,6 +5147,42 @@ def register_admin_handlers(application: Application):
     # Add debug logging to the conversation handler
     handler.logger.info("🔧 Registering business_settings_conversation handler")
     application.add_handler(business_settings_handler)
+    # Delivery area creation wizard
+    add_delivery_area_handler = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(handler._start_add_delivery_area, pattern="^admin_add_delivery_area$")
+        ],
+        states={
+            AWAITING_DELIVERY_AREA_NAME_EN: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_delivery_area_name_en)
+            ],
+            AWAITING_DELIVERY_AREA_NAME_HE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_delivery_area_name_he)
+            ],
+            AWAITING_DELIVERY_AREA_CHARGE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_delivery_area_charge)
+            ],
+            ConversationHandler.TIMEOUT: [
+                MessageHandler(filters.ALL, handler._handle_conversation_timeout)
+            ],
+        },
+        fallbacks=[
+            CommandHandler("cancel", handler._reset_conversation),
+            MessageHandler(filters.COMMAND, handler._reset_conversation),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_deliveries$"),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_dashboard$"),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_")
+        ],
+        name="add_delivery_area_conversation",
+        persistent=False,
+        per_message=False,
+        per_chat=False,
+        per_user=True,
+        allow_reentry=True,
+        conversation_timeout=300,
+    )
+    application.add_handler(add_delivery_area_handler)
+    handler.logger.info("✅ add_delivery_area_conversation handler registered successfully")
     # Finally, register the general admin callback handler so conversation patterns take precedence
     application.add_handler(
         CallbackQueryHandler(

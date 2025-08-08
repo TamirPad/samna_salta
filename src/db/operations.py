@@ -35,6 +35,7 @@ from src.db.models import (
     OrderStatus,
     DeliveryMethod,
     PaymentMethod,
+    DeliveryArea,
 )
 from src.utils.logger import PerformanceLogger
 from src.utils.constants import (
@@ -1417,6 +1418,7 @@ def update_cart(
     items: list[dict],
     delivery_method: str | None = None,
     delivery_address: str | None = None,
+    delivery_area_id: int | None = None,
 ) -> bool:
     """Update cart with new items and delivery info"""
     session = get_db_session()
@@ -1453,6 +1455,8 @@ def update_cart(
             cart.delivery_method = delivery_method
         if delivery_address:
             cart.delivery_address = delivery_address
+        if delivery_area_id is not None:
+            cart.delivery_area_id = delivery_area_id
 
         session.commit()
         return True
@@ -1666,7 +1670,12 @@ def get_cart_by_telegram_id(telegram_id: int) -> Cart | None:
         customer = session.query(Customer).filter(Customer.telegram_id == telegram_id).first()
         if not customer:
             return None
-        return session.query(Cart).filter(Cart.customer_id == customer.id).first()
+        return (
+            session.query(Cart)
+            .options(joinedload(Cart.delivery_area))
+            .filter(Cart.customer_id == customer.id)
+            .first()
+        )
     finally:
         session.close()
 
@@ -2453,3 +2462,39 @@ def get_current_delivery_charge() -> float:
         pass
     # Fallback to delivery_methods table
     return get_delivery_charge("delivery")
+
+
+@retry_on_database_error()
+def get_active_delivery_areas() -> list[DeliveryArea]:
+    """Return all active delivery areas ordered for display"""
+    db_manager = get_db_manager()
+    with db_manager.get_session_context() as session:
+        return (
+            session.query(DeliveryArea)
+            .filter(DeliveryArea.is_active == True)  # noqa: E712
+            .order_by(DeliveryArea.display_order, DeliveryArea.name_en)
+            .all()
+        )
+
+
+@retry_on_database_error()
+def get_delivery_area_by_id(area_id: int) -> Optional[DeliveryArea]:
+    db_manager = get_db_manager()
+    with db_manager.get_session_context() as session:
+        return session.query(DeliveryArea).filter(DeliveryArea.id == area_id).first()
+
+
+@retry_on_database_error()
+def create_delivery_area(name_en: str, name_he: str, charge: Optional[float]) -> bool:
+    """Create a new delivery area"""
+    db_manager = get_db_manager()
+    try:
+        with db_manager.get_session_context() as session:
+            area = DeliveryArea(name_en=name_en.strip(), name_he=name_he.strip(), charge=charge, is_active=True)
+            session.add(area)
+            session.commit()
+            logger.info("Created delivery area: %s / %s (charge=%s)", name_en, name_he, charge)
+            return True
+    except Exception as e:
+        logger.error("Failed to create delivery area: %s", e)
+        return False
