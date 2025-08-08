@@ -159,8 +159,9 @@ class OrderValidator:
     
     VALID_STATUS_TRANSITIONS = {
         'pending': ['confirmed', 'cancelled'],
-        'confirmed': ['preparing', 'cancelled'],
-        'preparing': ['ready', 'cancelled'],
+        'confirmed': ['preparing', 'missing', 'cancelled'],
+        'preparing': ['missing', 'ready', 'cancelled'],
+        'missing': ['preparing', 'cancelled'],
         'ready': ['delivered'],
         'delivered': [],  # Terminal state
         'cancelled': []   # Terminal state

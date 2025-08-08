@@ -1598,7 +1598,15 @@ class AdminHandler:
         self, order_id: int, user_id: int = None
     ) -> list[list[InlineKeyboardButton]]:
         """Creates the keyboard for the order details view."""
-        statuses = ["pending", "confirmed", "preparing", "ready", "delivered"]
+        statuses = [
+            "pending",
+            "confirmed",
+            "preparing",
+            # "missing" here indicates some items are unavailable; order remains active
+            "missing",
+            "ready",
+            "delivered",
+        ]
         keyboard = [
             [
                 InlineKeyboardButton(

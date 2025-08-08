@@ -84,6 +84,7 @@ class NotificationService:
         status_messages = {
             "confirmed": i18n.get_text("ORDER_STATUS_CONFIRMED", user_id=customer_chat_id),
             "preparing": i18n.get_text("ORDER_STATUS_PREPARING", user_id=customer_chat_id),
+            "missing": i18n.get_text("ORDER_STATUS_MISSING_ITEMS", user_id=customer_chat_id),
             "ready": i18n.get_text("ORDER_STATUS_READY", user_id=customer_chat_id),
             "delivered": i18n.get_text("ORDER_STATUS_DELIVERED", user_id=customer_chat_id),
             "cancelled": i18n.get_text("ORDER_STATUS_CANCELLED", user_id=customer_chat_id)
@@ -91,6 +92,9 @@ class NotificationService:
         
         # Get the appropriate message for the status
         message = status_messages.get(new_status.lower(), i18n.get_text("ORDER_STATUS_UNKNOWN", user_id=customer_chat_id).format(status=new_status))
+        # Clarify that "missing" means order continues, items need replacement/adjustment
+        if new_status.lower() == "missing":
+            message += "\n\n" + i18n.get_text("ORDER_STATUS_MISSING_ITEMS", user_id=customer_chat_id)
         
         # Add delivery-specific information for ready orders
         if new_status.lower() == "ready":
