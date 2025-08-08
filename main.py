@@ -125,6 +125,7 @@ def setup_bot():
     application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart_confirmation, pattern="^cart_clear_confirm"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart, pattern="^cart_clear_yes"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_checkout, pattern="^cart_checkout"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_quick_signup_start, pattern="^quick_signup$"))
     
     # Cart editing handlers
     application.add_handler(CallbackQueryHandler(cart_handler.handle_edit_cart_mode, pattern="^cart_edit_mode"))
@@ -138,6 +139,8 @@ def setup_bot():
     application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_address_choice, pattern="^delivery_address_"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_method, pattern="^delivery_"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_confirm_order, pattern="^confirm_order"))
+    # Capture quick signup text inputs globally
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, cart_handler.handle_quick_signup_input))
     
     # Register admin handlers
     register_admin_handlers(application)

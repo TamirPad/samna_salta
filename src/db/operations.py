@@ -734,7 +734,7 @@ def init_default_products():
 # Customer operations
 @retry_on_database_error()
 def get_or_create_customer(
-    telegram_id: int, full_name: str, phone_number: str, language: str = "en"
+    telegram_id: int, full_name: str, phone_number: str | None, language: str = "he"
 ) -> Customer:
     """Get existing customer or create new one"""
     session = get_db_session()
@@ -759,11 +759,13 @@ def get_or_create_customer(
             return customer
 
         # Check if customer exists with this phone number (but different telegram_id)
-        existing_customer = (
-            session.query(Customer)
-            .filter(Customer.phone == phone_number)
-            .first()
-        )
+        existing_customer = None
+        if phone_number:
+            existing_customer = (
+                session.query(Customer)
+                .filter(Customer.phone == phone_number)
+                .first()
+            )
 
         if existing_customer:
             # Update telegram_id if it changed
@@ -778,9 +780,9 @@ def get_or_create_customer(
 
         # Create new customer
         customer = Customer(
-            telegram_id=telegram_id, 
-            name=full_name, 
-            phone=phone_number, 
+            telegram_id=telegram_id,
+            name=full_name or "",
+            phone=phone_number,
             language=language,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()

@@ -5,7 +5,7 @@ Cart handler for managing shopping cart operations
 import logging
 from typing import Dict, Any, Optional, List
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ForceReply
 from telegram.ext import ContextTypes, filters, Application
 
 from src.container import get_container
@@ -394,6 +394,17 @@ class CartHandler:
                 )
                 return
 
+            # Gate: require minimal signup (phone) if guest before proceeding to delivery selection
+            customer = cart_service.get_customer(user_id)
+            if not (customer and getattr(customer, "phone", None) and len((customer.phone or "").strip()) >= 8):
+                await self._safe_edit_message(
+                    query,
+                    i18n.get_text("SIGNUP_REQUIRED_TO_ORDER", user_id=user_id),
+                    parse_mode="HTML",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(i18n.get_text("BUTTON_COMPLETE_SIGNUP", user_id=user_id), callback_data="quick_signup")]])
+                )
+                return
+
             # Calculate total
             cart_total = cart_service.calculate_total(cart_items)
 
@@ -439,6 +450,16 @@ class CartHandler:
 
             # Get cart service
             cart_service = self.container.get_cart_service()
+            # Gate for guest
+            customer = cart_service.get_customer(user_id)
+            if not (customer and getattr(customer, "phone", None) and len((customer.phone or "").strip()) >= 8):
+                await self._safe_edit_message(
+                    query,
+                    i18n.get_text("SIGNUP_REQUIRED_TO_ORDER", user_id=user_id),
+                    parse_mode="HTML",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(i18n.get_text("BUTTON_COMPLETE_SIGNUP", user_id=user_id), callback_data="quick_signup")]])
+                )
+                return
             
             # Update cart with delivery method
             success = cart_service.set_delivery_method(user_id, delivery_method)
@@ -472,8 +493,15 @@ class CartHandler:
                         i18n.get_text("DELIVERY_ADDRESS_REQUIRED", user_id=user_id),
                         parse_mode="HTML",
                     )
-                    # Set context to expect address input
+                    # Ask for address with a forced reply so the user knows to type it now
+                    await query.message.reply_text(
+                        i18n.get_text("DELIVERY_ADDRESS_PROMPT", user_id=user_id),
+                        parse_mode="HTML",
+                        reply_markup=ForceReply(selective=True),
+                    )
+                    # Set context to expect address input and use quick-signup input handler to capture it
                     context.user_data["expecting_delivery_address"] = True
+                    context.user_data["qs_stage"] = "address"
                     return
             else:
                 # Pickup - proceed to order confirmation
@@ -517,8 +545,15 @@ class CartHandler:
                     i18n.get_text("DELIVERY_ADDRESS_PROMPT", user_id=user_id),
                     parse_mode="HTML",
                 )
-                # Set context to expect address input
+                # Send a forced reply to clearly request text input
+                await query.message.reply_text(
+                    i18n.get_text("DELIVERY_ADDRESS_PROMPT", user_id=user_id),
+                    parse_mode="HTML",
+                    reply_markup=ForceReply(selective=True),
+                )
+                # Set context to expect address input and route via quick-signup input handler
                 context.user_data["expecting_delivery_address"] = True
+                context.user_data["qs_stage"] = "address"
             else:
                 await self._safe_edit_message(
                     query,
@@ -601,6 +636,39 @@ class CartHandler:
             # Get cart service
             cart_service = self.container.get_cart_service()
             
+            # Gate: require minimal signup (phone) if guest
+            customer = cart_service.get_customer(user_id)
+            if not (customer and getattr(customer, "phone", None) and len((customer.phone or "").strip()) >= 8):
+                # Redirect to quick signup
+                await self._safe_edit_message(
+                    query,
+                    i18n.get_text("SIGNUP_REQUIRED_TO_ORDER", user_id=user_id),
+                    parse_mode="HTML",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(i18n.get_text("BUTTON_COMPLETE_SIGNUP", user_id=user_id), callback_data="quick_signup")]])
+                )
+                return
+
+            # Additional gate: if delivery selected but no address, prompt for address now
+            try:
+                from src.db.operations import get_cart_by_telegram_id
+                cart = get_cart_by_telegram_id(user_id)
+            except Exception:
+                cart = None
+            needs_address = False
+            if cart and getattr(cart, "delivery_method", None) == "delivery":
+                cart_address = getattr(cart, "delivery_address", None)
+                customer_address = getattr(customer, "delivery_address", None) if customer else None
+                needs_address = not (cart_address and cart_address.strip()) and not (customer_address and customer_address.strip())
+            if needs_address:
+                await self._safe_edit_message(
+                    query,
+                    i18n.get_text("DELIVERY_ADDRESS_REQUIRED", user_id=user_id),
+                    parse_mode="HTML",
+                )
+                context.user_data["expecting_delivery_address"] = True
+                context.user_data["qs_stage"] = "address"
+                return
+
             # Get cart items
             cart_items = cart_service.get_items(user_id)
             if not cart_items:
@@ -656,6 +724,118 @@ class CartHandler:
                 parse_mode="HTML",
                 reply_markup=self._get_back_to_cart_keyboard(user_id)
             )
+
+    async def handle_quick_signup_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Start the inline quick signup flow inside the cart flow"""
+        query = update.callback_query
+        await query.answer()
+        user_id = update.effective_user.id
+        # Start name collection
+        context.user_data["qs_stage"] = "name"
+        await self._safe_edit_message(
+            query,
+            i18n.get_text("PLEASE_ENTER_NAME", user_id=user_id),
+            parse_mode="HTML",
+        )
+
+    async def handle_quick_signup_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle name/phone input for quick signup based on stage flags"""
+        try:
+            user_id = update.effective_user.id
+            stage = context.user_data.get("qs_stage")
+            if not stage:
+                return  # Not in quick signup
+
+            text = (update.message.text or "").strip()
+            if stage == "name":
+                if len(text) < 2:
+                    await update.message.reply_text(
+                        i18n.get_text("NAME_TOO_SHORT", user_id=user_id),
+                        parse_mode="HTML",
+                    )
+                    return
+                context.user_data["qs_name"] = text
+                context.user_data["qs_stage"] = "phone"
+                await update.message.reply_text(
+                    i18n.get_text("PLEASE_SHARE_PHONE", user_id=user_id),
+                    parse_mode="HTML",
+                )
+                return
+
+            if stage == "phone":
+                if len(text) < 8:
+                    await update.message.reply_text(
+                        i18n.get_text("ENTER_VALID_PHONE", user_id=user_id),
+                        parse_mode="HTML",
+                    )
+                    return
+                # Persist customer name+phone now
+                from src.utils.language_manager import language_manager
+                from src.db.operations import get_or_create_customer
+                name = context.user_data.get("qs_name") or "Guest"
+                lang = language_manager.get_user_language(user_id)
+                get_or_create_customer(user_id, name, text, lang)
+
+                # Ask for delivery address as part of signup (always collect)
+                context.user_data["qs_stage"] = "address"
+                await update.message.reply_text(
+                    i18n.get_text("DELIVERY_ADDRESS_PROMPT", user_id=user_id),
+                    parse_mode="HTML",
+                )
+                return
+
+            if stage == "address":
+                if len(text) < 5:
+                    await update.message.reply_text(
+                        i18n.get_text("ADDRESS_TOO_SHORT", user_id=user_id),
+                        parse_mode="HTML",
+                    )
+                    return
+                # Save address on customer and cart
+                cart_service = self.container.get_cart_service()
+                cart_service.update_customer_delivery_address(user_id, text)
+
+                # Clear quick signup flags
+                context.user_data.pop("qs_stage", None)
+                context.user_data.pop("qs_name", None)
+
+                await update.message.reply_text(
+                    i18n.get_text("DELIVERY_ADDRESS_SAVED", user_id=user_id).format(address=text),
+                    parse_mode="HTML",
+                )
+
+                # Show checkout summary and prompt delivery method
+                cart_items = cart_service.get_items(user_id)
+                if not cart_items:
+                    await update.message.reply_text(
+                        i18n.get_text("CART_EMPTY_CHECKOUT", user_id=user_id),
+                        parse_mode="HTML",
+                        reply_markup=self._get_professional_empty_cart_keyboard(user_id),
+                    )
+                    return
+                cart_total = cart_service.calculate_total(cart_items)
+                message = i18n.get_text("CHECKOUT_TITLE", user_id=user_id) + "\n\n"
+                for i, item in enumerate(cart_items, 1):
+                    item_total = item.get("unit_price", 0) * item.get("quantity", 1)
+                    from src.utils.helpers import translate_product_name
+                    translated_product_name = translate_product_name(item.get('product_name', i18n.get_text('PRODUCT_UNKNOWN', user_id=user_id)), item.get('options', {}), user_id)
+                    message += i18n.get_text("CART_ITEM_FORMAT", user_id=user_id).format(
+                        index=i,
+                        product_name=translated_product_name,
+                        quantity=item.get('quantity', 1),
+                        price=item.get('unit_price', 0),
+                        item_total=item_total
+                    ) + "\n\n"
+                message += i18n.get_text("CART_TOTAL", user_id=user_id).format(total=cart_total) + "\n\n"
+                message += i18n.get_text("SELECT_DELIVERY_METHOD", user_id=user_id)
+                await update.message.reply_text(
+                    message,
+                    parse_mode="HTML",
+                    reply_markup=self._get_delivery_method_keyboard(user_id),
+                )
+                return
+        except Exception as e:
+            self.logger.error("Exception in handle_quick_signup_input: %s", e)
 
     async def handle_decrease_quantity(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle decreasing item quantity in cart"""

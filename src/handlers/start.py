@@ -27,6 +27,7 @@ from src.states import (
     ONBOARDING_DELIVERY_ADDRESS,
     ONBOARDING_DELIVERY_METHOD,
     ONBOARDING_LANGUAGE,
+    ONBOARDING_CHOICE,
     ONBOARDING_NAME,
     ONBOARDING_PHONE,
 )
@@ -183,8 +184,11 @@ class OnboardingHandler:
                 from src.utils.language_manager import language_manager
                 language_manager._user_languages[user_id] = "en"
                 
-                await self._update_single_window(update, context, i18n.get_text("LANGUAGE_CHANGED", language="en") + "\n\n" + i18n.get_text("PLEASE_ENTER_NAME", language="en"))
-                return ONBOARDING_NAME
+                await self._update_single_window(update, context,
+                    i18n.get_text("ONBOARDING_CHOICE_PROMPT", language="en"),
+                    self._get_onboarding_choice_keyboard(user_id)
+                )
+                return ONBOARDING_CHOICE
             elif data == "language_he":
                 # Store language preference in context for later use
                 context.user_data["selected_language"] = "he"
@@ -192,8 +196,11 @@ class OnboardingHandler:
                 from src.utils.language_manager import language_manager
                 language_manager._user_languages[user_id] = "he"
                 
-                await self._update_single_window(update, context, i18n.get_text("LANGUAGE_CHANGED", language="he") + "\n\n" + i18n.get_text("PLEASE_ENTER_NAME", language="he"))
-                return ONBOARDING_NAME
+                await self._update_single_window(update, context,
+                    i18n.get_text("ONBOARDING_CHOICE_PROMPT", language="he"),
+                    self._get_onboarding_choice_keyboard(user_id)
+                )
+                return ONBOARDING_CHOICE
             else:
                 # Invalid language selection
                 await self._update_single_window(update, context, i18n.get_text("INVALID_CHOICE", user_id=user_id) + "\n\n" + i18n.get_text("SELECT_LANGUAGE_PROMPT", user_id=user_id), self._get_language_selection_keyboard())
@@ -204,6 +211,59 @@ class OnboardingHandler:
             await self._send_error_message(update, i18n.get_text("ERROR_TRY_START_AGAIN", user_id=user_id))
             return END
 
+    async def handle_onboarding_choice(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> int:
+        """Handle selection between signup and guest after language selection"""
+        try:
+            query = update.callback_query
+            await query.answer()
+
+            user_id = update.effective_user.id
+            data = query.data
+
+            if data == "onboard_signup":
+                # Proceed with existing signup flow
+                lang = context.user_data.get("selected_language") or "he"
+                await self._update_single_window(
+                    update,
+                    context,
+                    i18n.get_text("PLEASE_ENTER_NAME", language=lang),
+                )
+                return ONBOARDING_NAME
+            elif data == "onboard_guest":
+                # Create or fetch a minimal customer tied to telegram id
+                from src.db.operations import get_or_create_customer
+                lang = context.user_data.get("selected_language") or "he"
+                tg_user = update.effective_user
+                # Always save guest name as a neutral placeholder to avoid implying full signup
+                display_name = "Guest"
+                # phone None indicates guest (incomplete profile)
+                get_or_create_customer(tg_user.id, display_name, None, lang)
+
+                # Mark session as guest
+                context.user_data["is_guest"] = True
+
+                # Show main page with a small guest notice
+                notice = i18n.get_text("GUEST_MODE_NOTICE", language=lang)
+                await query.edit_message_text(
+                    f"{notice}\n\n" + i18n.get_text("MENU_PROMPT", user_id=user_id),
+                    reply_markup=self._get_main_page_keyboard(user_id),
+                    parse_mode="HTML",
+                )
+                return END
+            else:
+                await query.edit_message_text(
+                    i18n.get_text("INVALID_CHOICE", user_id=user_id),
+                    reply_markup=self._get_language_selection_keyboard(),
+                    parse_mode="HTML",
+                )
+                return ONBOARDING_LANGUAGE
+
+        except Exception as e:
+            self.logger.error("Error in handle_onboarding_choice: %s", e, exc_info=True)
+            await self._send_error_message(update, i18n.get_text("ERROR_TRY_START_AGAIN", user_id=user_id))
+            return END
     async def handle_name(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> int:
@@ -368,6 +428,13 @@ class OnboardingHandler:
         ]
         return InlineKeyboardMarkup(keyboard)
 
+    def _get_onboarding_choice_keyboard(self, user_id: int):
+        keyboard = [
+            [InlineKeyboardButton(i18n.get_text("BUTTON_SIGN_UP", user_id=user_id), callback_data="onboard_signup")],
+            [InlineKeyboardButton(i18n.get_text("BUTTON_CONTINUE_AS_GUEST", user_id=user_id), callback_data="onboard_guest")],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
     def _get_main_page_keyboard(self, user_id: int = None):
         """Get professional main page keyboard with each button on its own line"""
         keyboard = [
@@ -480,11 +547,21 @@ class OnboardingHandler:
             from src.keyboards.menu_keyboards import get_dynamic_main_menu_keyboard
             user_id = query.from_user.id
             
-            await query.edit_message_text(
-                i18n.get_text("MENU_PROMPT", user_id=user_id),
-                reply_markup=get_dynamic_main_menu_keyboard(user_id),
-                parse_mode="HTML"
-            )
+            new_text = i18n.get_text("MENU_PROMPT", user_id=user_id)
+            new_markup = get_dynamic_main_menu_keyboard(user_id)
+
+            # Avoid Telegram error when text/markup are identical
+            try:
+                await query.edit_message_text(
+                    new_text,
+                    reply_markup=new_markup,
+                    parse_mode="HTML"
+                )
+            except Exception as e:
+                if "Message is not modified" in str(e):
+                    # Nothing to change; silently ignore
+                    return
+                raise
 
         except Exception as e:
             self.logger.error("Error showing menu: %s", e)
@@ -874,6 +951,10 @@ def register_start_handlers(application: Application):
         states={
             ONBOARDING_LANGUAGE: [
                 CallbackQueryHandler(handler.handle_language_selection, pattern="^language_(en|he)$"),
+                CommandHandler("cancel", handler.cancel_onboarding),
+            ],
+            ONBOARDING_CHOICE: [
+                CallbackQueryHandler(handler.handle_onboarding_choice, pattern="^(onboard_signup|onboard_guest)$"),
                 CommandHandler("cancel", handler.cancel_onboarding),
             ],
             ONBOARDING_NAME: [
