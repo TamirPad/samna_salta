@@ -1497,7 +1497,6 @@ class AdminHandler:
             # Format customer details
             details = [
                 i18n.get_text("ADMIN_CUSTOMER_DETAILS_TITLE", user_id=user_id).format(name=customer['full_name'], id=customer['customer_id']),
-                i18n.get_text("ADMIN_CUSTOMER_TELEGRAM_ID", user_id=user_id).format(telegram_id=customer['telegram_id']),
                 i18n.get_text("ADMIN_CUSTOMER_PHONE", user_id=user_id).format(phone=customer['phone_number']),
                 i18n.get_text("ADMIN_CUSTOMER_LANGUAGE", user_id=user_id).format(language=customer['language'].upper() if customer['language'] else 'EN'),
                 i18n.get_text("ADMIN_CUSTOMER_JOINED", user_id=user_id).format(
@@ -2368,9 +2367,14 @@ class AdminHandler:
             # Check if category already exists
             existing_categories = await self.admin_service.get_product_categories_list()
             if name_en.lower() in [cat.lower() for cat in existing_categories] or (name_he and name_he.lower() in [cat.lower() for cat in existing_categories]):
-                await update.message.reply_text(
-                    i18n.get_text("ADMIN_CATEGORY_ALREADY_EXISTS", user_id=user_id).format(category=name_en or name_he)
-                )
+                text = i18n.get_text("ADMIN_CATEGORY_ALREADY_EXISTS", user_id=user_id).format(category=name_en or name_he)
+                if update.callback_query:
+                    try:
+                        await update.callback_query.edit_message_text(text, parse_mode="HTML")
+                    except Exception:
+                        await update.callback_query.message.reply_text(text, parse_mode="HTML")
+                else:
+                    await update.message.reply_text(text, parse_mode="HTML")
                 return AWAITING_CATEGORY_NAME_EN
             result = await self.admin_service.create_category_multilingual(
                 name=name_en or name_he,
@@ -2388,16 +2392,34 @@ class AdminHandler:
                 success_text = i18n.get_text("ADMIN_CATEGORY_ADD_SUCCESS", user_id=user_id).format(category=category_display)
                 keyboard = [[InlineKeyboardButton(i18n.get_text("ADMIN_CATEGORY_BACK_TO_LIST", user_id=user_id), callback_data="admin_view_categories")]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
-                await update.message.reply_text(success_text, parse_mode="HTML", reply_markup=reply_markup)
+                if update.callback_query:
+                    try:
+                        await update.callback_query.edit_message_text(success_text, parse_mode="HTML", reply_markup=reply_markup)
+                    except Exception:
+                        await update.callback_query.message.reply_text(success_text, parse_mode="HTML", reply_markup=reply_markup)
+                else:
+                    await update.message.reply_text(success_text, parse_mode="HTML", reply_markup=reply_markup)
                 return ConversationHandler.END
             else:
-                await update.message.reply_text(
-                    i18n.get_text("ADMIN_CATEGORY_ADD_ERROR", user_id=user_id).format(error=result["error"])
-                )
+                error_text = i18n.get_text("ADMIN_CATEGORY_ADD_ERROR", user_id=user_id).format(error=result["error"])
+                if update.callback_query:
+                    try:
+                        await update.callback_query.edit_message_text(error_text, parse_mode="HTML")
+                    except Exception:
+                        await update.callback_query.message.reply_text(error_text, parse_mode="HTML")
+                else:
+                    await update.message.reply_text(error_text, parse_mode="HTML")
             return ConversationHandler.END
         except Exception as e:
             self.logger.error("Error finalizing category creation: %s", e)
-            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            fallback_text = i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id)
+            if update.callback_query:
+                try:
+                    await update.callback_query.edit_message_text(fallback_text, parse_mode="HTML")
+                except Exception:
+                    await update.callback_query.message.reply_text(fallback_text, parse_mode="HTML")
+            else:
+                await update.message.reply_text(fallback_text)
             return ConversationHandler.END
 
     async def _start_edit_category_name(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -4711,6 +4733,34 @@ class AdminHandler:
             return ConversationHandler.END
 
 
+    async def _handle_conversation_timeout(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """Handle conversation timeout by clearing state and returning to dashboard"""
+        try:
+            user_id = update.effective_user.id if update.effective_user else None
+            if context and hasattr(context, 'user_data'):
+                context.user_data.clear()
+            self.logger.info(f"⏰ Conversation timed out for user {user_id}")
+            # Try to gracefully inform and show a safe screen
+            if update.callback_query:
+                try:
+                    await update.callback_query.answer("⏰ Timed out")
+                except Exception:
+                    pass
+                try:
+                    await self._show_admin_dashboard_from_callback(update.callback_query)
+                except Exception:
+                    pass
+            elif update.message:
+                try:
+                    await update.message.reply_text("⏰ Session timed out. Returning to admin dashboard…")
+                except Exception:
+                    pass
+            return ConversationHandler.END
+        except Exception as e:
+            self.logger.error(f"Error handling conversation timeout: {e}")
+            return ConversationHandler.END
+
+
 def register_admin_handlers(application: Application):
     """Register admin handlers"""
     handler = AdminHandler()
@@ -4721,10 +4771,7 @@ def register_admin_handlers(application: Application):
     # Emergency conversation reset command
     application.add_handler(CommandHandler("reset", handler._reset_conversation))
 
-    # Admin callback handlers (excluding conversation patterns but including fallback handlers)
-    application.add_handler(
-        CallbackQueryHandler(handler.handle_admin_callback, pattern="^admin_(?!add_product$|add_product_category_|add_product_confirm_|add_category$|edit_category_name_|edit_product_field_|edit_product_confirm_|edit_product_category_|product_edit_|edit_business_name$|edit_business_description$|edit_business_address$|edit_business_phone$|edit_business_email$|edit_business_website$|edit_business_hours$|edit_currency$|edit_delivery_charge$|cancel_business_edit$|skip_hebrew_name$|skip_hebrew_description$|skip_image_url$|skip_hebrew_category_name$)")
-    )
+    # (Moved) Admin callback handler is registered AFTER all conversation handlers below
 
     # Admin conversation handler for status updates
     conv_handler = ConversationHandler(
@@ -4735,11 +4782,20 @@ def register_admin_handlers(application: Application):
             AWAITING_ORDER_ID: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handler.show_order_details_for_status_update)
             ],
+            ConversationHandler.TIMEOUT: [
+                MessageHandler(filters.ALL, handler._handle_conversation_timeout)
+            ],
         },
         fallbacks=[
-            CommandHandler("cancel", lambda u, c: ConversationHandler.END)
+            CommandHandler("cancel", handler._reset_conversation),
+            MessageHandler(filters.COMMAND, handler._reset_conversation),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_"),
             ],
         per_message=False,
+        per_chat=False,
+        per_user=True,
+        allow_reentry=True,
+        conversation_timeout=180,
     )
 
     application.add_handler(conv_handler)
@@ -4777,17 +4833,26 @@ def register_admin_handlers(application: Application):
             AWAITING_PRODUCT_CONFIRMATION: [
                 CallbackQueryHandler(handler._handle_product_confirmation, pattern="^admin_add_product_confirm_")
             ],
+            ConversationHandler.TIMEOUT: [
+                MessageHandler(filters.ALL, handler._handle_conversation_timeout)
+            ],
         },
         fallbacks=[
             CommandHandler("cancel", handler._reset_conversation),
+            MessageHandler(filters.COMMAND, handler._reset_conversation),
             CallbackQueryHandler(handler._reset_conversation, pattern="^admin_dashboard$"),
             CallbackQueryHandler(handler._reset_conversation, pattern="^admin_back$"),
             CallbackQueryHandler(handler._reset_conversation, pattern="^admin_products_management$"),
-            CallbackQueryHandler(handler._start_add_product, pattern="^admin_add_product$")
+            CallbackQueryHandler(handler._start_add_product, pattern="^admin_add_product$"),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_"),
         ],
         name="add_product_conversation",
         persistent=False,
         per_message=False,
+        per_chat=False,
+        per_user=True,
+        allow_reentry=True,
+        conversation_timeout=300,
     )
     
     # Add debug logging to the conversation handler
@@ -4810,15 +4875,24 @@ def register_admin_handlers(application: Application):
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_category_name_he_input),
                 CallbackQueryHandler(handler._handle_skip_hebrew_category_name, pattern="^admin_skip_hebrew_category_name$")
             ],
+            ConversationHandler.TIMEOUT: [
+                MessageHandler(filters.ALL, handler._handle_conversation_timeout)
+            ],
         },
         fallbacks=[
             CommandHandler("cancel", handler._reset_conversation),
+            MessageHandler(filters.COMMAND, handler._reset_conversation),
             CallbackQueryHandler(handler._reset_conversation, pattern="^admin_dashboard$"),
-            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_back$")
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_back$"),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_"),
         ],
         name="add_category_conversation",
         persistent=False,
         per_message=False,
+        per_chat=False,
+        per_user=True,
+        allow_reentry=True,
+        conversation_timeout=300,
     )
 
     # Add debug logging to the conversation handler
@@ -4835,15 +4909,24 @@ def register_admin_handlers(application: Application):
             AWAITING_CATEGORY_NAME_EDIT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_category_name_edit_input)
             ],
+            ConversationHandler.TIMEOUT: [
+                MessageHandler(filters.ALL, handler._handle_conversation_timeout)
+            ],
         },
         fallbacks=[
             CommandHandler("cancel", handler._reset_conversation),
+            MessageHandler(filters.COMMAND, handler._reset_conversation),
             CallbackQueryHandler(handler._reset_conversation, pattern="^admin_dashboard$"),
-            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_back$")
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_back$"),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_"),
         ],
         name="edit_category_conversation",
         persistent=False,
         per_message=False,
+        per_chat=False,
+        per_user=True,
+        allow_reentry=True,
+        conversation_timeout=300,
     )
 
     application.add_handler(edit_category_handler)
@@ -4864,15 +4947,24 @@ def register_admin_handlers(application: Application):
             AWAITING_PRODUCT_EDIT_CONFIRM: [
                 CallbackQueryHandler(handler._handle_edit_confirmation, pattern="^admin_edit_product_confirm_")
             ],
+            ConversationHandler.TIMEOUT: [
+                MessageHandler(filters.ALL, handler._handle_conversation_timeout)
+            ],
         },
         fallbacks=[
-            CommandHandler("cancel", lambda u, c: ConversationHandler.END),
-            CallbackQueryHandler(lambda u, c: ConversationHandler.END, pattern="^admin_product_back_to_list$"),
-            CallbackQueryHandler(lambda u, c: ConversationHandler.END, pattern="^admin_edit_product_cancel$")
+            CommandHandler("cancel", handler._reset_conversation),
+            MessageHandler(filters.COMMAND, handler._reset_conversation),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_product_back_to_list$"),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_edit_product_cancel$"),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_"),
         ],
         name="edit_product_conversation",
         persistent=False,
         per_message=False,
+        per_chat=False,
+        per_user=True,
+        allow_reentry=True,
+        conversation_timeout=300,
     )
 
     # Add debug logging to the conversation handler
@@ -4891,22 +4983,37 @@ def register_admin_handlers(application: Application):
         states={
             AWAITING_BUSINESS_FIELD_INPUT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_business_settings_input)
-            ]
+            ],
+            ConversationHandler.TIMEOUT: [
+                MessageHandler(filters.ALL, handler._handle_conversation_timeout)
+            ],
         },
         fallbacks=[
             CommandHandler("cancel", handler._handle_business_conversation_fallback),
             CallbackQueryHandler(handler._handle_business_conversation_fallback, pattern="^admin_cancel_business_edit$"),
             CallbackQueryHandler(handler._handle_business_conversation_fallback, pattern="^admin_business_settings$"),
-            CallbackQueryHandler(handler._handle_business_conversation_fallback, pattern="^admin_dashboard$")
+            CallbackQueryHandler(handler._handle_business_conversation_fallback, pattern="^admin_dashboard$"),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_")
         ],
         name="business_settings_conversation",
         persistent=False,
         per_message=False,
+        per_chat=False,
+        per_user=True,
+        allow_reentry=True,
+        conversation_timeout=300,
     )
 
     # Add debug logging to the conversation handler
     handler.logger.info("🔧 Registering business_settings_conversation handler")
     application.add_handler(business_settings_handler)
+    # Finally, register the general admin callback handler so conversation patterns take precedence
+    application.add_handler(
+        CallbackQueryHandler(
+            handler.handle_admin_callback,
+            pattern="^admin_(?!add_product$|add_product_category_|add_product_confirm_|add_category$|edit_category_name_|edit_product_field_|edit_product_confirm_|edit_product_category_|product_edit_|edit_business_name$|edit_business_description$|edit_business_address$|edit_business_phone$|edit_business_email$|edit_business_website$|edit_business_hours$|edit_currency$|edit_delivery_charge$|cancel_business_edit$|skip_hebrew_name$|skip_hebrew_description$|skip_image_url$|skip_hebrew_category_name$)"
+        )
+    )
     handler.logger.info("✅ business_settings_conversation handler registered successfully")
 
     # Analytics callback handlers

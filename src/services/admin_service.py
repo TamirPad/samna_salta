@@ -492,15 +492,40 @@ class AdminService:
                 "items": []
             }
             
-            # Add order items if available
+            # Add order items if available, localized for the admin's language
             if hasattr(order, 'order_items') and order.order_items:
+                from src.utils.language_manager import language_manager
+                admin_lang = language_manager.get_user_language(order.customer.telegram_id) if order.customer else "he"
                 for item in order.order_items:
+                    localized_name = item.product_name
+                    try:
+                        # Try to map product_id to a multilingual name when possible
+                        if item.product_id:
+                            from src.db.operations import get_product_by_id, get_localized_name
+                            product = get_product_by_id(item.product_id)
+                            if product:
+                                localized_name = get_localized_name(product, admin_lang)
+                    except Exception:
+                        pass
                     result["items"].append({
-                        "product_name": item.product_name,
+                        "product_name": localized_name,
                         "quantity": item.quantity,
                         "total_price": item.total_price,
                         "unit_price": item.unit_price
                     })
+            # Append delivery as a pseudo-item for admin display
+            try:
+                if (getattr(order, "delivery_method", "").lower() == "delivery") and float(getattr(order, "delivery_charge", 0) or 0) > 0:
+                    from src.utils.i18n import i18n
+                    fee = float(getattr(order, "delivery_charge", 0) or 0)
+                    result["items"].append({
+                        "product_name": i18n.get_text("DELIVERY_ITEM_NAME"),
+                        "quantity": 1,
+                        "total_price": fee,
+                        "unit_price": fee
+                    })
+            except Exception:
+                pass
             
             logger.info("Retrieved order details for order #%s", order.order_number)
             return result

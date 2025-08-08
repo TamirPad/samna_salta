@@ -82,7 +82,7 @@ class NotificationService:
         """Notify customer about order status update"""
         # Create user-friendly status messages using i18n with customer's language
         status_messages = {
-            "confirmed": i18n.get_text("ORDER_STATUS_CONFIRMED", user_id=customer_chat_id),
+            "confirmed": i18n.get_text("ORDER_STATUS_CONFIRMED", user_id=customer_chat_id) + "\n\n" + i18n.get_text("ORDER_STATUS_CONFIRMED_FOLLOWUP", user_id=customer_chat_id),
             "preparing": i18n.get_text("ORDER_STATUS_PREPARING", user_id=customer_chat_id),
             "missing": i18n.get_text("ORDER_STATUS_MISSING_ITEMS", user_id=customer_chat_id),
             "ready": i18n.get_text("ORDER_STATUS_READY", user_id=customer_chat_id),
@@ -103,8 +103,8 @@ class NotificationService:
             else:
                 message += "\n\n" + i18n.get_text("PICKUP_READY_INFO", user_id=customer_chat_id)
         
-        # Add order id to the message (always prefer DB id for user-visible number)
-        full_message = f"{i18n.get_text('CUSTOMER_ORDER_UPDATE_HEADER', user_id=customer_chat_id)}\n\n📋 <b>{i18n.get_text('ORDER_NUMBER_LABEL', user_id=customer_chat_id)} #{order_id}</b>\n\n{message}"
+        # Always display database order id (not the human-readable number)
+        full_message = f"{i18n.get_text('CUSTOMER_ORDER_UPDATE_HEADER', user_id=customer_chat_id)}\n\n📋 <b>{i18n.get_text('ORDER_ID_LABEL', user_id=customer_chat_id)} #{order_id}</b>\n\n{message}"
         
         return await self.send_customer_notification(customer_chat_id, full_message)
 
@@ -114,7 +114,8 @@ class NotificationService:
         user_id = order_data.get('customer_telegram_id')
         
         items_text = ""
-        for i, item in enumerate(order_data.get('items', []), 1):
+        items = order_data.get('items', []) or []
+        for i, item in enumerate(items, 1):
             item_total = item.get("unit_price", 0) * item.get("quantity", 1)
             
             # Use the new localization system
@@ -136,6 +137,18 @@ class NotificationService:
                 localized_product_name = translate_product_name(item.get('product_name', 'Unknown'), item.get('options', {}), user_id)
             
             items_text += f"{i}. {localized_product_name} x{item.get('quantity', 1)} - 💰 ₪{item_total:.2f}\n"
+
+        # Add delivery as a line item for admin if applicable
+        try:
+            delivery_method = (order_data.get('delivery_method') or '').lower()
+            delivery_charge = float(order_data.get('delivery_charge') or 0)
+        except Exception:
+            delivery_method = (order_data.get('delivery_method') or '').lower()
+            delivery_charge = 0.0
+
+        if delivery_method == 'delivery' and delivery_charge > 0:
+            next_index = len(items) + 1
+            items_text += f"{next_index}. {i18n.get_text('DELIVERY_ITEM_NAME', user_id=user_id)} x1 - 💰 ₪{delivery_charge:.2f}\n"
         
         # Format delivery info
         delivery_method = order_data.get('delivery_method', 'Unknown').title()
