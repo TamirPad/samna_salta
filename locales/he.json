@@ -1,5 +1,5 @@
 {
-  "WELCOME": "🎉 <b>ברוכים הבאים ל-{business_name}!</b>\n\nאנחנו שמחים להגיש לכם את המעדנים התימניים האותנטיים שלנו.",
+  "WELCOME": "🎉 <b>ברוכים הבאים ל-{business_name}!</b>",
   "MENU_PROMPT": "<b>מה תרצו להזמין היום?</b>\n\nעיינו במעדנים התימניים הטעימים שלנו למטה:",
   "BUTTON_KUBANEH": "🍞 קובנה",
   "BUTTON_SAMNEH": "🧈 סמנה",
@@ -530,6 +530,7 @@
   "ADMIN_BUSINESS_WEBSITE": "אתר העסק",
   "ADMIN_BUSINESS_HOURS": "שעות פעילות",
   "ADMIN_DELIVERY_CHARGE": "עלות משלוח",
+  "ADMIN_DEFAULT_DELIVERY_CHARGE": "עלות משלוח ברירת מחדל",
   "ADMIN_CURRENCY": "מטבע",
   "ADMIN_EDIT_BUSINESS_NAME": "📝 ערוך שם",
   "ADMIN_EDIT_BUSINESS_DESCRIPTION": "📄 ערוך תיאור",

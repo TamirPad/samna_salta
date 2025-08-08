@@ -126,7 +126,16 @@ class OnboardingHandler:
                     # Welcome back existing customer with beautiful main page
                     user_id = user.id
                     
-                    welcome_message = f"""🌟 <b>{get_dynamic_welcome_for_returning_users(user_id=user_id)}</b>
+                    # Fetch optional business description to show under the welcome headline
+                    try:
+                        from src.db.operations import get_business_settings_dict
+                        _settings = get_business_settings_dict()
+                        _desc = (_settings or {}).get("business_description")
+                        description_line = f"\n{_desc}" if _desc else ""
+                    except Exception:
+                        description_line = ""
+
+                    welcome_message = f"""🌟 <b>{get_dynamic_welcome_for_returning_users(user_id=user_id)}</b>{description_line}
 
 👋 <b>{i18n.get_text("WELCOME_BACK", user_id=user_id).format(name=existing_customer.name)}</b>
 
@@ -141,9 +150,16 @@ class OnboardingHandler:
 
             # Start onboarding for new customer or incomplete profile with beautiful language selection
             user_id = user.id
-            welcome_text = f"""🎉 <b>{get_dynamic_welcome_message(user_id=user_id)}</b>
+            # Fetch optional business description to show under the welcome headline
+            try:
+                from src.db.operations import get_business_settings_dict
+                _settings = get_business_settings_dict()
+                _desc = (_settings or {}).get("business_description")
+                description_line = f"\n{_desc}" if _desc else ""
+            except Exception:
+                description_line = ""
 
-🌟 {i18n.get_text("WELCOME_HELP_MESSAGE", user_id=user_id)}
+            welcome_text = f"""🎉 <b>{get_dynamic_welcome_message(user_id=user_id)}</b>{description_line}
 
 🌍 {i18n.get_text("SELECT_LANGUAGE_PROMPT", user_id=user_id)}"""
 

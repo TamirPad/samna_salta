@@ -295,8 +295,8 @@ def get_dynamic_welcome_for_returning_users(user_id: Optional[int] = None) -> st
         settings = get_business_settings_dict()
         business_name = settings.get('business_name', 'Samna Salta')
         
-        # Get the welcome message template from i18n
-        welcome_template = i18n.get_text("WELCOME", user_id=user_id)
+        # Use the simple header-only template
+        welcome_template = i18n.get_text("WELCOME_NEW_USER", user_id=user_id)
         
         # Format the template with the business name
         welcome_message = welcome_template.format(business_name=business_name)

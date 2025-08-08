@@ -1,5 +1,5 @@
 {
-  "WELCOME": "🎉 <b>Welcome to {business_name}!</b>\n\nWe're excited to serve you our authentic Yemeni specialties.",
+  "WELCOME": "🎉 <b>Welcome to {business_name}!</b>",
   "MENU_PROMPT": "<b>What would you like to order today?</b>\n\nBrowse our delicious Yemeni specialties below:",
   "BUTTON_KUBANEH": "🍞 Kubaneh",
   "BUTTON_SAMNEH": "🧈 Samneh",
@@ -539,6 +539,7 @@
   "ADMIN_BUSINESS_WEBSITE": "Business Website",
   "ADMIN_BUSINESS_HOURS": "Business Hours",
   "ADMIN_DELIVERY_CHARGE": "Delivery Charge",
+  "ADMIN_DEFAULT_DELIVERY_CHARGE": "Default Delivery Charge",
   "ADMIN_CURRENCY": "Currency",
   "ADMIN_EDIT_BUSINESS_NAME": "📝 Edit Name",
   "ADMIN_EDIT_BUSINESS_DESCRIPTION": "📄 Edit Description",

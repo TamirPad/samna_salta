@@ -4463,10 +4463,10 @@ class AdminHandler:
                 text += f"📧 <b>{i18n.get_text('ADMIN_BUSINESS_EMAIL', user_id=user_id)}:</b> {settings.get('business_email', 'N/A')}\n"
                 text += f"🌐 <b>{i18n.get_text('ADMIN_BUSINESS_WEBSITE', user_id=user_id)}:</b> {settings.get('business_website', 'N/A')}\n"
                 text += f"🕒 <b>{i18n.get_text('ADMIN_BUSINESS_HOURS', user_id=user_id)}:</b> {settings.get('business_hours', 'N/A')}\n"
-                text += f"🚚 <b>{i18n.get_text('ADMIN_DELIVERY_CHARGE', user_id=user_id)}:</b> {settings.get('delivery_charge', 0)} {settings.get('currency', 'ILS')}\n"
+                # Keep showing default delivery charge for transparency, but clarify it's a default
+                text += f"🚚 <b>{i18n.get_text('ADMIN_DEFAULT_DELIVERY_CHARGE', user_id=user_id)}:</b> {settings.get('delivery_charge', 0)} {settings.get('currency', 'ILS')}\n"
                 text += f"💰 <b>{i18n.get_text('ADMIN_CURRENCY', user_id=user_id)}:</b> {settings.get('currency', 'ILS')}\n"
                 text += f"🏢 <b>{i18n.get_text('BUSINESS_TYPE', user_id=user_id)}:</b> Restaurant\n"
-                text += f"🌍 <b>{i18n.get_text('BUSINESS_ENVIRONMENT', user_id=user_id)}:</b> {config.environment}\n"
                 
                 keyboard = [
                     [
@@ -4624,7 +4624,7 @@ class AdminHandler:
                 "business_email": i18n.get_text("ADMIN_BUSINESS_EMAIL", user_id=user_id),
                 "business_website": i18n.get_text("ADMIN_BUSINESS_WEBSITE", user_id=user_id),
                 "business_hours": i18n.get_text("ADMIN_BUSINESS_HOURS", user_id=user_id),
-                "delivery_charge": i18n.get_text("ADMIN_DELIVERY_CHARGE", user_id=user_id),
+                "delivery_charge": i18n.get_text("ADMIN_DEFAULT_DELIVERY_CHARGE", user_id=user_id),
                 "currency": i18n.get_text("ADMIN_CURRENCY", user_id=user_id)
             }
             
