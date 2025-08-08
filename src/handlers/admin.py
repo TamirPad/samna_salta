@@ -1497,7 +1497,6 @@ class AdminHandler:
             # Format customer details
             details = [
                 i18n.get_text("ADMIN_CUSTOMER_DETAILS_TITLE", user_id=user_id).format(name=customer['full_name'], id=customer['customer_id']),
-                i18n.get_text("ADMIN_CUSTOMER_TELEGRAM_ID", user_id=user_id).format(telegram_id=customer['telegram_id']),
                 i18n.get_text("ADMIN_CUSTOMER_PHONE", user_id=user_id).format(phone=customer['phone_number']),
                 i18n.get_text("ADMIN_CUSTOMER_LANGUAGE", user_id=user_id).format(language=customer['language'].upper() if customer['language'] else 'EN'),
                 i18n.get_text("ADMIN_CUSTOMER_JOINED", user_id=user_id).format(
