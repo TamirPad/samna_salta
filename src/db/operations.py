@@ -60,14 +60,29 @@ logger = logging.getLogger(__name__)
 
 
 def get_localized_name(product: Product, language: str = "en") -> str:
-    """Get localized name for a product based on user language preference"""
-    if language == "he" and product.name_he:
-        return product.name_he
-    elif language == "en" and product.name_en:
-        return product.name_en
+    """Get localized name for a product based on user language preference.
+    - Prefer explicit multilingual columns (name_he/name_en)
+    - For Hebrew fallback, try heuristic translation from the base name to Hebrew labels
+    - Finally fallback to the legacy 'name' field
+    """
+    if language == "he":
+        if getattr(product, "name_he", None):
+            return product.name_he
+        # Heuristic fallback: translate known product names to Hebrew using helper
+        try:
+            from src.utils.helpers import translate_product_name
+            base_name = product.name_en or product.name or ""
+            translated = translate_product_name(base_name, options=None, user_id=None)
+            if translated:
+                return translated
+        except Exception:
+            pass
+        # Last resort
+        return product.name or product.name_en or ""
     else:
-        # Fallback to original name field
-        return product.name
+        if getattr(product, "name_en", None):
+            return product.name_en
+        return product.name or product.name_he or ""
 
 
 def get_localized_description(product: Product, language: str = "en") -> str:
@@ -1684,13 +1699,13 @@ def create_order_with_items(
     items: list[dict],
     delivery_method: str = "pickup",
     delivery_address: Optional[str] = None,
+    delivery_charge: float = 0.0,
 ) -> Optional[Order]:
     """Create a new order with order items from cart items"""
     try:
         with get_db_manager().get_session_context() as session:
-            # Calculate subtotal and delivery charge
+            # Calculate subtotal and total with delivery charge
             subtotal = total_amount
-            delivery_charge = 0.0  # For now, no delivery charge
             
             # Create the order
             order = Order(
@@ -1698,7 +1713,7 @@ def create_order_with_items(
                 order_number=order_number,
                 subtotal=subtotal,
                 delivery_charge=delivery_charge,
-                total=total_amount,
+                total=subtotal + (delivery_charge or 0.0),
                 delivery_method=delivery_method,
                 delivery_address=delivery_address or "",
                 status="pending"
@@ -1723,7 +1738,6 @@ def create_order_with_items(
                     total_price=total_price
                 )
                 session.add(order_item)
-            
             session.commit()
             session.refresh(order)
             logger.info("Created order #%s with %d items for customer %s", 
@@ -2349,3 +2363,18 @@ def get_delivery_charge(method_name: str) -> float:
         if method:
             return method.charge
         return 0.0
+
+
+@retry_on_database_error()
+def get_current_delivery_charge() -> float:
+    """Get the business-configured delivery charge from BusinessSettings.
+    Falls back to delivery_methods('delivery') if settings not present.
+    """
+    try:
+        settings = get_business_settings_dict()
+        if settings and settings.get("delivery_charge") is not None:
+            return float(settings["delivery_charge"]) or 0.0
+    except Exception:
+        pass
+    # Fallback to delivery_methods table
+    return get_delivery_charge("delivery")

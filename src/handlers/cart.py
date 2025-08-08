@@ -183,10 +183,18 @@ class CartHandler:
                 )
 
                 # Send beautiful success message
-                localized_product_name = self._get_localized_product_name(
-                    {"product_name": product_info["display_name"], "options": product_info.get('options', {})}, 
-                    user_id
-                )
+                # Prefer multilingual fields from parsed product when available
+                from src.utils.language_manager import language_manager
+                user_lang = language_manager.get_user_language(user_id)
+                if user_lang == "he" and product_info.get("name_he"):
+                    localized_product_name = product_info["name_he"]
+                elif user_lang == "en" and product_info.get("name_en"):
+                    localized_product_name = product_info["name_en"]
+                else:
+                    localized_product_name = self._get_localized_product_name(
+                        {"product_name": product_info["display_name"], "options": product_info.get('options', {})}, 
+                        user_id
+                    )
                 
                 # Format total with RTL support
                 from src.utils.helpers import format_price, format_quantity
@@ -278,8 +286,17 @@ class CartHandler:
             
             for i, item in enumerate(cart_items, 1):
                 item_total = item.get("unit_price", 0) * item.get("quantity", 1)
-                # Get localized product name
-                localized_product_name = self._get_localized_product_name(item, user_id)
+                # Get localized product name (prefer multilingual fields)
+                name_he = item.get("name_he")
+                name_en = item.get("name_en")
+                from src.utils.language_manager import language_manager
+                user_lang = language_manager.get_user_language(user_id)
+                if user_lang == "he" and name_he:
+                    localized_product_name = name_he
+                elif user_lang == "en" and name_en:
+                    localized_product_name = name_en
+                else:
+                    localized_product_name = self._get_localized_product_name(item, user_id)
                 
                 # Format prices and quantities with RTL support
                 from src.utils.helpers import format_price, format_quantity
@@ -413,9 +430,18 @@ class CartHandler:
             
             for i, item in enumerate(cart_items, 1):
                 item_total = item.get("unit_price", 0) * item.get("quantity", 1)
-                # Translate product name
-                from src.utils.helpers import translate_product_name
-                translated_product_name = translate_product_name(item.get('product_name', i18n.get_text('PRODUCT_UNKNOWN', user_id=user_id)), item.get('options', {}), user_id)
+                # Localize product name: prefer multilingual fields; fallback to translation helper
+                name_he = item.get("name_he")
+                name_en = item.get("name_en")
+                from src.utils.language_manager import language_manager
+                user_lang = language_manager.get_user_language(user_id)
+                if user_lang == "he" and name_he:
+                    translated_product_name = name_he
+                elif user_lang == "en" and name_en:
+                    translated_product_name = name_en
+                else:
+                    from src.utils.helpers import translate_product_name
+                    translated_product_name = translate_product_name(item.get('product_name', i18n.get_text('PRODUCT_UNKNOWN', user_id=user_id)), item.get('options', {}), user_id)
                 message += i18n.get_text("CART_ITEM_FORMAT", user_id=user_id).format(
                     index=i,
                     product_name=translated_product_name,
@@ -690,21 +716,87 @@ class CartHandler:
                 order_obj = order_result.get("order")
                 order_id = getattr(order_obj, "id", None)
                 order_total = order_result.get("total")
-                
-                # Send success message to customer
-                success_message = i18n.get_text("ORDER_CONFIRMED_SUCCESS", user_id=user_id).format(
-                    order_number=order_id,
-                    order_total=order_total
+
+                # Build order summary like admin, for customer-facing "received" message
+                # Localize delivery method and address
+                dm_name = getattr(order_obj, "delivery_method", "pickup") or "pickup"
+                try:
+                    from src.utils.language_manager import language_manager
+                    from src.db.operations import get_delivery_method_by_name
+                    user_lang = language_manager.get_user_language(user_id)
+                    dm_info = get_delivery_method_by_name(dm_name, user_lang)
+                    delivery_method_display = (dm_info.get("display_name") if dm_info else dm_name.title())
+                except Exception:
+                    delivery_method_display = dm_name.title()
+
+                address_line = ""
+                if dm_name == "delivery":
+                    addr = getattr(order_obj, "delivery_address", None)
+                    if not addr:
+                        # fallback to customer's saved address
+                        customer = cart_service.get_customer(user_id)
+                        addr = getattr(customer, "delivery_address", None) if customer else None
+                    if addr:
+                        address_line = "\n" + i18n.get_text("CUSTOMER_ORDER_DELIVERY_ADDRESS", user_id=user_id).format(address=addr)
+
+                # Compose items summary from cart_items we just placed
+                items_summary = "\n" + i18n.get_text("CUSTOMER_ORDER_ITEMS", user_id=user_id) + "\n"
+                try:
+                    from src.utils.language_manager import language_manager
+                    user_lang = language_manager.get_user_language(user_id)
+                except Exception:
+                    user_lang = "he"
+                for idx, item in enumerate(cart_items, 1):
+                    # Prefer multilingual fields from cart item, fallback to translation helper
+                    name_he = item.get("name_he")
+                    name_en = item.get("name_en")
+                    if user_lang == "he" and name_he:
+                        display_name = name_he
+                    elif user_lang == "en" and name_en:
+                        display_name = name_en
+                    else:
+                        from src.utils.helpers import translate_product_name
+                        display_name = translate_product_name(
+                            item.get("product_name", i18n.get_text("PRODUCT_UNKNOWN", user_id=user_id)),
+                            item.get("options", {}),
+                            user_id,
+                        )
+                    items_summary += i18n.get_text("CUSTOMER_ORDER_ITEM_LINE", user_id=user_id).format(
+                        name=display_name,
+                        quantity=item.get("quantity", 1),
+                        price=item.get("unit_price", 0),
+                    ) + "\n"
+
+                # If delivery, add delivery as a line item
+                try:
+                    delivery_fee = float(getattr(order_obj, "delivery_charge", 0) or 0)
+                except Exception:
+                    delivery_fee = 0.0
+                if dm_name == "delivery" and delivery_fee > 0:
+                    items_summary += i18n.get_text("CUSTOMER_ORDER_ITEM_LINE", user_id=user_id).format(
+                        name=i18n.get_text("DELIVERY_ITEM_NAME", user_id=user_id),
+                        quantity=1,
+                        price=delivery_fee,
+                    ) + "\n"
+
+                received_text = (
+                    i18n.get_text("ORDER_RECEIVED_TITLE", user_id=user_id) + "\n\n" +
+                    f"{i18n.get_text('CUSTOMER_ORDER_DETAILS_TITLE', user_id=user_id).format(number=order_id)}\n" +
+                    i18n.get_text("CUSTOMER_ORDER_TOTAL", user_id=user_id).format(total=order_total) + "\n" +
+                    i18n.get_text("CUSTOMER_ORDER_DELIVERY_METHOD", user_id=user_id).format(method=delivery_method_display) +
+                    address_line + "\n" +
+                    items_summary + "\n" +
+                    i18n.get_text("ORDER_RECEIVED_AWAITING_CONFIRMATION", user_id=user_id)
                 )
-                
+
                 await self._safe_edit_message(
                     query,
-                    success_message,
+                    received_text,
                     parse_mode="HTML",
                     reply_markup=self._get_order_success_keyboard(user_id)
                 )
-                
-                self.logger.info("✅ ORDER CREATED: id=%s for user %s", order_id, user_id)
+
+                self.logger.info("✅ ORDER CREATED (received): id=%s for user %s", order_id, user_id)
                 
             else:
                 error_msg = order_result.get("error", i18n.get_text("ERROR_UNKNOWN_OCCURRED", user_id=user_id))
@@ -1384,14 +1476,31 @@ class CartHandler:
 
             # Build order confirmation
             message = i18n.get_text("ORDER_CONFIRMATION_TITLE", user_id=user_id) + "\n\n"
+            # Ensure we read delivery method/address from the actual cart
+            try:
+                from src.db.operations import get_cart_by_telegram_id
+                cart = get_cart_by_telegram_id(user_id)
+            except Exception:
+                cart = None
+            # Localize delivery method display
+            dm_name = (getattr(cart, "delivery_method", None) or "pickup")
+            try:
+                from src.utils.language_manager import language_manager
+                from src.db.operations import get_delivery_method_by_name
+                user_lang = language_manager.get_user_language(user_id)
+                dm_info = get_delivery_method_by_name(dm_name, user_lang)
+                delivery_method_display = (dm_info.get("display_name") if dm_info else dm_name.title())
+            except Exception:
+                delivery_method_display = dm_name.title()
             message += i18n.get_text("DELIVERY_METHOD_LABEL", user_id=user_id).format(
-                method=cart_info.get('delivery_method', 'pickup').title()
+                method=delivery_method_display
             ) + "\n"
-            
-            if cart_info.get('delivery_method') == 'delivery' and cart_info.get('delivery_address'):
-                message += i18n.get_text("DELIVERY_ADDRESS_LABEL", user_id=user_id).format(
-                    address=cart_info.get('delivery_address')
-                ) + "\n"
+            if cart and getattr(cart, "delivery_method", None) == "delivery":
+                addr = getattr(cart, "delivery_address", None)
+                if addr:
+                    message += i18n.get_text("DELIVERY_ADDRESS_LABEL", user_id=user_id).format(
+                        address=addr
+                    ) + "\n"
             
             
             for i, item in enumerate(cart_items, 1):
@@ -1413,12 +1522,25 @@ class CartHandler:
 
 """
 
-            # Format total with RTL support
+            # Format totals and delivery fee
             from src.utils.helpers import format_price
             formatted_total = format_price(cart_total, user_id)
-            
+            delivery_charge_line = ""
+            total_with_delivery_line = ""
+            if cart and getattr(cart, "delivery_method", None) == "delivery":
+                try:
+                    from src.db.operations import get_current_delivery_charge
+                    charge = get_current_delivery_charge()
+                except Exception:
+                    charge = 0.0
+                formatted_charge = format_price(charge, user_id)
+                delivery_charge_line = f"{i18n.get_text('DELIVERY_CHARGE_LABEL', user_id=user_id)}: {formatted_charge}\n"
+                formatted_total_with_delivery = format_price(cart_total + charge, user_id)
+                total_with_delivery_line = i18n.get_text('TOTAL_WITH_DELIVERY', user_id=user_id).format(total=cart_total + charge)
+
             message += f"""
-💸 <b>{i18n.get_text("CART_TOTAL", user_id=user_id).format(total=formatted_total)}</b>
+{delivery_charge_line}💸 <b>{i18n.get_text("CART_TOTAL", user_id=user_id).format(total=formatted_total)}</b>
+{total_with_delivery_line}
 
 🤔 {i18n.get_text("CONFIRM_ORDER_PROMPT", user_id=user_id)}"""
 
@@ -1446,14 +1568,31 @@ class CartHandler:
 
             # Build order confirmation
             confirmation_message = i18n.get_text("ORDER_CONFIRMATION_TITLE", user_id=user_id) + "\n\n"
+            # Ensure we read delivery method/address from the actual cart
+            try:
+                from src.db.operations import get_cart_by_telegram_id
+                cart = get_cart_by_telegram_id(user_id)
+            except Exception:
+                cart = None
+            # Localize delivery method display
+            dm_name = (getattr(cart, "delivery_method", None) or "pickup")
+            try:
+                from src.utils.language_manager import language_manager
+                from src.db.operations import get_delivery_method_by_name
+                user_lang = language_manager.get_user_language(user_id)
+                dm_info = get_delivery_method_by_name(dm_name, user_lang)
+                delivery_method_display = (dm_info.get("display_name") if dm_info else dm_name.title())
+            except Exception:
+                delivery_method_display = dm_name.title()
             confirmation_message += i18n.get_text("DELIVERY_METHOD_LABEL", user_id=user_id).format(
-                method=cart_info.get('delivery_method', 'pickup').title()
+                method=delivery_method_display
             ) + "\n"
-            
-            if cart_info.get('delivery_method') == 'delivery' and cart_info.get('delivery_address'):
-                confirmation_message += i18n.get_text("DELIVERY_ADDRESS_LABEL", user_id=user_id).format(
-                    address=cart_info.get('delivery_address')
-                ) + "\n"
+            if cart and getattr(cart, "delivery_method", None) == "delivery":
+                addr = getattr(cart, "delivery_address", None)
+                if addr:
+                    confirmation_message += i18n.get_text("DELIVERY_ADDRESS_LABEL", user_id=user_id).format(
+                        address=addr
+                    ) + "\n"
             
             confirmation_message += "\n"
             
@@ -1476,13 +1615,26 @@ class CartHandler:
 
 """
 
-            # Format total with RTL support
+            # Format totals and delivery fee
             from src.utils.helpers import format_price
             formatted_total = format_price(cart_total, user_id)
+            delivery_charge_line = ""
+            total_with_delivery_line = ""
+            if cart and getattr(cart, "delivery_method", None) == "delivery":
+                try:
+                    from src.db.operations import get_current_delivery_charge
+                    charge = get_current_delivery_charge()
+                except Exception:
+                    charge = 0.0
+                formatted_charge = format_price(charge, user_id)
+                delivery_charge_line = f"{i18n.get_text('DELIVERY_CHARGE_LABEL', user_id=user_id)}: {formatted_charge}\n"
+                formatted_total_with_delivery = format_price(cart_total + charge, user_id)
+                total_with_delivery_line = i18n.get_text('TOTAL_WITH_DELIVERY', user_id=user_id).format(total=cart_total + charge)
             
             confirmation_message += f"""
 
-💸 <b>{i18n.get_text("CART_TOTAL", user_id=user_id).format(total=formatted_total)}</b>
+{delivery_charge_line}💸 <b>{i18n.get_text("CART_TOTAL", user_id=user_id).format(total=formatted_total)}</b>
+{total_with_delivery_line}
 
 🤔 {i18n.get_text("CONFIRM_ORDER_PROMPT", user_id=user_id)}"""
 

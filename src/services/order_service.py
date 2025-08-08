@@ -44,8 +44,17 @@ class OrderService:
                 delivery_address = cart.delivery_address or ""
                 logger.info("DEBUG: Order creation - delivery_method: %s, delivery_address: %s", delivery_method, delivery_address)
             
-            # Calculate total using unit_price from cart items
-            total = sum(item.get("unit_price", 0) * item.get("quantity", 1) for item in cart_items)
+            # Calculate subtotal using unit_price from cart items
+            subtotal = sum(item.get("unit_price", 0) * item.get("quantity", 1) for item in cart_items)
+            # Delivery charge from business settings if delivery selected
+            delivery_charge = 0.0
+            if delivery_method == "delivery":
+                try:
+                    from src.db.operations import get_current_delivery_charge
+                    delivery_charge = get_current_delivery_charge()
+                except Exception:
+                    delivery_charge = 0.0
+            total = subtotal + delivery_charge
             
             # Generate order number
             order_number = generate_order_number()
@@ -54,10 +63,11 @@ class OrderService:
             order = create_order_with_items(
                 customer_id=customer.id,
                 order_number=order_number,
-                total_amount=total,
+                total_amount=subtotal,
                 items=cart_items,
                 delivery_method=delivery_method,
-                delivery_address=delivery_address
+                delivery_address=delivery_address,
+                delivery_charge=delivery_charge
             )
             
             if order:
@@ -77,6 +87,7 @@ class OrderService:
                         "customer_phone": customer.phone_number,
                         "items": cart_items,
                         "total": total,
+                        "delivery_charge": delivery_charge,
                         "delivery_method": order.delivery_method,
                         "delivery_address": order.delivery_address,
                         "customer_telegram_id": telegram_id,
