@@ -136,7 +136,7 @@ async def generate_pdf_from_html(html: str) -> Optional[bytes]:
         logger.warning("Playwright not available for PDF generation: %s", e)
         return None
 
-    try:
+    async def _render() -> Optional[bytes]:
         async with async_playwright() as p:
             browser = await p.chromium.launch()
             page = await browser.new_page()
@@ -144,9 +144,18 @@ async def generate_pdf_from_html(html: str) -> Optional[bytes]:
             pdf_bytes = await page.pdf(format="A4", print_background=True)
             await browser.close()
             return pdf_bytes
+    try:
+        return await _render()
     except Exception as e:
+        # Attempt one-time browser install at runtime, then retry
         logger.error("Failed to render PDF via Playwright: %s", e)
-        return None
+        try:
+            import subprocess, sys
+            subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=False)
+            return await _render()
+        except Exception as e2:
+            logger.error("PDF retry after install failed: %s", e2)
+            return None
 
 
 async def build_invoice_pdf(order: Dict, business: Dict | None = None, receipt: bool = False, user_id: Optional[int] = None) -> Dict[str, Optional[bytes]]:
