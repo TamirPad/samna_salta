@@ -30,7 +30,9 @@ class I18nManager:
         return cls._instance
 
     def _load_translations(self) -> None:
-        """Load all translation files"""
+        """Load all translation files safely into a temp cache.
+        Only swap into the live cache if at least one language loaded successfully.
+        """
         # Point to root level locales directory
         locales_dir = os.path.join(os.path.dirname(__file__), "..", "..", "locales")
         
@@ -38,16 +40,35 @@ class I18nManager:
             logger.warning("Locales directory not found at %s", locales_dir)
             return
 
+        temp_cache: Dict[str, Dict] = {}
         for filename in os.listdir(locales_dir):
             if filename.endswith(".json"):
                 language = filename[:-5]  # Remove .json extension
                 file_path = os.path.join(locales_dir, filename)
                 try:
                     with open(file_path, "r", encoding="utf-8") as f:
-                        self._translations[language] = json.load(f)
+                        temp_cache[language] = json.load(f)
                     logger.info("Loaded translations for %s", language)
                 except Exception as e:
                     logger.error("Failed to load translations for %s: %s", language, e)
+        if temp_cache:
+            # Merge languages that loaded successfully; keep any previously
+            # loaded languages that failed to reload this time.
+            self._translations.update(temp_cache)
+            logger.info(
+                "Translations cache updated. Languages now available: %s",
+                ", ".join(sorted(self._translations.keys())),
+            )
+        else:
+            logger.error("No translation files were loaded. Keeping previous cache with %d languages.", len(self._translations))
+
+    def reload(self) -> None:
+        """Public method to reload locale files at runtime."""
+        try:
+            self._load_translations()
+            logger.info("Translations reloaded successfully")
+        except Exception as e:
+            logger.error("Failed to reload translations: %s", e)
 
     def get_text(self, key: str, language: Optional[str] = None, user_id: Optional[int] = None) -> str:
         """Get translated text for a key"""
@@ -57,13 +78,28 @@ class I18nManager:
         
         language = language or DEFAULT_LANGUAGE
 
-        # Try requested language
+        # Try requested language (first attempt)
         if language in self._translations and key in self._translations[language]:
             return self._translations[language][key]
 
-        # Try fallback language
+        # If translations seem empty or language missing, try a one-time reload
+        if not self._translations or language not in self._translations:
+            self.reload()
+            if language in self._translations and key in self._translations[language]:
+                return self._translations[language][key]
+
+        # Try fallback language (Hebrew)
         if FALLBACK_LANGUAGE in self._translations and key in self._translations[FALLBACK_LANGUAGE]:
             return self._translations[FALLBACK_LANGUAGE][key]
+
+        # Secondary fallback to English if available
+        if "en" in self._translations and key in self._translations["en"]:
+            return self._translations["en"][key]
+
+        # Last-resort: try any available language to avoid showing raw keys
+        for lang, mapping in self._translations.items():
+            if key in mapping:
+                return mapping[key]
 
         # Return key if no translation found
         logger.warning("No translation found for key: %s", key)

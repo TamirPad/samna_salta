@@ -43,15 +43,34 @@ class OrderService:
                 delivery_method = cart.delivery_method or "pickup"
                 delivery_address = cart.delivery_address or ""
                 logger.info("DEBUG: Order creation - delivery_method: %s, delivery_address: %s", delivery_method, delivery_address)
+                # Use area-specific charge if selected
+                try:
+                    from src.db.operations import get_delivery_area_by_id
+                    if getattr(cart, "delivery_area_id", None):
+                        area = get_delivery_area_by_id(cart.delivery_area_id)
+                        if area and area.charge is not None:
+                            # override charge when delivery selected
+                            pass  # we'll set below
+                except Exception:
+                    pass
             
             # Calculate subtotal using unit_price from cart items
             subtotal = sum(item.get("unit_price", 0) * item.get("quantity", 1) for item in cart_items)
-            # Delivery charge from business settings if delivery selected
+            # Delivery charge from area (if selected) or business settings
             delivery_charge = 0.0
             if delivery_method == "delivery":
+                # Prefer area charge if set; else business default
                 try:
-                    from src.db.operations import get_current_delivery_charge
-                    delivery_charge = get_current_delivery_charge()
+                    charge = None
+                    if cart and getattr(cart, "delivery_area_id", None):
+                        from src.db.operations import get_delivery_area_by_id
+                        area = get_delivery_area_by_id(cart.delivery_area_id)
+                        if area and area.charge is not None:
+                            charge = float(area.charge)
+                    if charge is None:
+                        from src.db.operations import get_current_delivery_charge
+                        charge = get_current_delivery_charge()
+                    delivery_charge = float(charge or 0.0)
                 except Exception:
                     delivery_charge = 0.0
             total = subtotal + delivery_charge

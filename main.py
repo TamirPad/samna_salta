@@ -137,7 +137,8 @@ def setup_bot():
     application.add_handler(CallbackQueryHandler(cart_handler.handle_separator, pattern="^cart_separator"))
     
     application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_address_choice, pattern="^delivery_address_"))
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_method, pattern="^delivery_"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_method, pattern="^delivery_(pickup|delivery)$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_area_selection, pattern="^delivery_area_\d+$"))
     application.add_handler(CallbackQueryHandler(cart_handler.handle_confirm_order, pattern="^confirm_order"))
     # Register admin handlers BEFORE any catch-all text handlers to ensure conversations receive messages
     register_admin_handlers(application)
