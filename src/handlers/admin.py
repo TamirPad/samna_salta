@@ -4771,10 +4771,7 @@ def register_admin_handlers(application: Application):
     # Emergency conversation reset command
     application.add_handler(CommandHandler("reset", handler._reset_conversation))
 
-    # Admin callback handlers (excluding conversation patterns but including fallback handlers)
-    application.add_handler(
-        CallbackQueryHandler(handler.handle_admin_callback, pattern="^admin_(?!add_product$|add_product_category_|add_product_confirm_|add_category$|edit_category_name_|edit_product_field_|edit_product_confirm_|edit_product_category_|product_edit_|edit_business_name$|edit_business_description$|edit_business_address$|edit_business_phone$|edit_business_email$|edit_business_website$|edit_business_hours$|edit_currency$|edit_delivery_charge$|cancel_business_edit$|skip_hebrew_name$|skip_hebrew_description$|skip_image_url$|skip_hebrew_category_name$)")
-    )
+    # (Moved) Admin callback handler is registered AFTER all conversation handlers below
 
     # Admin conversation handler for status updates
     conv_handler = ConversationHandler(
@@ -5010,6 +5007,13 @@ def register_admin_handlers(application: Application):
     # Add debug logging to the conversation handler
     handler.logger.info("🔧 Registering business_settings_conversation handler")
     application.add_handler(business_settings_handler)
+    # Finally, register the general admin callback handler so conversation patterns take precedence
+    application.add_handler(
+        CallbackQueryHandler(
+            handler.handle_admin_callback,
+            pattern="^admin_(?!add_product$|add_product_category_|add_product_confirm_|add_category$|edit_category_name_|edit_product_field_|edit_product_confirm_|edit_product_category_|product_edit_|edit_business_name$|edit_business_description$|edit_business_address$|edit_business_phone$|edit_business_email$|edit_business_website$|edit_business_hours$|edit_currency$|edit_delivery_charge$|cancel_business_edit$|skip_hebrew_name$|skip_hebrew_description$|skip_image_url$|skip_hebrew_category_name$)"
+        )
+    )
     handler.logger.info("✅ business_settings_conversation handler registered successfully")
 
     # Analytics callback handlers
