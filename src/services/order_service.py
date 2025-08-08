@@ -56,7 +56,7 @@ class OrderService:
             
             # Calculate subtotal using unit_price from cart items
             subtotal = sum(item.get("unit_price", 0) * item.get("quantity", 1) for item in cart_items)
-            # Delivery charge from business settings if delivery selected
+            # Delivery charge from area (if selected) or business settings
             delivery_charge = 0.0
             if delivery_method == "delivery":
                 # Prefer area charge if set; else business default

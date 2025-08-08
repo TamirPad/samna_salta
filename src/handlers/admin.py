@@ -1731,6 +1731,20 @@ class AdminHandler:
                         price=price
                     )
                 )
+        # Add delivery as a line item if delivery method and charge present
+        try:
+            if (order_info.get("delivery_method") or "").lower() == "delivery":
+                delivery_charge = float(order_info.get("delivery_charge") or 0)
+                if delivery_charge > 0:
+                    details.append(
+                        i18n.get_text("ADMIN_ITEM_LINE", user_id=user_id).format(
+                            name=i18n.get_text("DELIVERY_ITEM_NAME", user_id=user_id),
+                            quantity=1,
+                            price=delivery_charge,
+                        )
+                    )
+        except Exception:
+            pass
         return "\n".join(details)
 
     def _create_order_details_keyboard(

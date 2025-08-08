@@ -1607,9 +1607,17 @@ class CartHandler:
             delivery_charge_line = ""
             total_with_delivery_line = ""
             if cart and getattr(cart, "delivery_method", None) == "delivery":
+                # Prefer area-specific charge when a delivery area is selected; otherwise use business default
                 try:
-                    from src.db.operations import get_current_delivery_charge
-                    charge = get_current_delivery_charge()
+                    charge = None
+                    if getattr(cart, "delivery_area_id", None):
+                        from src.db.operations import get_delivery_area_by_id
+                        area = get_delivery_area_by_id(cart.delivery_area_id)
+                        if area and area.charge is not None:
+                            charge = float(area.charge)
+                    if charge is None:
+                        from src.db.operations import get_current_delivery_charge
+                        charge = float(get_current_delivery_charge() or 0.0)
                 except Exception:
                     charge = 0.0
                 formatted_charge = format_price(charge, user_id)
@@ -1700,9 +1708,17 @@ class CartHandler:
             delivery_charge_line = ""
             total_with_delivery_line = ""
             if cart and getattr(cart, "delivery_method", None) == "delivery":
+                # Prefer area-specific charge if available
                 try:
-                    from src.db.operations import get_current_delivery_charge
-                    charge = get_current_delivery_charge()
+                    charge = None
+                    if getattr(cart, "delivery_area_id", None):
+                        from src.db.operations import get_delivery_area_by_id
+                        area = get_delivery_area_by_id(cart.delivery_area_id)
+                        if area and area.charge is not None:
+                            charge = float(area.charge)
+                    if charge is None:
+                        from src.db.operations import get_current_delivery_charge
+                        charge = float(get_current_delivery_charge() or 0.0)
                 except Exception:
                     charge = 0.0
                 formatted_charge = format_price(charge, user_id)
