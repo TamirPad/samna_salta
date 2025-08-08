@@ -935,7 +935,42 @@ def create_product(
         # Check if product with same name already exists
         existing_product = session.query(Product).filter(Product.name == name).first()
         if existing_product:
-            logger.warning("Product with name '%s' already exists", name)
+            # If it exists but is inactive, reactivate and update it instead of failing
+            if getattr(existing_product, "is_active", True) is False:
+                # Get category by name
+                category_obj = session.query(MenuCategory).filter(MenuCategory.name_en == category).first()
+                if not category_obj:
+                    logger.warning("Category '%s' not found", category)
+                    return None
+
+                existing_product.description = description
+                existing_product.category_id = category_obj.id
+                existing_product.price = price
+                existing_product.image_url = image_url
+                existing_product.is_active = True
+                # Update multilingual fields if provided
+                if name_en is not None:
+                    existing_product.name_en = name_en
+                if name_he is not None:
+                    existing_product.name_he = name_he
+                if description_en is not None:
+                    existing_product.description_en = description_en
+                if description_he is not None:
+                    existing_product.description_he = description_he
+                existing_product.updated_at = datetime.utcnow()
+                session.commit()
+                session.refresh(existing_product)
+                # Clear cache after changing products
+                try:
+                    from src.utils.helpers import SimpleCache
+                    cache = SimpleCache()
+                    cache.clear()
+                    logger.info("Cleared cache after reactivating product '%s'", name)
+                except Exception as cache_error:
+                    logger.warning("Failed to clear cache after reactivating product '%s': %s", name, cache_error)
+                logger.info("Reactivated and updated product: %s (ID: %d)", name, existing_product.id)
+                return existing_product
+            logger.warning("Product with name '%s' already exists and is active", name)
             return None
         
         # Get category by name
@@ -960,6 +995,14 @@ def create_product(
         session.commit()
         session.refresh(product)
         logger.info("Created new product: %s (ID: %d)", name, product.id)
+        # Clear cache after creating product
+        try:
+            from src.utils.helpers import SimpleCache
+            cache = SimpleCache()
+            cache.clear()
+            logger.info("Cleared cache after creating product ID %d", product.id)
+        except Exception as cache_error:
+            logger.warning("Failed to clear cache after creating product ID %d: %s", product.id, cache_error)
         return product
     except SQLAlchemyError as e:
         session.rollback()
@@ -1029,6 +1072,14 @@ def deactivate_product(product_id: int) -> bool:
         product.updated_at = datetime.utcnow()
         session.commit()
         logger.info("Deactivated product ID %d: %s", product_id, product.name)
+        # Clear cache after product status change
+        try:
+            from src.utils.helpers import SimpleCache
+            cache = SimpleCache()
+            cache.clear()
+            logger.info("Cleared cache after deactivating product ID %d", product_id)
+        except Exception as cache_error:
+            logger.warning("Failed to clear cache after deactivating product ID %d: %s", product_id, cache_error)
         return True
     except SQLAlchemyError as e:
         session.rollback()
@@ -1066,6 +1117,14 @@ def hard_delete_product(product_id: int) -> bool:
         session.delete(product)
         session.commit()
         logger.info("Hard deleted product ID %d: %s", product_id, product_name)
+        # Clear cache after deleting product
+        try:
+            from src.utils.helpers import SimpleCache
+            cache = SimpleCache()
+            cache.clear()
+            logger.info("Cleared cache after hard deleting product ID %d", product_id)
+        except Exception as cache_error:
+            logger.warning("Failed to clear cache after hard deleting product ID %d: %s", product_id, cache_error)
         return True
     except SQLAlchemyError as e:
         session.rollback()
@@ -1908,6 +1967,14 @@ def create_category(
         
         session.add(category)
         session.commit()
+        # Clear cache so category lists refresh everywhere
+        try:
+            from src.utils.helpers import SimpleCache
+            cache = SimpleCache()
+            cache.clear()
+            logger.info("Cleared cache after creating category '%s'", name_en)
+        except Exception as cache_error:
+            logger.warning("Failed to clear cache after creating category '%s': %s", name_en, cache_error)
         
         logger.info("Successfully created category: %s (EN) / %s (HE)", name_en, name_he)
         return category
@@ -1943,6 +2010,14 @@ def delete_category(name_en: str, name_he: str = None) -> bool:
         # Delete the category (products will be orphaned)
         session.delete(category)
         session.commit()
+        # Clear cache after deleting category
+        try:
+            from src.utils.helpers import SimpleCache
+            cache = SimpleCache()
+            cache.clear()
+            logger.info("Cleared cache after deleting category '%s'", name_en)
+        except Exception as cache_error:
+            logger.warning("Failed to clear cache after deleting category '%s': %s", name_en, cache_error)
         
         logger.info("Successfully deleted category '%s' with %d products", name_en, product_count)
         return True
