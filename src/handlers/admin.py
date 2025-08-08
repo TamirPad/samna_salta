@@ -4772,6 +4772,8 @@ def register_admin_handlers(application: Application):
             CallbackQueryHandler(handler._reset_conversation, pattern="^admin_"),
             ],
         per_message=False,
+        per_chat=False,
+        per_user=True,
         allow_reentry=True,
         conversation_timeout=180,
     )
@@ -4827,6 +4829,8 @@ def register_admin_handlers(application: Application):
         name="add_product_conversation",
         persistent=False,
         per_message=False,
+        per_chat=False,
+        per_user=True,
         allow_reentry=True,
         conversation_timeout=300,
     )
@@ -4865,6 +4869,8 @@ def register_admin_handlers(application: Application):
         name="add_category_conversation",
         persistent=False,
         per_message=False,
+        per_chat=False,
+        per_user=True,
         allow_reentry=True,
         conversation_timeout=300,
     )
@@ -4897,6 +4903,8 @@ def register_admin_handlers(application: Application):
         name="edit_category_conversation",
         persistent=False,
         per_message=False,
+        per_chat=False,
+        per_user=True,
         allow_reentry=True,
         conversation_timeout=300,
     )
@@ -4933,6 +4941,8 @@ def register_admin_handlers(application: Application):
         name="edit_product_conversation",
         persistent=False,
         per_message=False,
+        per_chat=False,
+        per_user=True,
         allow_reentry=True,
         conversation_timeout=300,
     )
@@ -4968,6 +4978,8 @@ def register_admin_handlers(application: Application):
         name="business_settings_conversation",
         persistent=False,
         per_message=False,
+        per_chat=False,
+        per_user=True,
         allow_reentry=True,
         conversation_timeout=300,
     )
