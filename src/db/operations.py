@@ -408,9 +408,16 @@ class DatabaseManager:
             # This is a safety net for schema evolution
             try:
                 with self.get_session_context() as session:
-                    # Check and add any missing columns here if needed
-                    # For now, we'll just ensure the basic structure is correct
-                    pass
+                    # Add missing column: business_settings.app_images (TEXT)
+                    if not _column_exists("business_settings", "app_images"):
+                        try:
+                            # PostgreSQL and SQLite both support simple ADD COLUMN
+                            session.execute(text("ALTER TABLE business_settings ADD COLUMN app_images TEXT"))
+                            session.commit()
+                            self.logger.info("Added missing column business_settings.app_images")
+                        except Exception as add_err:
+                            session.rollback()
+                            self.logger.warning(f"Failed to add column app_images: {add_err}")
             except Exception as e:
                 self.logger.warning(f"Auto-migration check failed: {e}")
 
@@ -2060,7 +2067,8 @@ def get_business_settings() -> Optional[BusinessSettings]:
                 delivery_charge=config.delivery_charge,
                 currency=config.currency,
                 hilbeh_available_days=json.dumps(config.hilbeh_available_days),
-                hilbeh_available_hours=config.hilbeh_available_hours
+                hilbeh_available_hours=config.hilbeh_available_hours,
+                app_images=None
             )
             session.add(settings)
             session.commit()
@@ -2092,12 +2100,15 @@ def update_business_settings(**kwargs) -> bool:
             'business_phone', 'business_email', 'business_website',
             'business_hours', 'delivery_charge', 'currency',
             'hilbeh_available_days', 'hilbeh_available_hours',
-            'welcome_message', 'about_us', 'contact_info'
+            'welcome_message', 'about_us', 'contact_info', 'app_images'
         ]
         
         for field, value in kwargs.items():
             if field in allowed_fields:
                 if field == 'hilbeh_available_days' and isinstance(value, list):
+                    setattr(settings, field, json.dumps(value))
+                elif field == 'app_images' and isinstance(value, dict):
+                    # Store as JSON
                     setattr(settings, field, json.dumps(value))
                 else:
                     setattr(settings, field, value)
@@ -2105,6 +2116,14 @@ def update_business_settings(**kwargs) -> bool:
         settings.updated_at = datetime.utcnow()
         session.commit()
         logger.info("Updated business settings: %s", list(kwargs.keys()))
+        # Clear in-memory caches so changes reflect immediately (e.g., step images)
+        try:
+            from src.utils.helpers import SimpleCache
+            cache = SimpleCache()
+            cache.clear()
+            logger.info("Cleared cache after updating business settings")
+        except Exception as _e:
+            logger.debug("Failed to clear cache after settings update: %s", _e)
         return True
     except SQLAlchemyError as e:
         session.rollback()

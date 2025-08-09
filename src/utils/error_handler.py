@@ -327,9 +327,22 @@ class ErrorHandler:
         error: Exception,
         update: Update,
     ):
-        """Send a user-friendly error message"""
-        user_message = "Something went wrong. Please try again later."
+        """Send a user-friendly error message (localized)"""
+        # Derive user id for localization
+        user_id = None
+        try:
+            if hasattr(update, 'effective_user') and update.effective_user:
+                user_id = update.effective_user.id
+            elif hasattr(update, 'callback_query') and update.callback_query:
+                user_id = update.callback_query.from_user.id
+            elif hasattr(update, 'message') and update.message:
+                user_id = update.message.from_user.id
+        except Exception:
+            user_id = None
+
+        user_message = i18n.get_text("UNEXPECTED_ERROR", user_id=user_id)
         if isinstance(error, ApplicationError):
+            # Prefer domain-provided message if present
             user_message = error.message
 
         try:
@@ -586,8 +599,8 @@ async def handle_error(update: Update, error: Exception, operation: str = "unkno
             str(error)
         )
 
-        # Send user-friendly error message with helpful guidance
-        error_message = "❌ Something went wrong. Please try again or contact support if the problem persists."
+        # Send user-friendly localized error message
+        error_message = i18n.get_text("UNEXPECTED_ERROR", user_id=user_id)
         
         if hasattr(update, 'callback_query') and update.callback_query:
             try:
@@ -599,7 +612,7 @@ async def handle_error(update: Update, error: Exception, operation: str = "unkno
                         error_message,
                         parse_mode="HTML",
                         reply_markup=InlineKeyboardMarkup([[
-                            InlineKeyboardButton("⬅️ Back to Main", callback_data="menu_main")
+                            InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")
                         ]])
                     )
                 else:
@@ -609,7 +622,7 @@ async def handle_error(update: Update, error: Exception, operation: str = "unkno
                             error_message,
                             parse_mode="HTML",
                             reply_markup=InlineKeyboardMarkup([[
-                                InlineKeyboardButton("⬅️ Back to Main", callback_data="menu_main")
+                                InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")
                             ]])
                         )
             except Exception as edit_error:

@@ -445,6 +445,8 @@
   "CANCEL_ORDER": "❌ Cancel Order",
   "ENTER_DELIVERY_ADDRESS": "📍 Enter Delivery Address",
   "VIEW_ORDER_STATUS": "📋 View Order Status",
+  "ADMIN_INVOICE_PDF_BUTTON": "📄 Invoice (PDF)",
+  "ADMIN_RECEIPT_PDF_BUTTON": "🧾 Receipt 58mm",
   "ANALYTICS_LABEL_PENDING": "Pending",
   "ANALYTICS_LABEL_ACTIVE": "Active",
   "ANALYTICS_LABEL_COMPLETED": "Completed",
@@ -578,5 +580,13 @@
   "ADMIN_CATEGORY_ADD_STEP_NAME_HE": "Please enter the category name in Hebrew (optional):",
   "ADMIN_CATEGORY_NAME_HE_PLACEHOLDER": "e.g. ירקות",
   "ADMIN_SKIP_HEBREW": "Skip Hebrew",
-  "ADMIN_CATEGORY_BACK_TO_LIST": "Back to Category List"
+  "ADMIN_CATEGORY_BACK_TO_LIST": "Back to Category List",
+  "ADMIN_APP_IMAGES": "App Images",
+  "ADMIN_APP_IMAGES_TITLE": "Manage App Images (overrides)",
+  "ADMIN_APP_IMAGES_EDIT_PROMPT": "Send a valid image URL to override, or type 'default' to use the built-in image.",
+  "ADMIN_APP_IMAGES_INVALID_URL": "Please send a valid URL (starting with http or https).",
+  "ADMIN_APP_IMAGES_SAVED": "✅ Image setting saved.",
+  "ADMIN_APP_IMAGES_SAVE_ERROR": "❌ Failed to save image setting.",
+  "ADMIN_CANCEL": "Cancel",
+  "ADMIN_BACK_TO_DASHBOARD": "⬅️ Back to Dashboard"
 }

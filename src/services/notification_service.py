@@ -82,8 +82,8 @@ class NotificationService:
         order_id = order_data.get('order_id') or order_data.get('order_number')
         buttons = [
             [
-                InlineKeyboardButton("📄 Invoice (PDF)", callback_data=f"admin_invoice_pdf_{order_id}"),
-                InlineKeyboardButton("🧾 Receipt 58mm", callback_data=f"admin_receipt_pdf_{order_id}")
+                InlineKeyboardButton(i18n.get_text("ADMIN_INVOICE_PDF_BUTTON", language="en"), callback_data=f"admin_invoice_pdf_{order_id}"),
+                InlineKeyboardButton(i18n.get_text("ADMIN_RECEIPT_PDF_BUTTON", language="en"), callback_data=f"admin_receipt_pdf_{order_id}")
             ]
         ]
         markup = InlineKeyboardMarkup(buttons)

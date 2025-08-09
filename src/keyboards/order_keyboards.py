@@ -8,11 +8,11 @@ from src.utils.i18n import i18n
 from src.utils.constants_manager import get_delivery_method_name
 
 
-def get_order_confirmation_keyboard():
+def get_order_confirmation_keyboard(user_id: int | None = None):
     """Get order confirmation keyboard"""
     keyboard = [
-        [InlineKeyboardButton(i18n.get_text("CONFIRM_ORDER"), callback_data="order_confirm")],
-        [InlineKeyboardButton(i18n.get_text("CANCEL_ORDER"), callback_data="order_cancel")],
+        [InlineKeyboardButton(i18n.get_text("CONFIRM_ORDER", user_id=user_id), callback_data="order_confirm")],
+        [InlineKeyboardButton(i18n.get_text("CANCEL_ORDER", user_id=user_id), callback_data="order_cancel")],
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -26,29 +26,29 @@ def get_delivery_method_keyboard(user_id: int = None):
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_delivery_address_choice_keyboard():
+def get_delivery_address_choice_keyboard(user_id: int | None = None):
     """Get delivery address choice keyboard"""
     keyboard = [
-        [InlineKeyboardButton(i18n.get_text("USE_SAVED_ADDRESS"), callback_data="delivery_use_saved")],
-        [InlineKeyboardButton(i18n.get_text("ENTER_NEW_ADDRESS"), callback_data="delivery_new_address")],
-        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU"), callback_data="menu_main")],
+        [InlineKeyboardButton(i18n.get_text("USE_SAVED_ADDRESS", user_id=user_id), callback_data="delivery_use_saved")],
+        [InlineKeyboardButton(i18n.get_text("ENTER_NEW_ADDRESS", user_id=user_id), callback_data="delivery_new_address")],
+        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")],
     ]
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_delivery_address_required_keyboard():
+def get_delivery_address_required_keyboard(user_id: int | None = None):
     """Get delivery address required keyboard"""
     keyboard = [
-        [InlineKeyboardButton(i18n.get_text("ENTER_DELIVERY_ADDRESS"), callback_data="delivery_enter_address")],
-        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU"), callback_data="menu_main")],
+        [InlineKeyboardButton(i18n.get_text("ENTER_DELIVERY_ADDRESS", user_id=user_id), callback_data="delivery_enter_address")],
+        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")],
     ]
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_order_status_keyboard(order_id: int):
+def get_order_status_keyboard(order_id: int, user_id: int | None = None):
     """Get order status keyboard"""
     keyboard = [
-        [InlineKeyboardButton(i18n.get_text("VIEW_ORDER_STATUS"), callback_data=f"order_status_{order_id}")],
-        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU"), callback_data="menu_main")],
+        [InlineKeyboardButton(i18n.get_text("VIEW_ORDER_STATUS", user_id=user_id), callback_data=f"order_status_{order_id}")],
+        [InlineKeyboardButton(i18n.get_text("BACK_MAIN_MENU", user_id=user_id), callback_data="menu_main")],
     ]
     return InlineKeyboardMarkup(keyboard) 

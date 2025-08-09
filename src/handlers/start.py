@@ -33,6 +33,7 @@ from src.states import (
 )
 from src.utils.i18n import i18n
 from src.utils.helpers import get_dynamic_welcome_message, get_dynamic_welcome_for_returning_users
+from src.utils.image_handler import get_step_image
 
 
 logger = logging.getLogger(__name__)
@@ -46,16 +47,28 @@ class OnboardingHandler:
         self.cart_service = self.container.get_cart_service()
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    async def _update_single_window(self, update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, reply_markup=None, parse_mode: str = "HTML"):
+    async def _update_single_window(self, update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, reply_markup=None, parse_mode: str = "HTML", image_url: str | None = None):
         """Always keep a single bot message visible by editing the last bot message when possible.
-        - If invoked from a callback query, edit that message (or its caption) or delete and send a new one.
-        - If invoked from a user text message, edit the last stored bot message; if missing, send a new one.
+        If image_url is provided, send/update as a photo+caption; otherwise, send/update text.
         Stores the last bot message id in context.user_data['last_bot_message_id'].
         """
         try:
             if update.callback_query:
                 query = update.callback_query
                 msg = query.message
+                # If we want an image: delete and send photo+caption
+                if image_url:
+                    try:
+                        try:
+                            await msg.delete()
+                        except Exception:
+                            pass
+                        sent = await msg.reply_photo(photo=image_url, caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+                        context.user_data["last_bot_message_id"] = sent.message_id
+                        return
+                    except Exception:
+                        # fall back to text flow below
+                        pass
                 try:
                     if getattr(msg, "text", None):
                         await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
@@ -63,7 +76,6 @@ class OnboardingHandler:
                         return
                     # Photo/caption message
                     if getattr(msg, "caption", None) is not None or getattr(msg, "photo", None):
-                        # Try editing caption first
                         try:
                             await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
                             context.user_data["last_bot_message_id"] = msg.message_id
@@ -88,6 +100,15 @@ class OnboardingHandler:
             chat_id = update.effective_chat.id
             last_id = context.user_data.get("last_bot_message_id")
             if last_id:
+                # If image requested, cannot edit media type; delete and send photo
+                if image_url:
+                    try:
+                        await context.bot.delete_message(chat_id=chat_id, message_id=last_id)
+                    except Exception:
+                        pass
+                    sent = await update.effective_chat.send_photo(photo=image_url, caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+                    context.user_data["last_bot_message_id"] = sent.message_id
+                    return
                 # Try editing previous bot message
                 try:
                     await context.bot.edit_message_text(chat_id=chat_id, message_id=last_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode)
@@ -103,10 +124,51 @@ class OnboardingHandler:
                             await context.bot.delete_message(chat_id=chat_id, message_id=last_id)
                         except Exception:
                             pass
-            sent = await update.effective_chat.send_message(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+            # No previous message or editing failed
+            if image_url:
+                sent = await update.effective_chat.send_photo(photo=image_url, caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+            else:
+                sent = await update.effective_chat.send_message(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
             context.user_data["last_bot_message_id"] = sent.message_id
         except Exception as e:
             self.logger.error("_update_single_window failed: %s", e)
+
+    async def _update_query_single_window(self, query: CallbackQuery, text: str, reply_markup=None, parse_mode: str = "HTML", image_url: str | None = None):
+        """Single-window update for handlers that have a CallbackQuery instance."""
+        try:
+            msg = query.message
+            # If image requested, delete and send photo+caption
+            if image_url:
+                try:
+                    try:
+                        await msg.delete()
+                    except Exception:
+                        pass
+                    await msg.reply_photo(photo=image_url, caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+                    return
+                except Exception:
+                    # Fallback to text flow
+                    pass
+
+            # Try edit text
+            if getattr(msg, "text", None):
+                await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+                return
+            # Try edit caption
+            if getattr(msg, "caption", None) is not None or getattr(msg, "photo", None):
+                try:
+                    await query.edit_message_caption(caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+                    return
+                except Exception:
+                    pass
+            # Fallback: delete and send new text
+            try:
+                await msg.delete()
+            except Exception:
+                pass
+            await msg.reply_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+        except Exception as e:
+            self.logger.error("_update_query_single_window failed: %s", e)
 
     async def start_command(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> int:
         """Handle /start command - begin onboarding process"""
@@ -140,7 +202,7 @@ class OnboardingHandler:
 👋 <b>{i18n.get_text("WELCOME_BACK", user_id=user_id).format(name=existing_customer.name)}</b>
 
 🍽️ {i18n.get_text("WHAT_TO_ORDER_TODAY", user_id=user_id)}"""
-                    await self._update_single_window(update, _, welcome_message, self._get_main_page_keyboard(user_id))
+                    await self._update_single_window(update, _, welcome_message, self._get_main_page_keyboard(user_id), "HTML", get_step_image("main_page"))
                     return END
                 else:
                     # Customer exists but profile is incomplete - restart onboarding
@@ -163,7 +225,7 @@ class OnboardingHandler:
 
 🌍 {i18n.get_text("SELECT_LANGUAGE_PROMPT", user_id=user_id)}"""
 
-            await self._update_single_window(update, _, welcome_text, self._get_language_selection_keyboard())
+            await self._update_single_window(update, _, welcome_text, self._get_language_selection_keyboard(), "HTML", get_step_image("language"))
             return ONBOARDING_LANGUAGE
 
         except Exception as e:
@@ -202,7 +264,9 @@ class OnboardingHandler:
                 
                 await self._update_single_window(update, context,
                     i18n.get_text("ONBOARDING_CHOICE_PROMPT", language="en"),
-                    self._get_onboarding_choice_keyboard(user_id)
+                    self._get_onboarding_choice_keyboard(user_id),
+                    "HTML",
+                    get_step_image("onboarding_choice")
                 )
                 return ONBOARDING_CHOICE
             elif data == "language_he":
@@ -214,7 +278,9 @@ class OnboardingHandler:
                 
                 await self._update_single_window(update, context,
                     i18n.get_text("ONBOARDING_CHOICE_PROMPT", language="he"),
-                    self._get_onboarding_choice_keyboard(user_id)
+                    self._get_onboarding_choice_keyboard(user_id),
+                    "HTML",
+                    get_step_image("onboarding_choice")
                 )
                 return ONBOARDING_CHOICE
             else:
@@ -245,6 +311,9 @@ class OnboardingHandler:
                     update,
                     context,
                     i18n.get_text("PLEASE_ENTER_NAME", language=lang),
+                    None,
+                    "HTML",
+                    get_step_image("enter_name")
                 )
                 return ONBOARDING_NAME
             elif data == "onboard_guest":
@@ -262,10 +331,13 @@ class OnboardingHandler:
 
                 # Show main page with a small guest notice
                 notice = i18n.get_text("GUEST_MODE_NOTICE", language=lang)
-                await query.edit_message_text(
+                await self._update_single_window(
+                    update,
+                    context,
                     f"{notice}\n\n" + i18n.get_text("MENU_PROMPT", user_id=user_id),
-                    reply_markup=self._get_main_page_keyboard(user_id),
-                    parse_mode="HTML",
+                    self._get_main_page_keyboard(user_id),
+                    "HTML",
+                    get_step_image("main_page")
                 )
                 return END
             else:
@@ -301,7 +373,7 @@ class OnboardingHandler:
             # Store name in context
             context.user_data["full_name"] = name
 
-            await self._update_single_window(update, context, i18n.get_text("NICE_TO_MEET", language=user_language).format(name=name) + "\n\n" + i18n.get_text("PLEASE_SHARE_PHONE", language=user_language))
+            await self._update_single_window(update, context, i18n.get_text("NICE_TO_MEET", language=user_language).format(name=name) + "\n\n" + i18n.get_text("PLEASE_SHARE_PHONE", language=user_language), None, "HTML", get_step_image("enter_phone"))
             return ONBOARDING_PHONE
 
         except Exception as e:
@@ -348,10 +420,10 @@ class OnboardingHandler:
             context.user_data["phone_number"] = phone
 
             if result["is_returning"]:
-                await self._update_single_window(update, context, i18n.get_text("WELCOME_BACK_UPDATED", language=user_language).format(name=result["customer"].name) + "\n\n" + i18n.get_text("INFO_UPDATED", language=user_language) + "\n\n" + get_dynamic_welcome_for_returning_users(user_id=user_id) + "\n\n" + i18n.get_text("WHAT_TO_ORDER_TODAY", language=user_language), self._get_main_page_keyboard(user_id))
+                await self._update_single_window(update, context, i18n.get_text("WELCOME_BACK_UPDATED", language=user_language).format(name=result["customer"].name) + "\n\n" + i18n.get_text("INFO_UPDATED", language=user_language) + "\n\n" + get_dynamic_welcome_for_returning_users(user_id=user_id) + "\n\n" + i18n.get_text("WHAT_TO_ORDER_TODAY", language=user_language), self._get_main_page_keyboard(user_id), "HTML", get_step_image("main_page"))
                 next_state = END
             else:
-                await self._update_single_window(update, context, i18n.get_text("THANK_YOU_PHONE", language=user_language).format(name=result["customer"].name) + "\n\n" + i18n.get_text("PLEASE_ENTER_DELIVERY_ADDRESS_ONBOARDING", language=user_language) + "\n\n" + i18n.get_text("DELIVERY_ADDRESS_ONBOARDING_HELP", language=user_language))
+                await self._update_single_window(update, context, i18n.get_text("THANK_YOU_PHONE", language=user_language).format(name=result["customer"].name) + "\n\n" + i18n.get_text("PLEASE_ENTER_DELIVERY_ADDRESS_ONBOARDING", language=user_language) + "\n\n" + i18n.get_text("DELIVERY_ADDRESS_ONBOARDING_HELP", language=user_language), None, "HTML", get_step_image("enter_address"))
                 next_state = ONBOARDING_DELIVERY_ADDRESS
 
         except Exception as e:
@@ -394,7 +466,7 @@ class OnboardingHandler:
             )
 
             user_id = update.effective_user.id
-            await self._update_single_window(update, context, i18n.get_text("REGISTRATION_COMPLETE", user_id=user_id) + "\n\n" + i18n.get_text("DELIVERY_ADDRESS_SAVED_ONBOARDING", user_id=user_id).format(address=address) + "\n\n" + get_dynamic_welcome_message(user_id=user_id) + "\n\n" + i18n.get_text("WHAT_TO_ORDER_TODAY", user_id=user_id), self._get_main_page_keyboard(user_id))
+            await self._update_single_window(update, context, i18n.get_text("REGISTRATION_COMPLETE", user_id=user_id) + "\n\n" + i18n.get_text("DELIVERY_ADDRESS_SAVED_ONBOARDING", user_id=user_id).format(address=address) + "\n\n" + get_dynamic_welcome_message(user_id=user_id) + "\n\n" + i18n.get_text("WHAT_TO_ORDER_TODAY", user_id=user_id), self._get_main_page_keyboard(user_id), "HTML", get_step_image("registration_complete"))
             return END
 
         except Exception as e:
@@ -438,8 +510,8 @@ class OnboardingHandler:
         """Get professional language selection keyboard"""
         keyboard = [
             [
-                InlineKeyboardButton("🇺🇸 English", callback_data="language_en"),
-                InlineKeyboardButton("🇮🇱 עברית", callback_data="language_he"),
+                InlineKeyboardButton(i18n.get_text("LANGUAGE_ENGLISH"), callback_data="language_en"),
+                InlineKeyboardButton(i18n.get_text("LANGUAGE_HEBREW"), callback_data="language_he"),
             ],
         ]
         return InlineKeyboardMarkup(keyboard)
@@ -516,7 +588,11 @@ class OnboardingHandler:
 
         except Exception as e:
             self.logger.error("Error in handle_main_page_callback: %s", e)
-            await query.edit_message_text("❌ An error occurred. Please try again.")
+            await self._update_query_single_window(
+                query,
+                i18n.get_text("UNEXPECTED_ERROR", user_id=user_id),
+                parse_mode="HTML",
+            )
 
     async def _show_my_info(self, query: CallbackQuery):
         """Show user information"""
@@ -544,17 +620,21 @@ class OnboardingHandler:
             else:
                 info_text = i18n.get_text("USER_INFO_NOT_FOUND", user_id=user_id)
 
-            await query.edit_message_text(
+            await self._update_query_single_window(
+                query,
                 info_text,
                 reply_markup=self._get_my_info_keyboard(user_id),
-                parse_mode="HTML"
+                parse_mode="HTML",
+                image_url=get_step_image("my_info"),
             )
 
         except Exception as e:
             self.logger.error("Error showing my info: %s", e)
-            await query.edit_message_text(
+            await self._update_query_single_window(
+                query,
                 i18n.get_text("UNEXPECTED_ERROR", user_id=user_id),
-                reply_markup=self._get_back_to_main_keyboard(user_id)
+                reply_markup=self._get_back_to_main_keyboard(user_id),
+                parse_mode="HTML",
             )
 
     async def _show_menu(self, query: CallbackQuery):
@@ -568,22 +648,25 @@ class OnboardingHandler:
 
             # Avoid Telegram error when text/markup are identical
             try:
-                await query.edit_message_text(
+                await self._update_query_single_window(
+                    query,
                     new_text,
                     reply_markup=new_markup,
-                    parse_mode="HTML"
+                    parse_mode="HTML",
+                    image_url=get_step_image("menu"),
                 )
             except Exception as e:
                 if "Message is not modified" in str(e):
-                    # Nothing to change; silently ignore
                     return
                 raise
 
         except Exception as e:
             self.logger.error("Error showing menu: %s", e)
-            await query.edit_message_text(
-                "❌ Error loading menu. Please try again.",
-                reply_markup=self._get_back_to_main_keyboard()
+            await self._update_query_single_window(
+                query,
+                i18n.get_text("MENU_ERROR_OCCURRED", user_id=user_id),
+                reply_markup=self._get_back_to_main_keyboard(user_id),
+                parse_mode="HTML",
             )
 
     async def _show_main_page(self, query: CallbackQuery):
@@ -604,17 +687,21 @@ class OnboardingHandler:
                     f"{i18n.get_text('WHAT_TO_ORDER_TODAY', user_id=user_id)}"
                 )
 
-            await query.edit_message_text(
+            await self._update_query_single_window(
+                query,
                 welcome_message,
                 reply_markup=self._get_main_page_keyboard(user_id),
-                parse_mode="HTML"
+                parse_mode="HTML",
+                image_url=get_step_image("main_page"),
             )
 
         except Exception as e:
             self.logger.error("Error showing main page: %s", e)
-            await query.edit_message_text(
+            await self._update_query_single_window(
+                query,
                 i18n.get_text("UNEXPECTED_ERROR", user_id=user_id),
-                reply_markup=self._get_main_page_keyboard(user_id)
+                reply_markup=self._get_main_page_keyboard(user_id),
+                parse_mode="HTML",
             )
 
     def _get_my_info_keyboard(self, user_id: int):
@@ -648,17 +735,21 @@ class OnboardingHandler:
             user_id = query.from_user.id
             
             # Show language selection keyboard
-            await query.edit_message_text(
+            await self._update_query_single_window(
+                query,
                 i18n.get_text("SELECT_LANGUAGE_PROMPT", user_id=user_id),
                 reply_markup=self._get_language_selection_keyboard(),
-                parse_mode="HTML"
+                parse_mode="HTML",
+                image_url=get_step_image("language"),
             )
                 
         except Exception as e:
             self.logger.error("Error handling language selection from my info: %s", e)
-            await query.edit_message_text(
+            await self._update_query_single_window(
+                query,
                 i18n.get_text("UNEXPECTED_ERROR", user_id=user_id),
-                reply_markup=self._get_back_to_main_keyboard(user_id)
+                reply_markup=self._get_back_to_main_keyboard(user_id),
+                parse_mode="HTML",
             )
 
     async def _handle_language_selection(self, query: CallbackQuery):
@@ -671,10 +762,12 @@ class OnboardingHandler:
                 # Show language selection keyboard
                 from src.keyboards.language_keyboards import get_language_selection_keyboard
                 
-                await query.edit_message_text(
+                await self._update_query_single_window(
+                    query,
                     i18n.get_text("SELECT_LANGUAGE_PROMPT", user_id=user_id),
                     reply_markup=get_language_selection_keyboard(user_id),
-                    parse_mode="HTML"
+                    parse_mode="HTML",
+                    image_url=get_step_image("language"),
                 )
                 
             elif data.startswith("language_"):
@@ -686,17 +779,20 @@ class OnboardingHandler:
                 
                 # Show success message in new language and return to main page
                 success_text = i18n.get_text("LANGUAGE_CHANGED", user_id=user_id)
-                await query.edit_message_text(
+                await self._update_query_single_window(
+                    query,
                     success_text,
                     reply_markup=self._get_main_page_keyboard(user_id),
-                    parse_mode="HTML"
+                    parse_mode="HTML",
                 )
                 
         except Exception as e:
             self.logger.error("Error handling language selection: %s", e)
-            await query.edit_message_text(
+            await self._update_query_single_window(
+                query,
                 i18n.get_text("UNEXPECTED_ERROR", user_id=user_id),
-                reply_markup=self._get_back_to_main_keyboard(user_id)
+                reply_markup=self._get_back_to_main_keyboard(user_id),
+                parse_mode="HTML",
             )
 
     async def _handle_language_change_from_my_info(self, query: CallbackQuery):
@@ -713,17 +809,20 @@ class OnboardingHandler:
             
             # Show success message in new language and return to My Info
             success_text = i18n.get_text("LANGUAGE_CHANGED", language=language)
-            await query.edit_message_text(
+            await self._update_query_single_window(
+                query,
                 success_text,
                 reply_markup=self._get_my_info_keyboard(user_id),
-                parse_mode="HTML"
+                parse_mode="HTML",
             )
                 
         except Exception as e:
             self.logger.error("Error handling language change from my info: %s", e)
-            await query.edit_message_text(
+            await self._update_query_single_window(
+                query,
                 i18n.get_text("UNEXPECTED_ERROR", user_id=user_id),
-                reply_markup=self._get_back_to_main_keyboard(user_id)
+                reply_markup=self._get_back_to_main_keyboard(user_id),
+                parse_mode="HTML",
             )
 
     async def _show_customer_active_orders(self, query: CallbackQuery):
@@ -763,8 +862,12 @@ class OnboardingHandler:
                 ])
             
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(
-                text, parse_mode="HTML", reply_markup=reply_markup
+            await self._update_query_single_window(
+                query,
+                text,
+                reply_markup=reply_markup,
+                parse_mode="HTML",
+                image_url=get_step_image("track_orders"),
             )
             
         except Exception as e:
@@ -811,8 +914,12 @@ class OnboardingHandler:
                 ])
             
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(
-                text, parse_mode="HTML", reply_markup=reply_markup
+            await self._update_query_single_window(
+                query,
+                text,
+                reply_markup=reply_markup,
+                parse_mode="HTML",
+                image_url=get_step_image("track_orders"),
             )
             
         except Exception as e:
@@ -844,8 +951,12 @@ class OnboardingHandler:
             ]
             
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(
-                text, parse_mode="HTML", reply_markup=reply_markup
+            await self._update_query_single_window(
+                query,
+                text,
+                reply_markup=reply_markup,
+                parse_mode="HTML",
+                image_url=get_step_image("track_orders"),
             )
             
         except Exception as e:
@@ -945,9 +1056,12 @@ class OnboardingHandler:
                 [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="main_page")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await query.edit_message_text(
-                text, parse_mode="HTML", reply_markup=reply_markup
+            await self._update_query_single_window(
+                query,
+                text,
+                reply_markup=reply_markup,
+                parse_mode="HTML",
+                image_url=get_step_image("contact_us"),
             )
             
         except Exception as e:

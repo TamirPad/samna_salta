@@ -522,7 +522,7 @@ class AdminService:
                     from src.utils.i18n import i18n
                     fee = float(getattr(order, "delivery_charge", 0) or 0)
                     result["items"].append({
-                        "product_name": i18n.get_text("DELIVERY_ITEM_NAME"),
+                        "product_name": i18n.get_text("DELIVERY_ITEM_NAME", user_id=admin_telegram_id),
                         "quantity": 1,
                         "total_price": fee,
                         "unit_price": fee

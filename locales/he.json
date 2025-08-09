@@ -171,7 +171,7 @@
   "ADMIN_ITEMS_LABEL": "<b>פריטים:</b>",
   "ADMIN_ITEM_LINE": "• {name} x{quantity} - ₪{price:.2f}",
   "ADMIN_SET_STATUS": "הגדר ל-{status}",
-  "ADMIN_BACK_TO_DASHBOARD": "⬅️ חזור ללוח הבקרה",
+  "ADMIN_BACK_TO_DASHBOARD_ALT": "⬅️ חזור ללוח הבקרה",
   "ADMIN_BACK_TO_ORDERS": "⬅️ חזור להזמנות",
   "ADMIN_STATUS_UPDATED": "הסטטוס עודכן ל-{status}",
   "ADMIN_STATUS_UPDATE_ERROR": "שגיאה בעדכון סטטוס: {error}",
@@ -352,6 +352,8 @@
   "CANCEL_ORDER": "❌ בטל הזמנה",
   "ENTER_DELIVERY_ADDRESS": "📍 הכנס כתובת משלוח",
   "VIEW_ORDER_STATUS": "📋 צפה בסטטוס הזמנה",
+  "ADMIN_INVOICE_PDF_BUTTON": "📄 חשבונית (PDF)",
+  "ADMIN_RECEIPT_PDF_BUTTON": "🧾 קבלה 58 מ\"מ",
   "ADMIN_CUSTOMERS": "👥 לקוחות",
   "ADMIN_CUSTOMERS_TITLE": "👥 <b>ניהול לקוחות</b>",
   "ADMIN_NO_CUSTOMERS": "📭 לא נמצאו לקוחות.",
@@ -590,5 +592,13 @@
   "ADMIN_CATEGORY_ADD_STEP_NAME_HE": "הזן את שם הקטגוריה בעברית (לא חובה):",
   "ADMIN_CATEGORY_NAME_HE_PLACEHOLDER": "לדוג' ירקות",
   "ADMIN_SKIP_HEBREW": "דלג על עברית",
-  "ADMIN_CATEGORY_BACK_TO_LIST": "חזרה לרשימת קטגוריות"
+  "ADMIN_CATEGORY_BACK_TO_LIST": "חזרה לרשימת קטגוריות",
+  "ADMIN_APP_IMAGES": "תמונות האפליקציה",
+  "ADMIN_APP_IMAGES_TITLE": "ניהול תמונות האפליקציה (החלפות)",
+  "ADMIN_APP_IMAGES_EDIT_PROMPT": "שלחו קישור תמונה תקין כדי להחליף, או כתבו 'default' כדי להשתמש בתמונה המובנית.",
+  "ADMIN_APP_IMAGES_INVALID_URL": "אנא שלחו כתובת URL תקפה (המתחילה ב-http או https).",
+  "ADMIN_APP_IMAGES_SAVED": "✅ שמירת התמונה הצליחה.",
+  "ADMIN_APP_IMAGES_SAVE_ERROR": "❌ שמירת התמונה נכשלה.",
+  "ADMIN_CANCEL": "ביטול",
+  "ADMIN_BACK_TO_DASHBOARD": "⬅️ חזרה ללוח הבקרה"
 }

@@ -21,6 +21,7 @@ from src.keyboards.menu_keyboards import (
 )
 from src.utils.i18n import i18n
 from src.utils.helpers import translate_category_name
+from src.utils.image_handler import get_step_image, get_default_category_image
 from src.utils.constants import ErrorMessages
 from src.utils.language_manager import language_manager
 from src.db.operations import get_localized_name, get_localized_description, get_localized_category_name
@@ -36,29 +37,30 @@ class MenuHandler:
         self.order_service = self.container.get_order_service()
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    async def _safe_edit_message(self, query: CallbackQuery, text: str, reply_markup=None, parse_mode="HTML"):
-        """Safely edit a message, handling both text and photo messages"""
+    async def _safe_edit_message(self, query: CallbackQuery, text: str, reply_markup=None, parse_mode="HTML", image_url: str | None = None):
+        """Safely edit a message, handling both text and photo messages.
+        If image_url is provided, replace with photo+caption to maintain visual context.
+        """
         try:
-            # Check if the current message is a photo message
+            if image_url:
+                try:
+                    try:
+                        await query.message.delete()
+                    except Exception:
+                        pass
+                    await query.message.reply_photo(photo=image_url, caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+                    return
+                except Exception as e:
+                    self.logger.warning("Failed to send photo, fallback to text: %s", e)
+            # No image or failed to send photo: proceed with text edit flow
             if query.message.photo:
-                # For photo messages, we need to delete and send a new text message
                 try:
                     await query.message.delete()
                 except Exception as delete_error:
                     self.logger.warning("Failed to delete photo message: %s", delete_error)
-                
-                await query.message.reply_text(
-                    text=text,
-                    reply_markup=reply_markup,
-                    parse_mode=parse_mode
-                )
+                await query.message.reply_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
             else:
-                # For text messages, we can edit normally
-                await query.edit_message_text(
-                    text=text,
-                    reply_markup=reply_markup,
-                    parse_mode=parse_mode
-                )
+                await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
         except BadRequest as e:
             error_message = str(e)
             if "There is no text in the message to edit" in error_message or "Message to edit not found" in error_message:
@@ -210,7 +212,7 @@ class MenuHandler:
         from src.utils.text_formatter import format_title
         text = format_title(i18n.get_text("MENU_PROMPT", user_id=user_id))
         reply_markup = get_dynamic_main_menu_keyboard(user_id)
-        await self._safe_edit_message(query, text, reply_markup, "HTML")
+        await self._safe_edit_message(query, text, reply_markup, "HTML", image_url=get_step_image("menu"))
 
     async def _show_category_menu(self, query: CallbackQuery, category: str):
         """Show products in a specific category with multilingual support"""
@@ -245,7 +247,8 @@ class MenuHandler:
                 category=category_display_name, count=len(products)
             ))
             reply_markup = get_category_menu_keyboard(category, user_id)
-            await self._safe_edit_message(query, text, reply_markup, "HTML")
+            header_image = get_default_category_image(category)
+            await self._safe_edit_message(query, text, reply_markup, "HTML", image_url=header_image)
             
         except Exception as e:
             self.logger.error("Error showing category menu: %s", e)

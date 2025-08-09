@@ -334,6 +334,11 @@ class AdminHandler:
             await self._start_add_delivery_area(update, _)
         elif data == "admin_edit_business_settings":
             await self._start_edit_business_settings(query)
+        elif data.startswith("admin_app_images"):
+            await self._show_app_images_dashboard(query)
+        elif data.startswith("admin_edit_app_image_"):
+            key = data.replace("admin_edit_app_image_", "")
+            await self._start_edit_app_image(query, key)
         elif (data.startswith("admin_edit_business_") or 
               data == "admin_edit_currency" or 
               data == "admin_edit_delivery_charge"):
@@ -416,6 +421,13 @@ class AdminHandler:
                     callback_data="admin_business_settings"
                 )
             ],
+            # 🖼️ App Images Section
+            [
+                InlineKeyboardButton(
+                    i18n.get_text('ADMIN_APP_IMAGES', user_id=user_id) if hasattr(i18n, 'get_text') else "App Images", 
+                    callback_data="admin_app_images"
+                )
+            ],
             # 📊 Analytics Section
             [
                 InlineKeyboardButton(
@@ -438,6 +450,12 @@ class AdminHandler:
             
             # Get user_id from query
             user_id = query.from_user.id
+            # Ensure any staged edit key is cleared when opening the dashboard (e.g., after Cancel)
+            try:
+                from src.utils.helpers import SimpleCache
+                SimpleCache().delete(f"app_images_edit_key:{user_id}")
+            except Exception:
+                pass
 
             # Get order statistics
             pending_orders = await self.admin_service.get_pending_orders()
@@ -493,6 +511,200 @@ class AdminHandler:
         except Exception as e:
             self.logger.error("Error showing deliveries dashboard: %s", e)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
+
+    async def _show_app_images_dashboard(self, query: CallbackQuery) -> None:
+        """Show App Images management dashboard with pagination (text-only list)"""
+        try:
+            user_id = query.from_user.id
+            # Parse page from callback data, default to 1
+            data = query.data or "admin_app_images"
+            try:
+                page = int(data.split(":")[1]) if ":" in data else 1
+            except Exception:
+                page = 1
+            page = max(1, page)
+
+            page_size = 8
+            from src.utils.image_handler import list_step_image_keys
+            from src.db.operations import get_business_settings_dict
+            keys = list_step_image_keys()
+            settings = get_business_settings_dict() or {}
+            overrides = settings.get("app_images")
+            if isinstance(overrides, str):
+                import json
+                try:
+                    overrides = json.loads(overrides)
+                except Exception:
+                    overrides = {}
+            overrides = overrides or {}
+
+            total = len(keys)
+            start = (page - 1) * page_size
+            end = start + page_size
+            page_keys = keys[start:end]
+
+            # Minimal header only; per-key details and previews are shown in the edit view
+            lines = [i18n.get_text("ADMIN_APP_IMAGES_TITLE", user_id=user_id) if hasattr(i18n, 'get_text') else "App Images", ""]
+            lines.append(f"Page {page} / {((total-1)//page_size)+1}")
+            lines.append("")
+            text = "\n".join(lines)
+
+            keyboard = []
+            for key in page_keys:
+                keyboard.append([InlineKeyboardButton(f"✏️ {key}", callback_data=f"admin_edit_app_image_{key}")])
+
+            # Pagination controls
+            nav_row = []
+            if page > 1:
+                nav_row.append(InlineKeyboardButton("⬅️ Prev", callback_data=f"admin_app_images:{page-1}"))
+            if end < total:
+                nav_row.append(InlineKeyboardButton("Next ➡️", callback_data=f"admin_app_images:{page+1}"))
+            if nav_row:
+                keyboard.append(nav_row)
+
+            keyboard.append([InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_dashboard")])
+
+            # Safely render as text message even if current message is a photo
+            try:
+                msg = query.message
+                if getattr(msg, "text", None):
+                    await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+                else:
+                    # Delete photo/caption message and send fresh text-only message
+                    try:
+                        await msg.delete()
+                    except Exception:
+                        pass
+                    await msg.reply_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+            except Exception as _e:
+                # Last resort: reply as new message
+                await query.message.reply_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+        except Exception as e:
+            self.logger.error("Error showing app images dashboard: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
+
+    async def _start_edit_app_image(self, query: CallbackQuery, key: str) -> None:
+        """Prompt admin to input a new URL for a specific app image key; show current image preview."""
+        try:
+            user_id = query.from_user.id
+            # Load current overrides
+            from src.db.operations import get_business_settings_dict
+            settings = get_business_settings_dict() or {}
+            overrides = settings.get("app_images")
+            if isinstance(overrides, str):
+                import json
+                try:
+                    overrides = json.loads(overrides)
+                except Exception:
+                    overrides = {}
+            overrides = overrides or {}
+
+            current_url = overrides.get(key, None)
+            # Always compute the effective image (override if set, otherwise default) for preview
+            try:
+                from src.utils.image_handler import get_step_image
+                effective_url = get_step_image(key)
+            except Exception:
+                effective_url = current_url
+
+            caption_lines = [
+                f"Key: <b>{key}</b>",
+                f"Override: {current_url or '(default)'}",
+                f"Current image: {effective_url or '(none)'}",
+                "",
+                i18n.get_text("ADMIN_APP_IMAGES_EDIT_PROMPT", user_id=user_id) if hasattr(i18n,'get_text') else "Enter a valid image URL or 'default' to remove override",
+            ]
+            caption = "\n".join(caption_lines)
+
+            # Delete current message and send photo preview to avoid BadRequest on editing text->photo
+            try:
+                try:
+                    await query.message.delete()
+                except Exception:
+                    pass
+                if effective_url:
+                    await query.message.reply_photo(
+                        photo=effective_url,
+                        caption=caption,
+                        parse_mode="HTML",
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(i18n.get_text("ADMIN_CANCEL", user_id=user_id), callback_data="admin_app_images")]])
+                    )
+                else:
+                    await query.message.reply_text(
+                        caption,
+                        parse_mode="HTML",
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(i18n.get_text("ADMIN_CANCEL", user_id=user_id), callback_data="admin_app_images")]])
+                    )
+            except Exception:
+                # Fallback to simple text
+                await query.message.reply_text(
+                    caption,
+                    parse_mode="HTML",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(i18n.get_text("ADMIN_CANCEL", user_id=user_id), callback_data="admin_app_images")]])
+                )
+            # Store the key temporarily using SimpleCache
+            from src.utils.helpers import SimpleCache
+            cache = SimpleCache()
+            # SimpleCache.set signature is set(key, value, ttl=None)
+            cache.set(f"app_images_edit_key:{user_id}", key, ttl=600)
+        except Exception as e:
+            self.logger.error("Error starting app image edit: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
+
+    async def _handle_app_image_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """Handle text input for app image override URL if an app image key is staged for this admin."""
+        try:
+            user_id = update.effective_user.id
+            from src.utils.helpers import SimpleCache
+            cache = SimpleCache()
+            key = cache.get(f"app_images_edit_key:{user_id}")
+            if not key:
+                # Not in app image edit flow; ignore and let other handlers process
+                return ConversationHandler.END
+
+            text = (update.message.text or "").strip()
+            # Remove key from cache regardless of outcome to avoid stale state
+            cache.delete(f"app_images_edit_key:{user_id}")
+
+            # Load current overrides
+            from src.db.operations import get_business_settings_dict
+            settings = get_business_settings_dict() or {}
+            overrides = settings.get("app_images")
+            if isinstance(overrides, str):
+                import json
+                try:
+                    overrides = json.loads(overrides)
+                except Exception:
+                    overrides = {}
+            overrides = overrides or {}
+
+            # Update overrides
+            if text.lower() in ["default", "remove", "reset", "none", "-"]:
+                overrides.pop(key, None)
+            else:
+                from src.utils.image_handler import validate_image_url
+                if not validate_image_url(text):
+                    await update.message.reply_text(i18n.get_text("ADMIN_APP_IMAGES_INVALID_URL", user_id=user_id))
+                    return ConversationHandler.END
+                overrides[key] = text
+
+            result = await self.admin_service.update_business_settings(app_images=overrides)
+            base_text = (
+                i18n.get_text("ADMIN_APP_IMAGES_SAVED", user_id=user_id)
+                if result.get("success")
+                else i18n.get_text("ADMIN_APP_IMAGES_SAVE_ERROR", user_id=user_id)
+            )
+            # Provide inline buttons to navigate back to dashboard or continue editing
+            keyboard = [
+                [InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_dashboard")],
+                [InlineKeyboardButton(i18n.get_text("ADMIN_APP_IMAGES", user_id=user_id), callback_data="admin_app_images")],
+            ]
+            await update.message.reply_text(base_text, reply_markup=InlineKeyboardMarkup(keyboard))
+            return ConversationHandler.END
+        except Exception as e:
+            self.logger.error("Error handling app image input: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=update.effective_user.id))
+            return ConversationHandler.END
 
     async def _show_delivery_areas(self, query: CallbackQuery) -> None:
         """List all active delivery areas"""
@@ -1272,7 +1484,7 @@ class AdminHandler:
 
         except BusinessLogicError as e:
             self.logger.error("💥 PENDING ORDERS ERROR: %s", e)
-            await query.message.reply_text(i18n.get_text("PENDING_ORDERS_ERROR"))
+            await query.message.reply_text(i18n.get_text("PENDING_ORDERS_ERROR", user_id=user_id))
 
     async def _show_active_orders(self, query: CallbackQuery, page: int = 0, page_size: int = 5) -> None:
         """Show active orders with pagination"""
@@ -1336,7 +1548,7 @@ class AdminHandler:
 
         except BusinessLogicError as e:
             self.logger.error("💥 ACTIVE ORDERS ERROR: %s", e)
-            await query.message.reply_text(i18n.get_text("ACTIVE_ORDERS_ERROR"))
+            await query.message.reply_text(i18n.get_text("ACTIVE_ORDERS_ERROR", user_id=user_id))
 
     async def _show_all_orders(self, query: CallbackQuery, page: int = 0, page_size: int = 5) -> None:
         """Show all orders with pagination"""
@@ -1399,7 +1611,7 @@ class AdminHandler:
 
         except BusinessLogicError as e:
             self.logger.error("💥 ALL ORDERS ERROR: %s", e)
-            await query.message.reply_text(i18n.get_text("ALL_ORDERS_ERROR"))
+            await query.message.reply_text(i18n.get_text("ALL_ORDERS_ERROR", user_id=user_id))
 
     async def _show_completed_orders(self, query: CallbackQuery, page: int = 0, page_size: int = 5) -> None:
         """Show completed (delivered) orders with pagination"""
@@ -1462,7 +1674,7 @@ class AdminHandler:
 
         except BusinessLogicError as e:
             self.logger.error("💥 COMPLETED ORDERS ERROR: %s", e)
-            await query.message.reply_text(i18n.get_text("ALL_ORDERS_ERROR"))
+            await query.message.reply_text(i18n.get_text("ALL_ORDERS_ERROR", user_id=user_id))
 
     def _create_pagination_keyboard(
         self, 
@@ -1630,7 +1842,7 @@ class AdminHandler:
 
         except BusinessLogicError as e:
             self.logger.error("💥 CUSTOMERS ERROR: %s", e)
-            await query.message.reply_text(i18n.get_text("CUSTOMERS_ERROR"))
+            await query.message.reply_text(i18n.get_text("CUSTOMERS_ERROR", user_id=user_id))
 
     async def _show_customer_details(self, query: CallbackQuery, customer_id: int) -> None:
         """Show details for a specific customer."""
@@ -1685,7 +1897,7 @@ class AdminHandler:
 
         except BusinessLogicError as e:
             self.logger.error("💥 CUSTOMER DETAILS ERROR: %s", e)
-            await query.message.reply_text(i18n.get_text("CUSTOMER_DETAILS_ERROR"))
+            await query.message.reply_text(i18n.get_text("CUSTOMER_DETAILS_ERROR", user_id=user_id))
 
     async def _show_customer_orders(self, query: CallbackQuery, customer_id: int) -> None:
         """Show order history for a specific customer."""
@@ -1729,7 +1941,7 @@ class AdminHandler:
 
         except BusinessLogicError as e:
             self.logger.error("💥 ORDER DETAILS ERROR: %s", e)
-            await query.message.reply_text(i18n.get_text("ORDER_DETAILS_ERROR"))
+            await query.message.reply_text(i18n.get_text("ORDER_DETAILS_ERROR", user_id=user_id))
 
     async def _send_order_invoice_pdf(self, query: CallbackQuery, order_id: int, receipt: bool = False) -> None:
         """Acknowledge quickly and generate invoice/receipt in the background to avoid timeouts."""
@@ -1918,8 +2130,8 @@ class AdminHandler:
         
         # Add invoice/receipt actions
         keyboard.append([
-            InlineKeyboardButton("📄 Invoice (PDF)", callback_data=f"admin_invoice_pdf_{order_id}"),
-            InlineKeyboardButton("🧾 Receipt 58mm", callback_data=f"admin_receipt_pdf_{order_id}")
+            InlineKeyboardButton(i18n.get_text("ADMIN_INVOICE_PDF_BUTTON", user_id=user_id), callback_data=f"admin_invoice_pdf_{order_id}"),
+            InlineKeyboardButton(i18n.get_text("ADMIN_RECEIPT_PDF_BUTTON", user_id=user_id), callback_data=f"admin_receipt_pdf_{order_id}")
         ])
 
         # Add delete order button
@@ -2570,7 +2782,7 @@ class AdminHandler:
             if context is None:
                 self.logger.error("Context is None in _start_add_category")
                 if update.callback_query:
-                    await update.callback_query.answer("Error: Context not available")
+                    await update.callback_query.answer(i18n.get_text("UNEXPECTED_ERROR", user_id=user_id))
                 return ConversationHandler.END
             if hasattr(context, 'user_data'):
                 context.user_data.clear()
@@ -2578,7 +2790,7 @@ class AdminHandler:
             else:
                 self.logger.error("Context has no user_data attribute")
                 if update.callback_query:
-                    await update.callback_query.answer("Error: Context not properly initialized")
+                    await update.callback_query.answer(i18n.get_text("UNEXPECTED_ERROR", user_id=user_id))
                 return ConversationHandler.END
             # Use a placeholder for English name
             text = i18n.get_text("ADMIN_CATEGORY_ADD_STEP_NAME_EN", user_id=user_id)
@@ -2607,7 +2819,7 @@ class AdminHandler:
             user_id = update.effective_user.id
             if context is None or not hasattr(context, 'user_data'):
                 self.logger.error("Context is not properly initialized in _handle_category_name_en_input")
-                await update.message.reply_text("Error: Context not available. Please try again.")
+                await update.message.reply_text(i18n.get_text("UNEXPECTED_ERROR", user_id=user_id))
                 return ConversationHandler.END
             name_en = update.message.text.strip()
             if len(name_en) < 2:
@@ -2637,7 +2849,7 @@ class AdminHandler:
             user_id = update.effective_user.id
             if context is None or not hasattr(context, 'user_data'):
                 self.logger.error("Context is not properly initialized in _handle_category_name_he_input")
-                await update.message.reply_text("Error: Context not available. Please try again.")
+                await update.message.reply_text(i18n.get_text("UNEXPECTED_ERROR", user_id=user_id))
                 return ConversationHandler.END
             name_he = update.message.text.strip()
             if len(name_he) < 2:
@@ -2900,7 +3112,7 @@ class AdminHandler:
             if context is None:
                 self.logger.error("Context is None in _start_add_product")
                 if update.callback_query:
-                    await update.callback_query.answer("Error: Context not available")
+                    await update.callback_query.answer(i18n.get_text("UNEXPECTED_ERROR", user_id=user_id))
                 return ConversationHandler.END
             
             # Clear any existing context data
@@ -2910,7 +3122,7 @@ class AdminHandler:
             else:
                 self.logger.error("Context has no user_data attribute")
                 if update.callback_query:
-                    await update.callback_query.answer("Error: Context not properly initialized")
+                    await update.callback_query.answer(i18n.get_text("UNEXPECTED_ERROR", user_id=user_id))
                 return ConversationHandler.END
             
             # Ask for English name first
@@ -2947,7 +3159,7 @@ class AdminHandler:
             # Ensure context is properly initialized
             if context is None or not hasattr(context, 'user_data'):
                 self.logger.error("Context is not properly initialized in _handle_product_name_en_input")
-                await update.message.reply_text("Error: Context not available. Please try again.")
+                await update.message.reply_text(i18n.get_text("UNEXPECTED_ERROR", user_id=user_id))
                 return ConversationHandler.END
             
             name_en = update.message.text.strip()
@@ -4429,8 +4641,8 @@ class AdminHandler:
         """Get language selection keyboard for admin"""
         keyboard = [
             [
-                InlineKeyboardButton("🇺🇸 English", callback_data="admin_language_en"),
-                InlineKeyboardButton("🇮🇱 עברית", callback_data="admin_language_he")
+                InlineKeyboardButton(i18n.get_text("LANGUAGE_ENGLISH", user_id=None), callback_data="admin_language_en"),
+                InlineKeyboardButton(i18n.get_text("LANGUAGE_HEBREW", user_id=None), callback_data="admin_language_he")
             ],
             [InlineKeyboardButton(i18n.get_text("BACK_TO_BUSINESS_SETTINGS", user_id=None), callback_data="admin_business_settings")]
         ]
@@ -5004,7 +5216,7 @@ class AdminHandler:
             # Send confirmation message and show appropriate menu
             if update.callback_query:
                 # Always answer the callback query first to prevent retries
-                await update.callback_query.answer("✅ Conversation cancelled")
+                await update.callback_query.answer(i18n.get_text("ONBOARDING_CANCELLED", user_id=user_id))
                 
                 # Show the appropriate menu based on the callback data
                 data = update.callback_query.data
@@ -5024,7 +5236,7 @@ class AdminHandler:
                     self.logger.error(f"Error showing menu after conversation reset: {menu_error}")
                     # If menu showing fails, at least we answered the callback
             elif update.message:
-                await update.message.reply_text("✅ Conversation cancelled")
+                await update.message.reply_text(i18n.get_text("ONBOARDING_CANCELLED", user_id=user_id))
             
             return ConversationHandler.END
             
@@ -5049,7 +5261,7 @@ class AdminHandler:
             # Try to gracefully inform and show a safe screen
             if update.callback_query:
                 try:
-                    await update.callback_query.answer("⏰ Timed out")
+                    await update.callback_query.answer(i18n.get_text("UNEXPECTED_ERROR", user_id=user_id))
                 except Exception:
                     pass
                 try:
@@ -5058,7 +5270,7 @@ class AdminHandler:
                     pass
             elif update.message:
                 try:
-                    await update.message.reply_text("⏰ Session timed out. Returning to admin dashboard…")
+                    await update.message.reply_text(i18n.get_text("UNEXPECTED_ERROR", user_id=user_id))
                 except Exception:
                     pass
             return ConversationHandler.END
@@ -5299,6 +5511,8 @@ def register_admin_handlers(application: Application):
             CallbackQueryHandler(handler._handle_business_conversation_fallback, pattern="^admin_cancel_business_edit$"),
             CallbackQueryHandler(handler._handle_business_conversation_fallback, pattern="^admin_business_settings$"),
             CallbackQueryHandler(handler._handle_business_conversation_fallback, pattern="^admin_dashboard$"),
+            # Also route back to App Images dashboard when canceling there
+            CallbackQueryHandler(handler._show_app_images_dashboard, pattern="^admin_app_images(:(\\d+))?$"),
             CallbackQueryHandler(handler._reset_conversation, pattern="^admin_")
         ],
         name="business_settings_conversation",
@@ -5313,6 +5527,9 @@ def register_admin_handlers(application: Application):
     # Add debug logging to the conversation handler
     handler.logger.info("🔧 Registering business_settings_conversation handler")
     application.add_handler(business_settings_handler)
+    # App images input handler (runs when SimpleCache holds a staged key)
+    # App images input handler (guarded inside handler method by cache key presence)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_app_image_input))
     # Delivery area creation wizard
     add_delivery_area_handler = ConversationHandler(
         entry_points=[

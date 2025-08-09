@@ -650,6 +650,8 @@ class BusinessSettings(Base):
     welcome_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     about_us: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     contact_info: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # JSON map of app-level images (step_key -> URL)
+    app_images: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=True
     )
@@ -678,6 +680,7 @@ class BusinessSettings(Base):
             "welcome_message": self.welcome_message,
             "about_us": self.about_us,
             "contact_info": self.contact_info,
+            "app_images": self.app_images,
             "created_at": self.created_at,
             "updated_at": self.updated_at
         }

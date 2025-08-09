@@ -10,6 +10,7 @@ from telegram.ext import ContextTypes, filters, Application
 
 from src.container import get_container
 from src.utils.i18n import i18n
+from src.utils.image_handler import get_step_image, get_product_image
 from src.utils.error_handler import handle_error
 from src.utils.constants_manager import get_delivery_method_name
 
@@ -96,10 +97,23 @@ class CartHandler:
         self.container = get_container()
         self.logger = logger
 
-    async def _safe_edit_message(self, query, text, **kwargs):
-        """Safely update the existing message (text or caption); delete and send new message as last resort"""
+    async def _safe_edit_message(self, query, text, image_url: str | None = None, **kwargs):
+        """Safely update the existing message (text or caption);
+        if image_url provided, delete and send photo+caption; delete and send new message as last resort.
+        """
         try:
             if query.message:
+                # If image is requested, prefer sending photo+caption and return
+                if image_url:
+                    try:
+                        try:
+                            await query.message.delete()
+                        except Exception:
+                            pass
+                        await query.message.reply_photo(photo=image_url, caption=text, **kwargs)
+                        return
+                    except Exception:
+                        pass
                 # Prefer editing text messages
                 if getattr(query.message, "text", None):
                     await query.edit_message_text(text, **kwargs)
@@ -149,9 +163,9 @@ class CartHandler:
             if not product_info:
                 await self._safe_edit_message(
                     query,
-                    "❌ Invalid product selection. Please try again.",
+                    i18n.get_text("UNEXPECTED_ERROR", user_id=user_id),
                     parse_mode="HTML",
-                    reply_markup=self._get_back_to_menu_keyboard(),
+                    reply_markup=self._get_back_to_menu_keyboard(user_id),
                 )
                 return
 
@@ -221,9 +235,21 @@ class CartHandler:
 
 {what_next}"""
 
+                # Try to attach the product image if available
+                image_url = None
+                try:
+                    from src.db.operations import get_product_by_id
+                    product = get_product_by_id(product_info["product_id"])
+                    if product:
+                        category = getattr(product, "category", None) or "other"
+                        image_url = get_product_image(getattr(product, "image_url", None), category)
+                except Exception:
+                    image_url = None
+
                 await self._safe_edit_message(
                     query,
                     message,
+                    image_url=image_url,
                     parse_mode="HTML",
                     reply_markup=self._get_cart_success_keyboard(user_id),
                 )
@@ -270,6 +296,7 @@ class CartHandler:
                 await self._safe_edit_message(
                     query,
                     empty_cart_message,
+                    image_url=get_step_image("view_cart"),
                     parse_mode="HTML",
                     reply_markup=self._get_professional_empty_cart_keyboard(user_id),
                 )
@@ -326,6 +353,7 @@ class CartHandler:
             await self._safe_edit_message(
                 query,
                 message,
+                image_url=get_step_image("view_cart"),
                 parse_mode="HTML",
                 reply_markup=self._get_simplified_cart_keyboard(cart_items, user_id),
             )
@@ -347,6 +375,7 @@ class CartHandler:
             await self._safe_edit_message(
                 query,
                 i18n.get_text("CLEAR_CART_CONFIRMATION", user_id=user_id),
+                image_url=get_step_image("clear_cart_confirm"),
                 parse_mode="HTML",
                 reply_markup=self._get_clear_cart_confirmation_keyboard(user_id),
             )
@@ -373,6 +402,7 @@ class CartHandler:
                 await self._safe_edit_message(
                     query,
                     i18n.get_text("CART_CLEARED_SUCCESS", user_id=user_id),
+                    image_url=get_step_image("cart_cleared"),
                     parse_mode="HTML",
                     reply_markup=self._get_professional_empty_cart_keyboard(user_id),
                 )
@@ -406,6 +436,7 @@ class CartHandler:
                 await self._safe_edit_message(
                     query,
                     i18n.get_text("CART_EMPTY_CHECKOUT", user_id=user_id),
+                    image_url=get_step_image("view_cart"),
                     parse_mode="HTML",
                     reply_markup=self._get_professional_empty_cart_keyboard(user_id),
                 )
@@ -723,7 +754,7 @@ class CartHandler:
             )
             
             # Show order confirmation
-            await self._show_order_confirmation_text(update.message, cart_service, user_id, instructions=instructions)
+            await self._show_order_confirmation_text(update.message, cart_service, user_id)
 
         except Exception as e:
             self.logger.error("Exception in handle_delivery_address_input: %s", e)
