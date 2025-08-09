@@ -4155,15 +4155,30 @@ class AdminHandler:
             await query.answer("Error", show_alert=True)
 
     async def _show_options_catalog(self, query: CallbackQuery, product_id: int) -> None:
-        """CRUD screen for global options catalog (create, toggle active, rename later)."""
+        """Options catalog scoped to the given product: show only options linked to it.
+        Allows toggling active state and future CRUD actions on those linked options.
+        """
         try:
             user_id = query.from_user.id
-            from src.db.operations import get_product_options, set_product_option_active
+            from src.db.operations import get_product_option_config
             from src.utils.i18n import i18n
             from src.utils.language_manager import language_manager
 
             user_lang = language_manager.get_user_language(user_id)
-            options = get_product_options(None, language=user_lang, include_inactive=True)
+            cfg = get_product_option_config(product_id)
+            # Flatten assigned choices across all types
+            assigned_by_type = cfg.get("choices", {}) if isinstance(cfg, dict) else {}
+            options = []
+            for lst in assigned_by_type.values():
+                for o in lst:
+                    # normalize shape to id/display_name/is_active
+                    options.append({
+                        "id": o.get("id"),
+                        "name": o.get("name"),
+                        "display_name": (o.get("display_name_he") if user_lang == "he" else o.get("display_name_en")) or o.get("name"),
+                        # fall back to active=True if not present
+                        "is_active": bool(o.get("is_active", True)),
+                    })
 
             # Header
             lines = [i18n.get_text("ADMIN_OPTIONS_CATALOG_TITLE", user_id=user_id), ""]
@@ -4173,7 +4188,7 @@ class AdminHandler:
 
             # Build buttons: show first N options with activate/deactivate
             kb = []
-            for o in options[:20]:
+            for o in options[:50]:
                 name = o.get("display_name") or o.get("name")
                 active = o.get("is_active", True)
                 toggle_label = i18n.get_text("DEACTIVATE", user_id=user_id) if active else i18n.get_text("ACTIVATE", user_id=user_id)
