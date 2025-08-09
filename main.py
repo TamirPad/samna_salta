@@ -24,6 +24,7 @@ from src.handlers.start import start_handler, OnboardingHandler, register_start_
 from src.handlers.menu import MenuHandler
 from src.handlers.cart import CartHandler
 from src.handlers.admin import register_admin_handlers, AdminHandler
+from src.services.invoice_service import warmup_playwright_chromium
 from src.utils.logger import ProductionLogger
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from telegram import Update
@@ -71,6 +72,12 @@ def setup_bot():
             logger.error(f"Database initialization failed: {e}")
             logger.warning("Bot will start with limited functionality - database features may not work")
             # Continue with bot startup even if database fails
+        # Warm up Playwright Chromium in the background to avoid first-use latency
+        try:
+            asyncio.create_task(warmup_playwright_chromium())
+            logger.info("Scheduled Playwright warm-up task")
+        except Exception as e:
+            logger.warning(f"Failed to schedule Playwright warm-up: {e}")
     except Exception as e:
         logger.error(f"Failed to setup bot: {e}")
         raise

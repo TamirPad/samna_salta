@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from datetime import datetime
 from typing import Dict, Optional
 from src.utils.i18n import i18n
@@ -138,7 +139,15 @@ async def generate_pdf_from_html(html: str) -> Optional[bytes]:
 
     async def _render() -> Optional[bytes]:
         async with async_playwright() as p:
-            browser = await p.chromium.launch()
+            # Launch with flags that are friendly to containers like Render/Heroku
+            browser = await p.chromium.launch(
+                args=[
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                ]
+            )
             page = await browser.new_page()
             await page.set_content(html, wait_until="load")
             pdf_bytes = await page.pdf(format="A4", print_background=True)
@@ -156,6 +165,47 @@ async def generate_pdf_from_html(html: str) -> Optional[bytes]:
         except Exception as e2:
             logger.error("PDF retry after install failed: %s", e2)
             return None
+
+
+async def warmup_playwright_chromium() -> None:
+    """Warm up Playwright by ensuring Chromium is installed and can launch.
+
+    Called at service startup to avoid slow first invoice and repeated taps.
+    Safe to run multiple times.
+    """
+    try:
+        from playwright.async_api import async_playwright  # noqa: F401
+    except Exception as e:
+        logger.info("Playwright not installed; skipping warm-up: %s", e)
+        return
+
+    # Heuristic: if cache dir lacks chromium, perform install
+    try:
+        cache_dir = os.environ.get("PLAYWRIGHT_BROWSERS_PATH") or "/opt/render/.cache/ms-playwright"
+        needs_install = not os.path.isdir(cache_dir) or not any(
+            name.startswith("chromium") for name in os.listdir(cache_dir)
+        )
+    except Exception:
+        needs_install = True
+
+    if needs_install:
+        try:
+            import subprocess, sys
+            logger.info("Playwright warm-up: installing chromium...")
+            subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=False)
+        except Exception as e:
+            logger.warning("Playwright warm-up install failed: %s", e)
+            return
+
+    # Verify we can launch a browser
+    try:
+        from playwright.async_api import async_playwright
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"])  # type: ignore
+            await browser.close()
+        logger.info("Playwright warm-up completed")
+    except Exception as e:
+        logger.warning("Playwright warm-up verification failed: %s", e)
 
 
 async def build_invoice_pdf(order: Dict, business: Dict | None = None, receipt: bool = False, user_id: Optional[int] = None) -> Dict[str, Optional[bytes]]:

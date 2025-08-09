@@ -3,6 +3,7 @@ Admin Handler for the Telegram bot.
 """
 
 import logging
+import asyncio
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -74,6 +75,8 @@ class AdminHandler:
         self.admin_service = self.container.get_admin_service()
         self.notification_service = self.container.get_notification_service()
         self.admin_conversations = {}  # Initialize admin conversations storage
+        # Track in-flight invoice/receipt generations to deduplicate rapid clicks
+        self._inflight_invoice_tasks = set()
 
     @error_handler("admin_dashboard")
     async def handle_admin_command(
@@ -1729,25 +1732,55 @@ class AdminHandler:
             await query.message.reply_text(i18n.get_text("ORDER_DETAILS_ERROR"))
 
     async def _send_order_invoice_pdf(self, query: CallbackQuery, order_id: int, receipt: bool = False) -> None:
-        """Generate invoice/receipt PDF and send it back to the admin chat."""
+        """Acknowledge quickly and generate invoice/receipt in the background to avoid timeouts."""
+        user_id = query.from_user.id
+        task_key = (query.message.chat_id, order_id, "receipt" if receipt else "invoice")
         try:
-            await query.answer()
-            user_id = query.from_user.id
+            # Deduplicate rapid clicks
+            if task_key in self._inflight_invoice_tasks:
+                try:
+                    await query.answer(i18n.get_text("ADMIN_INVOICE_ALREADY_GENERATING", user_id=user_id))
+                except Exception:
+                    pass
+                return
+            self._inflight_invoice_tasks.add(task_key)
+
+            # Immediate lightweight acknowledgement so Telegram doesn't expire the callback
+            try:
+                await query.answer(i18n.get_text("ADMIN_INVOICE_GENERATING", user_id=user_id), show_alert=False)
+            except Exception:
+                # Ignore callback errors; proceed to background generation
+                pass
+
+            # Fire-and-forget the heavy work
+            asyncio.create_task(self._generate_and_send_invoice_pdf_background(query.message.chat_id, order_id, receipt, user_id))
+        except Exception as e:
+            self.logger.error("💥 INVOICE PDF ERROR (pre): %s", e)
+            # As a fallback, notify via chat (avoid answering callback again)
+            try:
+                await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            except Exception:
+                pass
+
+    async def _generate_and_send_invoice_pdf_background(self, chat_id: int, order_id: int, receipt: bool, user_id: int) -> None:
+        """Heavy invoice generation runs here to keep the callback responsive."""
+        task_key = (chat_id, order_id, "receipt" if receipt else "invoice")
+        try:
             # Fetch full order information
             order_info = await self.admin_service.get_order_by_id(order_id)
             if not order_info:
-                await query.edit_message_text(i18n.get_text("ADMIN_ORDER_NOT_FOUND", user_id=user_id))
+                from src.container import get_container
+                await get_container().get_bot().send_message(chat_id=chat_id, text=i18n.get_text("ADMIN_ORDER_NOT_FOUND", user_id=user_id))
                 return
-            # Prepare order dict for invoice service
+
             from src.db.operations import get_business_settings_dict
             business = get_business_settings_dict()
-            # Enrich items with unit_price if missing
+
+            # Prepare items, excluding synthetic Delivery line
             items = []
-            # Exclude synthetic Delivery pseudo-line from items to avoid double counting
             delivery_label = i18n.get_text("DELIVERY_ITEM_NAME", user_id=user_id)
             for it in order_info.get("items", []):
                 if (it.get("product_name") or "").strip() == delivery_label:
-                    # handled via delivery_charge totals section
                     continue
                 unit = it.get("unit_price")
                 if unit is None:
@@ -1758,8 +1791,9 @@ class AdminHandler:
                     "product_name": it.get("product_name"),
                     "quantity": it.get("quantity", 1),
                     "unit_price": unit,
-                    "total_price": it.get("total_price", unit * it.get("quantity", 1))
+                    "total_price": it.get("total_price", unit * it.get("quantity", 1)),
                 })
+
             order_payload = {
                 "order_id": order_info.get("order_id"),
                 "order_number": order_info.get("order_number"),
@@ -1774,27 +1808,36 @@ class AdminHandler:
                 "total": float(order_info.get("total", 0)),
                 "created_at": order_info.get("created_at"),
             }
+
             from src.services.invoice_service import build_invoice_pdf
             result = await build_invoice_pdf(order_payload, business, receipt=receipt, user_id=user_id)
             pdf_bytes = result.get("pdf")
             html = result.get("html")
             from src.container import get_container
-            container = get_container()
-            bot = container.get_bot()
+            bot = get_container().get_bot()
             if pdf_bytes:
                 await bot.send_document(
-                    chat_id=query.message.chat_id,
+                    chat_id=chat_id,
                     document=pdf_bytes,
                     filename=f"invoice_{order_id}.pdf" if not receipt else f"receipt_{order_id}.pdf",
-                    caption=f"Order #{order_id} invoice" if not receipt else f"Order #{order_id} receipt"
+                    caption=f"Order #{order_id} invoice" if not receipt else f"Order #{order_id} receipt",
                 )
             else:
-                # Fallback: send HTML as a file or message
-                await bot.send_message(chat_id=query.message.chat_id, text="PDF not available; sending printable HTML below.", parse_mode="HTML")
-                await bot.send_message(chat_id=query.message.chat_id, text=html)
+                await bot.send_message(chat_id=chat_id, text=i18n.get_text("ADMIN_INVOICE_HTML_FALLBACK", user_id=user_id), parse_mode="HTML")
+                await bot.send_message(chat_id=chat_id, text=html)
         except Exception as e:
-            self.logger.error("💥 INVOICE PDF ERROR: %s", e)
-            await query.answer(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id), show_alert=True)
+            self.logger.error("💥 INVOICE PDF ERROR (bg): %s", e)
+            try:
+                from src.container import get_container
+                await get_container().get_bot().send_message(chat_id=chat_id, text=i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            except Exception:
+                pass
+        finally:
+            # Clear inflight flag
+            try:
+                self._inflight_invoice_tasks.discard(task_key)
+            except Exception:
+                pass
 
     async def _get_formatted_order_details(self, order_id: int, user_id: int = None) -> str | None:
         """Helper to get and format order details."""
