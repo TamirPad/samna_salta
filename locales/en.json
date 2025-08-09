@@ -281,6 +281,12 @@
   "ADMIN_ADD_PRODUCT_INVALID_URL": "Invalid URL format. Please enter a valid URL starting with http:// or https://",
   "ADMIN_SKIP_HEBREW": "⏭️ Skip Hebrew",
   "ADMIN_SKIP_IMAGE": "⏭️ Skip Image",
+  "ADMIN_CATEGORY_IMAGE_URL_PROMPT": "<b>Optional:</b> Enter an image URL for this category, or tap Skip.",
+  "ADMIN_CATEGORY_IMAGE_INVALID_URL": "❌ Invalid image URL. Please provide a full URL starting with http(s) or tap Skip.",
+  "ADMIN_CATEGORY_EDIT_IMAGE": "🖼️ Edit Image",
+  "ADMIN_CATEGORY_IMAGE_EDIT_PROMPT": "Editing image for <b>{category}</b>\nCurrent: {current}\n\nSend a new image URL or tap Skip to keep current.",
+  "ADMIN_CATEGORY_IMAGE_SAVED": "✅ Category image saved.",
+  "ADMIN_CATEGORY_EDIT_BACK": "⬅️ Back to Category"
   "ADMIN_ADD_PRODUCT_CATEGORY_BREAD": "🍞 Bread",
   "ADMIN_ADD_PRODUCT_CATEGORY_SPICE": "🌶️ Spice",
   "ADMIN_ADD_PRODUCT_CATEGORY_SPREAD": "🧈 Spread",

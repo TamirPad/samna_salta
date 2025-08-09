@@ -17,6 +17,7 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+from telegram.error import BadRequest
 
 from src.container import get_container
 from src.utils.error_handler import BusinessLogicError, error_handler
@@ -57,6 +58,8 @@ AWAITING_PRODUCT_IMAGE_URL = 54
 # Add new states for category wizard
 AWAITING_CATEGORY_NAME_EN = 32
 AWAITING_CATEGORY_NAME_HE = 33
+AWAITING_CATEGORY_IMAGE_URL = 34
+AWAITING_CATEGORY_IMAGE_URL_EDIT = 35
 
 # Delivery area wizard states
 AWAITING_DELIVERY_AREA_NAME_EN = 60
@@ -77,6 +80,55 @@ class AdminHandler:
         self.admin_conversations = {}  # Initialize admin conversations storage
         # Track in-flight invoice/receipt generations to deduplicate rapid clicks
         self._inflight_invoice_tasks = set()
+
+    async def _safe_edit_message(self, query: CallbackQuery, text: str, reply_markup=None, parse_mode: str = "HTML", image_url: Optional[str] | None = None):
+        """Safely update the current admin window, handling text<->photo transitions.
+        Keeps a single-window UX by deleting and re-sending when the media type changes.
+        """
+        try:
+            if image_url:
+                # Switch to photo message: delete old message and send photo with caption
+                try:
+                    try:
+                        await query.message.delete()
+                    except Exception:
+                        pass
+                    await query.message.reply_photo(photo=image_url, caption=text, reply_markup=reply_markup, parse_mode=parse_mode)
+                    return
+                except Exception as e:
+                    self.logger.warning("Admin safe edit: failed to send photo, fallback to text: %s", e)
+            # No image or failed to send photo
+            if getattr(query.message, "photo", None):
+                # Current is a photo; delete and re-send as text to avoid BadRequest
+                try:
+                    await query.message.delete()
+                except Exception as delete_error:
+                    self.logger.warning("Admin safe edit: failed to delete photo message: %s", delete_error)
+                await query.message.reply_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+            else:
+                await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+        except BadRequest as e:
+            msg = str(e)
+            if "There is no text in the message to edit" in msg or "Message to edit not found" in msg:
+                try:
+                    await query.message.delete()
+                except Exception as delete_error:
+                    self.logger.warning("Admin safe edit fallback delete failed: %s", delete_error)
+                await query.message.reply_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+            else:
+                self.logger.warning("Admin safe edit BadRequest: %s", msg)
+                try:
+                    await query.message.reply_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+                except Exception as reply_error:
+                    self.logger.error("Admin safe edit final fallback failed: %s", reply_error)
+                    raise e
+        except Exception as e:
+            self.logger.error("Admin safe edit unexpected error: %s", e)
+            try:
+                await query.message.reply_text(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+            except Exception as reply_error:
+                self.logger.error("Admin safe edit could not send message: %s", reply_error)
+                raise e
 
     @error_handler("admin_dashboard")
     async def handle_admin_command(
@@ -487,9 +539,7 @@ class AdminHandler:
             keyboard = self._create_professional_admin_keyboard(user_id)
 
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(
-                text=dashboard_text, parse_mode="HTML", reply_markup=reply_markup
-            )
+            await self._safe_edit_message(query, dashboard_text, reply_markup, "HTML")
 
         except (BusinessLogicError, RuntimeError) as e:
             self.logger.error("💥 DASHBOARD ERROR: %s", e, exc_info=True)
@@ -507,7 +557,7 @@ class AdminHandler:
                 [InlineKeyboardButton(i18n.get_text("ADMIN_DELIVERY_AREAS", user_id=user_id), callback_data="admin_delivery_areas")],
                 [InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_dashboard")],
             ]
-            await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+            await self._safe_edit_message(query, text, InlineKeyboardMarkup(keyboard), "HTML")
         except Exception as e:
             self.logger.error("Error showing deliveries dashboard: %s", e)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
@@ -565,20 +615,7 @@ class AdminHandler:
             keyboard.append([InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_dashboard")])
 
             # Safely render as text message even if current message is a photo
-            try:
-                msg = query.message
-                if getattr(msg, "text", None):
-                    await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
-                else:
-                    # Delete photo/caption message and send fresh text-only message
-                    try:
-                        await msg.delete()
-                    except Exception:
-                        pass
-                    await msg.reply_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
-            except Exception as _e:
-                # Last resort: reply as new message
-                await query.message.reply_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+            await self._safe_edit_message(query, text, InlineKeyboardMarkup(keyboard), "HTML")
         except Exception as e:
             self.logger.error("Error showing app images dashboard: %s", e)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
@@ -617,31 +654,9 @@ class AdminHandler:
             caption = "\n".join(caption_lines)
 
             # Delete current message and send photo preview to avoid BadRequest on editing text->photo
-            try:
-                try:
-                    await query.message.delete()
-                except Exception:
-                    pass
-                if effective_url:
-                    await query.message.reply_photo(
-                        photo=effective_url,
-                        caption=caption,
-                        parse_mode="HTML",
-                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(i18n.get_text("ADMIN_CANCEL", user_id=user_id), callback_data="admin_app_images")]])
-                    )
-                else:
-                    await query.message.reply_text(
-                        caption,
-                        parse_mode="HTML",
-                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(i18n.get_text("ADMIN_CANCEL", user_id=user_id), callback_data="admin_app_images")]])
-                    )
-            except Exception:
-                # Fallback to simple text
-                await query.message.reply_text(
-                    caption,
-                    parse_mode="HTML",
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(i18n.get_text("ADMIN_CANCEL", user_id=user_id), callback_data="admin_app_images")]])
-                )
+            # Use safe edit to keep single-window UX
+            cancel_markup = InlineKeyboardMarkup([[InlineKeyboardButton(i18n.get_text("ADMIN_CANCEL", user_id=user_id), callback_data="admin_app_images")]])
+            await self._safe_edit_message(query, caption, cancel_markup, "HTML", image_url=effective_url)
             # Store the key temporarily using SimpleCache
             from src.utils.helpers import SimpleCache
             cache = SimpleCache()
@@ -2214,7 +2229,7 @@ class AdminHandler:
             ]
             
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            await self._safe_edit_message(query, text, reply_markup, "HTML")
             
         except Exception as e:
             self.logger.error("💥 DELETE CONFIRMATION ERROR: %s", e, exc_info=True)
@@ -2755,6 +2770,12 @@ class AdminHandler:
                 ],
                 [
                     InlineKeyboardButton(
+                        i18n.get_text("ADMIN_CATEGORY_EDIT_IMAGE", user_id=user_id),
+                        callback_data=f"admin_edit_category_image_{category}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
                         i18n.get_text("ADMIN_CATEGORY_DELETE", user_id=user_id),
                         callback_data=f"admin_delete_category_{category}"
                     )
@@ -2773,6 +2794,114 @@ class AdminHandler:
         except Exception as e:
             self.logger.error("Error showing edit category: %s", e)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
+
+    async def _start_edit_category_image(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """Start editing category image with current preview"""
+        try:
+            query = update.callback_query
+            user_id = query.from_user.id
+            category = query.data.replace("admin_edit_category_image_", "")
+            from src.db.operations import get_category_by_name
+            category_obj = get_category_by_name(category)
+            current_url = getattr(category_obj, "image_url", None) if category_obj else None
+            preview_url = current_url
+            if not preview_url:
+                from src.utils.image_handler import get_default_category_image
+                preview_url = get_default_category_image(category)
+            caption = i18n.get_text("ADMIN_CATEGORY_IMAGE_EDIT_PROMPT", user_id=user_id).format(
+                category=category,
+                current=current_url or "(default)"
+            )
+            try:
+                try:
+                    await query.message.delete()
+                except Exception:
+                    pass
+                if preview_url:
+                    await query.message.reply_photo(
+                        photo=preview_url,
+                        caption=caption,
+                        parse_mode="HTML",
+                        reply_markup=InlineKeyboardMarkup([
+                            [InlineKeyboardButton(i18n.get_text("ADMIN_SKIP_IMAGE", user_id=user_id), callback_data=f"admin_skip_category_image_edit_{category}")],
+                            [InlineKeyboardButton(i18n.get_text("CANCEL", user_id=user_id), callback_data=f"admin_edit_category_{category}")]
+                        ])
+                    )
+                else:
+                    await query.message.reply_text(
+                        caption,
+                        parse_mode="HTML",
+                        reply_markup=InlineKeyboardMarkup([
+                            [InlineKeyboardButton(i18n.get_text("ADMIN_SKIP_IMAGE", user_id=user_id), callback_data=f"admin_skip_category_image_edit_{category}")],
+                            [InlineKeyboardButton(i18n.get_text("CANCEL", user_id=user_id), callback_data=f"admin_edit_category_{category}")]
+                        ])
+                    )
+            except Exception:
+                await query.message.reply_text(
+                    caption,
+                    parse_mode="HTML",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton(i18n.get_text("ADMIN_SKIP_IMAGE", user_id=user_id), callback_data=f"admin_skip_category_image_edit_{category}")],
+                        [InlineKeyboardButton(i18n.get_text("CANCEL", user_id=user_id), callback_data=f"admin_edit_category_{category}")]
+                    ])
+                )
+            context.user_data["edit_category_image_target"] = category
+            return AWAITING_CATEGORY_IMAGE_URL_EDIT
+        except Exception as e:
+            self.logger.error("Error starting edit category image: %s", e)
+            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _handle_category_image_url_edit_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle input of new image URL for category edit"""
+        try:
+            user_id = update.effective_user.id
+            category = context.user_data.get("edit_category_image_target")
+            image_url = (update.message.text or "").strip()
+            from src.utils.image_handler import validate_image_url
+            if image_url and not validate_image_url(image_url):
+                await update.message.reply_text(i18n.get_text("ADMIN_CATEGORY_IMAGE_INVALID_URL", user_id=user_id))
+                return AWAITING_CATEGORY_IMAGE_URL_EDIT
+            from src.db.operations import get_db_session
+            from src.db.models import MenuCategory
+            session = get_db_session()
+            try:
+                category_obj = session.query(MenuCategory).filter((MenuCategory.name_en == category) | (MenuCategory.name_he == category)).first()
+                if not category_obj:
+                    await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+                    return ConversationHandler.END
+                category_obj.image_url = image_url or None
+                session.commit()
+            finally:
+                session.close()
+            # Clear cache
+            try:
+                from src.utils.helpers import SimpleCache
+                SimpleCache().clear()
+            except Exception:
+                pass
+            await update.message.reply_text(i18n.get_text("ADMIN_CATEGORY_IMAGE_SAVED", user_id=user_id), reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton(i18n.get_text("ADMIN_CATEGORY_BACK_TO_LIST", user_id=user_id), callback_data="admin_view_categories")],
+                [InlineKeyboardButton(i18n.get_text("ADMIN_CATEGORY_EDIT_BACK", user_id=user_id), callback_data=f"admin_edit_category_{category}")]
+            ]))
+            return ConversationHandler.END
+        except Exception as e:
+            self.logger.error("Error editing category image url: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _handle_skip_category_image_edit(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        try:
+            query = update.callback_query
+            user_id = query.from_user.id
+            category = query.data.replace("admin_skip_category_image_edit_", "")
+            # Go back to edit menu
+            await self._show_edit_category(query, category)
+            return ConversationHandler.END
+        except Exception as e:
+            self.logger.error("Error skipping category image edit: %s", e)
+            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
 
     async def _start_add_category(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         """Start the multilingual add category conversation"""
@@ -2882,25 +3011,85 @@ class AdminHandler:
             user_id = update.effective_user.id if update.effective_user else None
             name_en = context.user_data.get("category_name_en", "")
             name_he = context.user_data.get("category_name_he", "")
-            # Check if category already exists
+            # Prompt for optional category image URL before creation
+            prompt_text = i18n.get_text("ADMIN_CATEGORY_IMAGE_URL_PROMPT", user_id=user_id)
+            keyboard = [
+                [InlineKeyboardButton(i18n.get_text("ADMIN_SKIP_IMAGE", user_id=user_id), callback_data="admin_skip_category_image_url")],
+                [InlineKeyboardButton(i18n.get_text("CANCEL", user_id=user_id), callback_data="admin_view_categories")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            if update.callback_query:
+                try:
+                    await update.callback_query.edit_message_text(prompt_text, parse_mode="HTML", reply_markup=reply_markup)
+                except Exception:
+                    await update.callback_query.message.reply_text(prompt_text, parse_mode="HTML", reply_markup=reply_markup)
+            else:
+                await update.message.reply_text(prompt_text, parse_mode="HTML", reply_markup=reply_markup)
+            return AWAITING_CATEGORY_IMAGE_URL
+        except Exception as e:
+            self.logger.error("Error finalizing category creation: %s", e)
+            fallback_text = i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id)
+            if update.callback_query:
+                try:
+                    await update.callback_query.edit_message_text(fallback_text, parse_mode="HTML")
+                except Exception:
+                    await update.callback_query.message.reply_text(fallback_text, parse_mode="HTML")
+            else:
+                await update.message.reply_text(fallback_text)
+            return ConversationHandler.END
+
+    async def _handle_category_image_url_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle optional category image URL input during add category"""
+        try:
+            user_id = update.effective_user.id
+            image_url = (update.message.text or "").strip()
+            if image_url:
+                from src.utils.image_handler import validate_image_url, ImageHandler
+                if not validate_image_url(image_url):
+                    await update.message.reply_text(i18n.get_text("ADMIN_CATEGORY_IMAGE_INVALID_URL", user_id=user_id))
+                    return AWAITING_CATEGORY_IMAGE_URL
+                # Normalize formatting
+                image_url = ImageHandler.format_image_url(image_url, width=900, height=600)
+                context.user_data["category_image_url"] = image_url
+            else:
+                context.user_data["category_image_url"] = None
+            return await self._create_category_with_collected_data(update, context)
+        except Exception as e:
+            self.logger.error("Error handling category image url input: %s", e)
+            await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=update.effective_user.id))
+            return ConversationHandler.END
+
+    async def _handle_skip_category_image_url(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Skip category image URL input"""
+        try:
+            query = update.callback_query
+            user_id = query.from_user.id
+            context.user_data["category_image_url"] = None
+            return await self._create_category_with_collected_data(update, context)
+        except Exception as e:
+            self.logger.error("Error skipping category image url: %s", e)
+            await update.callback_query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+            return ConversationHandler.END
+
+    async def _create_category_with_collected_data(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Create category using collected names and optional image URL"""
+        user_id = update.effective_user.id if update.effective_user else update.callback_query.from_user.id
+        name_en = context.user_data.get("category_name_en", "")
+        name_he = context.user_data.get("category_name_he", "")
+        image_url = context.user_data.get("category_image_url")
+        try:
             existing_categories = await self.admin_service.get_product_categories_list()
             if name_en.lower() in [cat.lower() for cat in existing_categories] or (name_he and name_he.lower() in [cat.lower() for cat in existing_categories]):
                 text = i18n.get_text("ADMIN_CATEGORY_ALREADY_EXISTS", user_id=user_id).format(category=name_en or name_he)
-                if update.callback_query:
-                    try:
-                        await update.callback_query.edit_message_text(text, parse_mode="HTML")
-                    except Exception:
-                        await update.callback_query.message.reply_text(text, parse_mode="HTML")
-                else:
-                    await update.message.reply_text(text, parse_mode="HTML")
+                await (update.callback_query.edit_message_text if update.callback_query else update.message.reply_text)(text, parse_mode="HTML")
                 return AWAITING_CATEGORY_NAME_EN
             result = await self.admin_service.create_category_multilingual(
                 name=name_en or name_he,
                 name_en=name_en,
-                name_he=name_he
+                name_he=name_he,
+                image_url=image_url
             )
-            if result["success"]:
-                # Improved confirmation rendering
+            if result.get("success"):
                 if name_he and name_en:
                     category_display = f"{name_he} ({name_en})"
                 elif name_he:
@@ -2919,7 +3108,7 @@ class AdminHandler:
                     await update.message.reply_text(success_text, parse_mode="HTML", reply_markup=reply_markup)
                 return ConversationHandler.END
             else:
-                error_text = i18n.get_text("ADMIN_CATEGORY_ADD_ERROR", user_id=user_id).format(error=result["error"])
+                error_text = i18n.get_text("ADMIN_CATEGORY_ADD_ERROR", user_id=user_id).format(error=result.get("error"))
                 if update.callback_query:
                     try:
                         await update.callback_query.edit_message_text(error_text, parse_mode="HTML")
@@ -2927,9 +3116,9 @@ class AdminHandler:
                         await update.callback_query.message.reply_text(error_text, parse_mode="HTML")
                 else:
                     await update.message.reply_text(error_text, parse_mode="HTML")
-            return ConversationHandler.END
+                return ConversationHandler.END
         except Exception as e:
-            self.logger.error("Error finalizing category creation: %s", e)
+            self.logger.error("Error creating category with collected data: %s", e)
             fallback_text = i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id)
             if update.callback_query:
                 try:
@@ -5393,6 +5582,10 @@ def register_admin_handlers(application: Application):
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_category_name_he_input),
                 CallbackQueryHandler(handler._handle_skip_hebrew_category_name, pattern="^admin_skip_hebrew_category_name$")
             ],
+            AWAITING_CATEGORY_IMAGE_URL: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_category_image_url_input),
+                CallbackQueryHandler(handler._handle_skip_category_image_url, pattern="^admin_skip_category_image_url$")
+            ],
             ConversationHandler.TIMEOUT: [
                 MessageHandler(filters.ALL, handler._handle_conversation_timeout)
             ],
@@ -5448,6 +5641,38 @@ def register_admin_handlers(application: Application):
     )
 
     application.add_handler(edit_category_handler)
+
+    # Admin conversation handler for editing category image
+    edit_category_image_handler = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(handler._start_edit_category_image, pattern="^admin_edit_category_image_")
+        ],
+        states={
+            AWAITING_CATEGORY_IMAGE_URL_EDIT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_category_image_url_edit_input),
+                CallbackQueryHandler(handler._handle_skip_category_image_edit, pattern="^admin_skip_category_image_edit_")
+            ],
+            ConversationHandler.TIMEOUT: [
+                MessageHandler(filters.ALL, handler._handle_conversation_timeout)
+            ],
+        },
+        fallbacks=[
+            CommandHandler("cancel", handler._reset_conversation),
+            MessageHandler(filters.COMMAND, handler._reset_conversation),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_dashboard$"),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_back$"),
+            CallbackQueryHandler(handler._reset_conversation, pattern="^admin_")
+        ],
+        name="edit_category_image_conversation",
+        persistent=False,
+        per_message=False,
+        per_chat=False,
+        per_user=True,
+        allow_reentry=True,
+        conversation_timeout=300,
+    )
+
+    application.add_handler(edit_category_image_handler)
 
     # Admin conversation handler for editing products (wizard)
     edit_product_handler = ConversationHandler(

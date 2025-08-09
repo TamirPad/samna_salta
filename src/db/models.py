@@ -76,7 +76,7 @@ class MenuCategory(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     display_order: Mapped[Optional[int]] = mapped_column(Integer, default=0, nullable=True)
     is_active: Mapped[Optional[bool]] = mapped_column(Boolean, default=True, nullable=True)
-    image_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    image_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=True
     )
@@ -419,7 +419,7 @@ class Product(Base):
     )
     price: Mapped[float] = mapped_column(Float, nullable=False)
     is_active: Mapped[Optional[bool]] = mapped_column(Boolean, default=True, nullable=True)
-    image_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    image_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     preparation_time_minutes: Mapped[Optional[int]] = mapped_column(Integer, default=15, nullable=True)
     allergens: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, default=[], nullable=True)
     nutritional_info: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, default={}, nullable=True)

@@ -418,6 +418,27 @@ class DatabaseManager:
                         except Exception as add_err:
                             session.rollback()
                             self.logger.warning(f"Failed to add column app_images: {add_err}")
+
+                    # Widen image_url columns to TEXT to support long URLs
+                    try:
+                        # menu_categories.image_url
+                        session.execute(text("ALTER TABLE menu_categories ALTER COLUMN image_url TYPE TEXT"))
+                        # menu_products.image_url
+                        session.execute(text("ALTER TABLE menu_products ALTER COLUMN image_url TYPE TEXT"))
+                        session.commit()
+                        self.logger.info("Ensured image_url columns are TEXT for long URLs")
+                    except Exception as widen_err:
+                        session.rollback()
+                        # For SQLite, ALTER TYPE is limited; try add+copy approach
+                        try:
+                            if self.config.database_url.startswith('sqlite'):
+                                # SQLite fallback: attempt table rebuilds only if necessary (no-op if already TEXT)
+                                pass
+                        except Exception:
+                            pass
+                        self.logger.warning(
+                            f"Could not alter image_url columns to TEXT (may already be TEXT): {widen_err}"
+                        )
             except Exception as e:
                 self.logger.warning(f"Auto-migration check failed: {e}")
 

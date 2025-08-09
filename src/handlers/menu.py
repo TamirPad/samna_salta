@@ -247,7 +247,18 @@ class MenuHandler:
                 category=category_display_name, count=len(products)
             ))
             reply_markup = get_category_menu_keyboard(category, user_id)
-            header_image = get_default_category_image(category)
+
+            # Prefer DB category image if available and valid; otherwise fallback to default mapping
+            try:
+                from src.utils.image_handler import validate_image_url, ImageHandler
+                db_image_url = getattr(category_obj, "image_url", None) if category_obj else None
+                if db_image_url and validate_image_url(db_image_url):
+                    header_image = ImageHandler.format_image_url(db_image_url, width=900, height=600)
+                else:
+                    header_image = get_default_category_image(category)
+            except Exception:
+                header_image = get_default_category_image(category)
+
             await self._safe_edit_message(query, text, reply_markup, "HTML", image_url=header_image)
             
         except Exception as e:

@@ -1222,7 +1222,7 @@ class AdminService:
             logger.error("Error creating category: %s", e)
             return {"success": False, "error": f"Failed to create category: {str(e)}"}
 
-    async def create_category_multilingual(self, name: str, name_en: str = None, name_he: str = None, description: str = None) -> Dict:
+    async def create_category_multilingual(self, name: str, name_en: str = None, name_he: str = None, description: str = None, image_url: Optional[str] = None) -> Dict:
         """Create a new category with multilingual support"""
         try:
             # Validate input
@@ -1240,7 +1240,8 @@ class AdminService:
                 name_en=name_en or name.strip(),
                 name_he=name_he or name.strip(),
                 description=description or f"Category for {name}",
-                display_order=len(existing_categories) + 1
+                display_order=len(existing_categories) + 1,
+                image_url=image_url
             )
             
             if category:
