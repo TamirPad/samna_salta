@@ -26,7 +26,14 @@ class NotificationService:
                 logger.warning("Admin chat ID not configured, skipping admin notification")
                 return False
                 
-            if order_id:
+            # Only prepend the short header for non-Hebrew admins. For Hebrew, the message body already
+            # contains a localized header and order number, so avoid duplication.
+            try:
+                from src.utils.language_manager import language_manager
+                admin_lang = language_manager.get_user_language(int(self.admin_chat_id)) if str(self.admin_chat_id).isdigit() else "en"
+            except Exception:
+                admin_lang = "en"
+            if order_id and admin_lang != "he":
                 message = f"🆕 New Order #{order_id}\n\n{message}"
             
             # Get bot instance from container
@@ -147,7 +154,16 @@ class NotificationService:
                 from src.utils.helpers import translate_product_name
                 localized_product_name = translate_product_name(item.get('product_name', 'Unknown'), item.get('options', {}), user_id)
             
-            items_text += f"{i}. {localized_product_name} x{item.get('quantity', 1)} - 💰 ₪{item_total:.2f}\n"
+            # Resolve option labels for notifications (choice IDs, sizes, typed)
+            options_line = ""
+            try:
+                from src.db.operations import get_option_labels_from_payload
+                labels = get_option_labels_from_payload(item.get('options') or {}, user_language if user_id else 'en')
+                if labels:
+                    options_line = " (" + ", ".join(labels) + ")"
+            except Exception:
+                options_line = ""
+            items_text += f"{i}. {localized_product_name}{options_line} x{item.get('quantity', 1)} - 💰 ₪{item_total:.2f}\n"
 
         # Add delivery as a line item for admin if applicable
         try:

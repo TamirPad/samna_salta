@@ -36,6 +36,8 @@ class MenuHandler:
         self.container = get_container()
         self.order_service = self.container.get_order_service()
         self.logger = logging.getLogger(self.__class__.__name__)
+        # Temporary in-memory selections per user/product: {(user_id, product_id): set(option_ids)}
+        self._option_selections: dict[tuple[int, int], set[int]] = {}
 
     async def _safe_edit_message(self, query: CallbackQuery, text: str, reply_markup=None, parse_mode="HTML", image_url: str | None = None):
         """Safely edit a message, handling both text and photo messages.
@@ -100,7 +102,7 @@ class MenuHandler:
                 self.logger.error("Failed to send fallback message: %s", reply_error)
                 raise e
 
-    async def handle_menu_callback(self, update: Update, _: ContextTypes.DEFAULT_TYPE):
+    async def handle_menu_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle menu-related callbacks"""
         query = update.callback_query
         await query.answer()
@@ -116,6 +118,8 @@ class MenuHandler:
         try:
             if data == "menu_main":
                 await self._show_main_menu(query)
+            elif data == "noop":
+                await query.answer()
             elif data.startswith("category_"):
                 # Handle category menu
                 category = data.replace("category_", "")
@@ -124,6 +128,27 @@ class MenuHandler:
                 # Handle product selection
                 product_id = int(data.replace("product_", ""))
                 await self._show_product_details(query, product_id)
+            elif data.startswith("toggle_opt_"):
+                # toggle_opt_{productId}_{optionId}
+                try:
+                    payload = data.replace("toggle_opt_", "")
+                    pid_str, oid_str = payload.split("_", 1)
+                    pid_i = int(pid_str)
+                    oid_i = int(oid_str)
+                except Exception:
+                    await query.answer()
+                    return
+                key = (user_id, pid_i)
+                selected = self._option_selections.setdefault(key, set())
+                if oid_i in selected:
+                    selected.remove(oid_i)
+                else:
+                    selected.add(oid_i)
+                await self._show_product_details(query, pid_i)
+            elif data.startswith("add_with_opts_"):
+                # add_with_opts_{productId}
+                pid = int(data.split("_")[-1])
+                await self._add_with_selected_options(query, user_id, pid)
             elif data.startswith("quick_add_"):
                 # Handle quick add to cart
                 product_id = int(data.replace("quick_add_", ""))
@@ -271,6 +296,8 @@ class MenuHandler:
         try:
             user_id = query.from_user.id
             from src.db.operations import get_product_by_id
+            from src.db.operations import get_product_option_config
+            from src.config import get_config
             from src.utils.image_handler import get_product_image
             
             product = get_product_by_id(product_id)
@@ -298,44 +325,109 @@ class MenuHandler:
             # Get localized product name and description
             localized_name = get_localized_name(product, user_language)
             localized_description = get_localized_description(product, user_language)
-            
+
+            # Compute live price preview based on current selections (if feature enabled)
+            from src.config import get_config
+            display_price = float(product.price)
+            try:
+                config = get_config()
+                if getattr(config, "enable_product_options", False):
+                    option_cfg = get_product_option_config(product_id)
+                    choices = option_cfg.get("choices", {}) if isinstance(option_cfg, dict) else {}
+                    selected_ids = self._option_selections.get((user_id, product_id), set())
+                    id_to_price = {o['id']: float(o.get('price_modifier') or 0) for lst in choices.values() for o in lst}
+                    extra = sum(id_to_price.get(i, 0.0) for i in selected_ids)
+                    display_price = float(product.price) + extra
+            except Exception:
+                pass
+
             from src.utils.text_formatter import format_product_info
-            
+
             # Format product details with centering
             category_name = translate_category_name(product.category, user_id) if product.category else i18n.get_text('UNCATEGORIZED', user_id=user_id)
             text = format_product_info(
                 name=localized_name,
                 description=localized_description or i18n.get_text('NO_DESCRIPTION', user_id=user_id),
-                price=product.price,
+                price=display_price,
                 category=category_name
             )
+            # Append currently selected options summary, if any
+            try:
+                config = get_config()
+                if getattr(config, "enable_product_options", False):
+                    option_cfg = get_product_option_config(product_id)
+                    choices = option_cfg.get("choices", {}) if isinstance(option_cfg, dict) else {}
+                    selected_ids = list(self._option_selections.get((user_id, product_id), set()))
+                    if selected_ids:
+                        # Build id->label
+                        label_map = {}
+                        for lst in choices.values():
+                            for ch in lst:
+                                # Prefer localized display
+                                title = ch.get("display_name_he") if user_language == "he" else ch.get("display_name_en")
+                                if not title:
+                                    title = ch.get("name")
+                                label_map[ch["id"]] = title
+                        ordered = [label_map[i] for i in selected_ids if i in label_map]
+                        if ordered:
+                            labels_line = " • ".join(ordered)
+                            text = text + f"\n\n🧩 {i18n.get_text('SELECTED_OPTIONS', user_id=user_id)}: {labels_line}"
+            except Exception:
+                pass
             
-            # Create keyboard with add to cart and back options
-            keyboard = [
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("ADD_TO_CART", user_id=user_id),
-                        callback_data=f"add_product_{product_id}"
-                    )
-                ]
-            ]
-            
-            # Add back to category button if product has a category
-            if product.category:
-                keyboard.append([
-                    InlineKeyboardButton(
-                        i18n.get_text("BACK_TO_CATEGORY", user_id=user_id).format(category=translate_category_name(product.category, user_id)),
-                        callback_data=f"category_{product.category}"
-                    )
-                ])
-            
-            # Always add back to main menu option
+            # Create keyboard with add to cart and optional option choices
+            keyboard = []
+
+            # If product options feature enabled, show quick choices for first option group
+            try:
+                config = get_config()
+                if getattr(config, "enable_product_options", False):
+                    option_cfg = get_product_option_config(product_id)
+                    rules = option_cfg.get("rules", []) if isinstance(option_cfg, dict) else []
+                    choices = option_cfg.get("choices", {}) if isinstance(option_cfg, dict) else {}
+                    # Build option selection rows for all groups; one button per line
+                    selected_ids = self._option_selections.get((user_id, product_id), set())
+                    # Compute price modifier for preview
+                    id_to_price = {o['id']: float(o.get('price_modifier') or 0) for lst in choices.values() for o in lst}
+                    # extra is incorporated in caption; no need to render a price button
+                    # Show groups from rules if present, otherwise show all assigned choices grouped by type
+                    if rules:
+                        for rule in rules:
+                            gkey = rule.get("option_type")
+                            glist = choices.get(gkey, [])
+                            for ch in glist:
+                                delta = float(ch.get("price_modifier") or 0)
+                                delta_txt = f" (+{delta:.0f}₪)" if delta > 0 else (f" (-{abs(delta):.0f}₪)" if delta < 0 else "")
+                                title = (ch.get("display_name_he") or ch.get("display_name_en") or ch.get("name")) + delta_txt
+                                mark = "✅ " if ch["id"] in selected_ids else "➕ "
+                                keyboard.append([InlineKeyboardButton(f"{mark}{title}", callback_data=f"toggle_opt_{product_id}_{ch['id']}")])
+                    else:
+                        for glist in choices.values():
+                            for ch in glist:
+                                delta = float(ch.get("price_modifier") or 0)
+                                delta_txt = f" (+{delta:.0f}₪)" if delta > 0 else (f" (-{abs(delta):.0f}₪)" if delta < 0 else "")
+                                title = (ch.get("display_name_he") or ch.get("display_name_en") or ch.get("name")) + delta_txt
+                                mark = "✅ " if ch["id"] in selected_ids else "➕ "
+                                keyboard.append([InlineKeyboardButton(f"{mark}{title}", callback_data=f"toggle_opt_{product_id}_{ch['id']}")])
+                    # No extra price button; the caption already shows updated price
+            except Exception:
+                pass
+
+            # Primary add to cart with selected options button
             keyboard.append([
                 InlineKeyboardButton(
-                    i18n.get_text("BACK_MAIN_MENU", user_id=user_id),
-                    callback_data="menu_main"
+                    i18n.get_text("ADD_TO_CART", user_id=user_id),
+                    callback_data=f"add_with_opts_{product_id}"
                 )
             ])
+            
+            # Single back button: go back to category if available, otherwise main menu
+            back_callback = f"category_{product.category}" if product.category else "menu_main"
+            back_label = (
+                i18n.get_text("BACK_TO_CATEGORY", user_id=user_id).format(category=translate_category_name(product.category, user_id))
+                if product.category else i18n.get_text("BACK_MAIN_MENU", user_id=user_id)
+            )
+            keyboard.append([InlineKeyboardButton(back_label, callback_data=back_callback)])
             
             reply_markup = InlineKeyboardMarkup(keyboard)
             
@@ -372,6 +464,44 @@ class MenuHandler:
             self.logger.error("Error showing product details: %s", e)
             error_text = i18n.get_text("MENU_ERROR_OCCURRED", user_id=user_id)
             await self._safe_edit_message(query, error_text)
+
+    async def _add_with_selected_options(self, query: CallbackQuery, user_id: int, product_id: int) -> None:
+        """Add to cart using current selection."""
+        try:
+            selected = list(self._option_selections.get((user_id, product_id), set()))
+            cart_service = self.container.get_cart_service()
+            # options payload compatible with db operations pricing logic
+            options_payload = {"choice_ids": selected}
+            success = cart_service.add_item(user_id, product_id, 1, options=options_payload)  # type: ignore[arg-type]
+            if success:
+                # Clear selection for this product after successful add
+                try:
+                    self._option_selections.pop((user_id, product_id), None)
+                except Exception:
+                    pass
+                # Show a concise success message with next steps
+                try:
+                    from src.db.operations import get_product_by_id, get_localized_name
+                    product = get_product_by_id(product_id)
+                    localized_name = get_localized_name(product, language_manager.get_user_language(user_id)) if product else ""
+                except Exception:
+                    localized_name = ""
+                from src.utils.text_formatter import format_title
+                title = format_title(i18n.get_text("CART_SUCCESS_TITLE", user_id=user_id))
+                line1 = f"📦 <b>{localized_name}</b>"
+                line2 = i18n.get_text("CART_ADDED_SUCCESSFULLY", user_id=user_id)
+                message = f"{title}\n\n{line1}\n{line2}"
+                from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+                reply_markup = InlineKeyboardMarkup([
+                    [InlineKeyboardButton(i18n.get_text("VIEW_CART", user_id=user_id), callback_data="cart_view")],
+                    [InlineKeyboardButton(i18n.get_text("BACK_TO_MAIN", user_id=user_id), callback_data="menu_main")],
+                ])
+                await self._safe_edit_message(query, message, reply_markup, "HTML")
+            else:
+                await query.answer(i18n.get_text("ERROR_FAILED_ADD_TO_CART", user_id=user_id), show_alert=True)
+        except Exception as e:
+            self.logger.error("Error adding with selected options: %s", e)
+            await query.answer(i18n.get_text("ERROR_FAILED_ADD_TO_CART", user_id=user_id), show_alert=True)
 
     def _get_product_description_from_db(self, category_name: str, user_id: int) -> str:
         """Get product description from database for a category"""
@@ -476,6 +606,7 @@ def register_menu_handlers(application: Application):
     """Register menu handlers"""
     handler = MenuHandler()
 
+    # Route all menu-related callbacks through one handler
     application.add_handler(
-        CallbackQueryHandler(handler.handle_menu_callback, pattern="^menu_")
+        CallbackQueryHandler(handler.handle_menu_callback, pattern=r"^(menu_|category_|product_|quick_add_|toggle_opt_|add_with_opts_|noop$)")
     )

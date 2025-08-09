@@ -74,7 +74,11 @@ def setup_bot():
             # Continue with bot startup even if database fails
         # Warm up Playwright Chromium in the background to avoid first-use latency
         try:
-            asyncio.create_task(warmup_playwright_chromium())
+            import threading
+            threading.Thread(
+                target=lambda: asyncio.run(warmup_playwright_chromium()),
+                daemon=True,
+            ).start()
             logger.info("Scheduled Playwright warm-up task")
         except Exception as e:
             logger.warning(f"Failed to schedule Playwright warm-up: {e}")
@@ -114,40 +118,35 @@ def setup_bot():
     # Customer order tracking handlers
     application.add_handler(CallbackQueryHandler(onboarding_handler.handle_main_page_callback, pattern="^customer_order_"))
     
-    # Menu handlers
+    # Menu handlers (covers menu navigation, product details, option toggles and add-with-options)
     menu_handler_instance = MenuHandler()
-    application.add_handler(CallbackQueryHandler(menu_handler_instance.handle_menu_callback, pattern="^menu_"))
+    application.add_handler(
+        CallbackQueryHandler(
+            menu_handler_instance.handle_menu_callback,
+            pattern=r"^(menu_|category_|product_|quick_add_|toggle_opt_|add_with_opts_|noop$)"
+        )
+    )
     
-    # Dynamic menu handlers (for new product system)
-    application.add_handler(CallbackQueryHandler(menu_handler_instance.handle_menu_callback, pattern="^category_"))
-    application.add_handler(CallbackQueryHandler(menu_handler_instance.handle_menu_callback, pattern="^product_"))
-    
-    # Cart handlers
+    # Cart handlers (patterns consolidated; cart.py also registers internally when used standalone)
     cart_handler = CartHandler()
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^add_"))
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^add_product_"))
-    # Register all product option callbacks
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern="^(kubaneh_|samneh_|red_bisbas_|hilbeh_|hawaij_coffee_spice|white_coffee)"))
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_view_cart, pattern="^cart_view"))
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart_confirmation, pattern="^cart_clear_confirm"))
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart, pattern="^cart_clear_yes"))
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_checkout, pattern="^cart_checkout"))
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_quick_signup_start, pattern="^quick_signup$"))
-    
-    # Cart editing handlers
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_edit_cart_mode, pattern="^cart_edit_mode"))
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_decrease_quantity, pattern="^cart_decrease_"))
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_increase_quantity, pattern="^cart_increase_"))
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_remove_item, pattern="^cart_remove_"))
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_edit_quantity, pattern="^cart_edit_"))
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_item_info, pattern="^cart_info_"))
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_separator, pattern="^cart_separator"))
-    
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_address_choice, pattern="^delivery_address_"))
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_method, pattern="^delivery_(pickup|delivery)$"))
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_area_selection, pattern="^delivery_area_\d+$"))
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_confirm_order, pattern="^confirm_order"))
-    application.add_handler(CallbackQueryHandler(cart_handler.handle_add_delivery_instructions, pattern="^delivery_instructions_add$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern=r"^(add_|add_product_|kubaneh_|samneh_|red_bisbas_|hilbeh_|hawaij_coffee_spice|white_coffee)"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_view_cart, pattern=r"^cart_view$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart_confirmation, pattern=r"^cart_clear_confirm$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart, pattern=r"^(cart_clear|cart_clear_yes)$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_checkout, pattern=r"^cart_checkout$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_quick_signup_start, pattern=r"^quick_signup$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_edit_cart_mode, pattern=r"^cart_edit_mode$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_decrease_quantity, pattern=r"^cart_decrease_\d+$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_increase_quantity, pattern=r"^cart_increase_\d+$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_remove_item, pattern=r"^cart_remove_\d+$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_edit_quantity, pattern=r"^cart_edit_\d+$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_item_info, pattern=r"^cart_info_\d+$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_separator, pattern=r"^cart_separator$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_address_choice, pattern=r"^delivery_address_"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_method, pattern=r"^delivery_(pickup|delivery)$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_area_selection, pattern=r"^delivery_area_\d+$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_confirm_order, pattern=r"^confirm_order$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_add_delivery_instructions, pattern=r"^delivery_instructions_add$"))
     # Register admin handlers BEFORE any catch-all text handlers to ensure conversations receive messages
     register_admin_handlers(application)
     
@@ -178,33 +177,13 @@ def run_polling():
     
     try:
         application = setup_bot()
-        
+
         print("✅ Bot started successfully!")
         print("📱 Send /start to your bot in Telegram to test it!")
         print("🛑 Press Ctrl+C to stop the bot")
-        
-        # Start polling (this will run until interrupted)
-        try:
-            # Use asyncio.run() for proper event loop handling in Python 3.11
-            async def run_bot():
-                await application.initialize()
-                await application.start()
-                await application.updater.start_polling()
-                try:
-                    # Keep the bot running
-                    await asyncio.Event().wait()
-                except KeyboardInterrupt:
-                    print("\n🛑 Bot stopped by user")
-                finally:
-                    await application.updater.stop()
-                    await application.stop()
-                    await application.shutdown()
-            
-            asyncio.run(run_bot())
-            
-        except Exception as polling_error:
-            logging.getLogger(__name__).error(f"Error during polling: {polling_error}")
-            raise
+
+        # Start polling (blocking until interrupted)
+        application.run_polling()
         
     except Exception as e:
         logging.getLogger(__name__).error(f"Failed to start bot: {e}")
@@ -232,10 +211,10 @@ def run_webhook():
         try:
             application = setup_bot()
             
-            # Initialize the application
+            # Initialize the application to handle updates
             await application.initialize()
             await application.start()
-            
+
             # Clean up any existing webhook first
             await cleanup_webhook(application.bot)
             

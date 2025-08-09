@@ -8,7 +8,7 @@ Properly defined models with correct Base class and type annotations.
 from datetime import datetime
 from typing import Any, List, Optional, Type
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, BigInteger, String, Text, Index
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, BigInteger, String, Text, Index, Table, Column
 from sqlalchemy.orm import (
     DeclarativeMeta,
     Mapped,
@@ -119,6 +119,15 @@ class MenuCategory(Base):
         return f"<MenuCategory(id={self.id}, name_en='{self.name_en}', name_he='{self.name_he}')>"
 
 
+# Association table for many-to-many Product <-> ProductOption
+product_option_links: Table = Table(
+    "product_option_links",
+    _Base.metadata,
+    Column("product_id", Integer, ForeignKey("menu_products.id"), primary_key=True),
+    Column("option_id", Integer, ForeignKey("product_options.id"), primary_key=True),
+)
+
+
 class ProductOption(Base):
     """Product option/variant model (e.g., Kubaneh Classic, Samneh Smoked)"""
 
@@ -174,6 +183,11 @@ class ProductOption(Base):
     def __str__(self) -> str:
         return f"<ProductOption(id={self.id}, name='{self.name}', type='{self.option_type}')>"
 
+    # Back-populate many-to-many relationship to products
+    products: Mapped[List["Product"]] = relationship(
+        "Product", secondary=product_option_links, back_populates="options"
+    )
+
 
 class ProductSize(Base):
     """Product size model (e.g., Small, Medium, Large, XL)"""
@@ -217,6 +231,25 @@ class ProductSize(Base):
 
     def __str__(self) -> str:
         return f"<ProductSize(id={self.id}, name='{self.name}')>"
+
+
+class ProductOptionRule(Base):
+    """Per-product option group selection rules.
+
+    Controls how a particular option_type behaves for a given product
+    (required/single/multi/min/max/display order).
+    """
+
+    __tablename__ = "product_option_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(Integer, ForeignKey("menu_products.id"), nullable=False, index=True)
+    option_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    is_required: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    selection_type: Mapped[str] = mapped_column(String(10), default="single", nullable=False)  # single|multi
+    min_choices: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    max_choices: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 
 class OrderStatus(Base):
@@ -440,6 +473,11 @@ class Product(Base):
     category_rel: Mapped[Optional["MenuCategory"]] = relationship("MenuCategory", back_populates="products")
     order_items: Mapped[List["OrderItem"]] = relationship(
         "OrderItem", back_populates="product"
+    )
+
+    # Many-to-many options available for this product
+    options: Mapped[List["ProductOption"]] = relationship(
+        "ProductOption", secondary=product_option_links, back_populates="products"
     )
 
     @property

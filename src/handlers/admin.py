@@ -66,6 +66,15 @@ AWAITING_DELIVERY_AREA_NAME_EN = 60
 AWAITING_DELIVERY_AREA_NAME_HE = 61
 AWAITING_DELIVERY_AREA_CHARGE = 62
 
+# Product option create wizard states (local to admin)
+AWAITING_OPTION_TYPE_SELECT = 200
+AWAITING_OPTION_NAME_KEY = 201
+AWAITING_OPTION_NAME_HE = 202
+AWAITING_OPTION_NAME_EN = 203
+AWAITING_OPTION_PRICE = 204
+AWAITING_OPTION_ORDER = 205
+AWAITING_OPTION_TYPE_NAME = 206
+
 logger = logging.getLogger(__name__)
 
 
@@ -371,6 +380,35 @@ class AdminHandler:
                 await self._show_product_details(query, product_id)
             else:
                 await self._show_all_products(query)
+        elif data.startswith("admin_product_options_"):
+            pid = int(data.split("_")[-1])
+            await self._show_product_options(query, pid)
+        elif data.startswith("admin_options_catalog_"):
+            pid = int(data.split("_")[-1])
+            await self._show_options_catalog(query, pid)
+        elif data.startswith("admin_options_assign_"):
+            pid = int(data.split("_")[-1])
+            await self._show_assign_options_screen(query, pid)
+        elif data.startswith("admin_options_create_"):
+            # Start of option create handled by ConversationHandler; just acknowledge
+            await query.answer()
+        elif data.startswith("admin_option_create_type_"):
+            # legacy path not used anymore; ignore
+            await query.answer()
+        elif data.startswith("admin_assign_option_"):
+            # format: admin_assign_option_{productId}_{optionId}
+            parts = data.split("_")
+            pid = int(parts[-2]); oid = int(parts[-1])
+            await self._assign_option_to_product(query, pid, oid)
+        elif data.startswith("admin_unassign_option_"):
+            parts = data.split("_")
+            pid = int(parts[-2]); oid = int(parts[-1])
+            await self._unassign_option_from_product(query, pid, oid)
+        elif data.startswith("admin_toggle_option_active_"):
+            # admin_toggle_option_active_{optionId}_{newState}_{productId}
+            parts = data.split("_")
+            oid = int(parts[4]); new_state = parts[5] == '1'; pid = int(parts[6])
+            await self._toggle_option_active(query, oid, new_state, pid)
         elif data.startswith("admin_product_"):
             await self._handle_product_callback(query, data)
         
@@ -539,7 +577,8 @@ class AdminHandler:
             keyboard = self._create_professional_admin_keyboard(user_id)
 
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await self._safe_edit_message(query, dashboard_text, reply_markup, "HTML")
+            from src.utils.helpers import to_single_column_markup
+            await self._safe_edit_message(query, dashboard_text, to_single_column_markup(reply_markup), "HTML")
 
         except (BusinessLogicError, RuntimeError) as e:
             self.logger.error("💥 DASHBOARD ERROR: %s", e, exc_info=True)
@@ -557,7 +596,8 @@ class AdminHandler:
                 [InlineKeyboardButton(i18n.get_text("ADMIN_DELIVERY_AREAS", user_id=user_id), callback_data="admin_delivery_areas")],
                 [InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_dashboard")],
             ]
-            await self._safe_edit_message(query, text, InlineKeyboardMarkup(keyboard), "HTML")
+            from src.utils.helpers import to_single_column_markup
+            await self._safe_edit_message(query, text, to_single_column_markup(InlineKeyboardMarkup(keyboard)), "HTML")
         except Exception as e:
             self.logger.error("Error showing deliveries dashboard: %s", e)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
@@ -615,7 +655,8 @@ class AdminHandler:
             keyboard.append([InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_DASHBOARD", user_id=user_id), callback_data="admin_dashboard")])
 
             # Safely render as text message even if current message is a photo
-            await self._safe_edit_message(query, text, InlineKeyboardMarkup(keyboard), "HTML")
+            from src.utils.helpers import to_single_column_markup
+            await self._safe_edit_message(query, text, to_single_column_markup(InlineKeyboardMarkup(keyboard)), "HTML")
         except Exception as e:
             self.logger.error("Error showing app images dashboard: %s", e)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=query.from_user.id))
@@ -656,7 +697,8 @@ class AdminHandler:
             # Delete current message and send photo preview to avoid BadRequest on editing text->photo
             # Use safe edit to keep single-window UX
             cancel_markup = InlineKeyboardMarkup([[InlineKeyboardButton(i18n.get_text("ADMIN_CANCEL", user_id=user_id), callback_data="admin_app_images")]])
-            await self._safe_edit_message(query, caption, cancel_markup, "HTML", image_url=effective_url)
+            from src.utils.helpers import to_single_column_markup
+            await self._safe_edit_message(query, caption, to_single_column_markup(cancel_markup), "HTML", image_url=effective_url)
             # Store the key temporarily using SimpleCache
             from src.utils.helpers import SimpleCache
             cache = SimpleCache()
@@ -1931,7 +1973,8 @@ class AdminHandler:
                 lines.append(f"#{o.id} • ₪{o.total:.2f} • {created} • {o.status}")
             text = "\n".join(lines)
             kb = [[InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_CUSTOMERS", user_id=user_id), callback_data="admin_customers")]]
-            await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb))
+            from src.utils.helpers import to_single_column_markup
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=to_single_column_markup(InlineKeyboardMarkup(kb)))
         except Exception as e:
             self.logger.error("💥 CUSTOMER ORDERS ERROR: %s", e)
             await query.answer(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id), show_alert=True)
@@ -2229,7 +2272,8 @@ class AdminHandler:
             ]
             
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await self._safe_edit_message(query, text, reply_markup, "HTML")
+            from src.utils.helpers import to_single_column_markup
+            await self._safe_edit_message(query, text, to_single_column_markup(reply_markup), "HTML")
             
         except Exception as e:
             self.logger.error("💥 DELETE CONFIRMATION ERROR: %s", e, exc_info=True)
@@ -3955,51 +3999,441 @@ class AdminHandler:
             from src.utils.i18n import translate_category_name
             translated_category = translate_category_name(product["category"], user_id=user_id)
             
+            # Beautified with emojis, spacing and safe HTML entities
+            from html import escape
+            safe_name = escape(product.get('name') or "")
+            safe_desc = escape(product.get('description') or i18n.get_text('NO_DESCRIPTION', user_id=user_id))
+            safe_cat = escape(translated_category)
+            price_value = float(product.get('price') or 0)
+            safe_created = escape(product["created_at"].strftime('%Y-%m-%d %H:%M'))
+
             text = (
-                i18n.get_text("ADMIN_PRODUCT_DETAILS", user_id=user_id) + "\n\n" +
-                i18n.get_text("ADMIN_PRODUCT_NAME", user_id=user_id).format(name=product["name"]) + "\n" +
-                i18n.get_text("ADMIN_PRODUCT_DESCRIPTION", user_id=user_id).format(description=product["description"]) + "\n" +
-                i18n.get_text("ADMIN_PRODUCT_CATEGORY", user_id=user_id).format(category=translated_category) + "\n" +
-                i18n.get_text("ADMIN_PRODUCT_PRICE", user_id=user_id).format(price=product["price"]) + "\n" +
-                i18n.get_text("ADMIN_PRODUCT_STATUS", user_id=user_id).format(status=status_text) + "\n" +
-                i18n.get_text("ADMIN_PRODUCT_CREATED", user_id=user_id).format(created_at=product["created_at"].strftime("%Y-%m-%d %H:%M"))
+                i18n.get_text("ADMIN_PRODUCT_DETAILS", user_id=user_id) + "\n\n"
+                + i18n.get_text("ADMIN_PRODUCT_NAME", user_id=user_id).format(name=f"<b>{safe_name}</b>") + "\n"
+                + i18n.get_text("ADMIN_PRODUCT_DESCRIPTION", user_id=user_id).format(description=safe_desc) + "\n"
+                + i18n.get_text("ADMIN_PRODUCT_CATEGORY", user_id=user_id).format(category=safe_cat) + "\n"
+                + i18n.get_text("ADMIN_PRODUCT_PRICE", user_id=user_id).format(price=price_value) + "\n"
+                + i18n.get_text("ADMIN_PRODUCT_STATUS", user_id=user_id).format(status=escape(status_text)) + "\n"
+                + i18n.get_text("ADMIN_PRODUCT_CREATED", user_id=user_id).format(created_at=safe_created)
             )
             
             keyboard = [
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_PRODUCT_EDIT", user_id=user_id),
-                        callback_data=f"admin_product_edit_{product_id}"
-                    ),
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_PRODUCT_TOGGLE_STATUS", user_id=user_id),
-                        callback_data=f"admin_product_toggle_{product_id}"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_PRODUCT_DEACTIVATE", user_id=user_id),
-                        callback_data=f"admin_product_deactivate_{product_id}"
-                    ),
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_PRODUCT_HARD_DELETE", user_id=user_id),
-                        callback_data=f"admin_product_hard_delete_{product_id}"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        i18n.get_text("ADMIN_PRODUCT_BACK_TO_LIST", user_id=user_id),
-                        callback_data="admin_product_back_to_list"
-                    )
-                ]
+                [InlineKeyboardButton(i18n.get_text("ADMIN_PRODUCT_EDIT", user_id=user_id), callback_data=f"admin_product_edit_{product_id}")],
+                [InlineKeyboardButton(i18n.get_text("ADMIN_PRODUCT_TOGGLE_STATUS", user_id=user_id), callback_data=f"admin_product_toggle_{product_id}")],
+                [InlineKeyboardButton(i18n.get_text("ADMIN_MANAGE_OPTIONS", user_id=user_id), callback_data=f"admin_product_options_{product_id}")],
+                [InlineKeyboardButton(i18n.get_text("ADMIN_PRODUCT_DEACTIVATE", user_id=user_id), callback_data=f"admin_product_deactivate_{product_id}")],
+                [InlineKeyboardButton(i18n.get_text("ADMIN_PRODUCT_HARD_DELETE", user_id=user_id), callback_data=f"admin_product_hard_delete_{product_id}")],
+                [InlineKeyboardButton(i18n.get_text("ADMIN_PRODUCT_BACK_TO_LIST", user_id=user_id), callback_data="admin_product_back_to_list")],
             ]
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            from src.utils.helpers import to_single_column_markup
+            reply_markup = to_single_column_markup(InlineKeyboardMarkup(keyboard))
             await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
             
         except Exception as e:
             self.logger.error("Error showing product details: %s", e)
             await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
+    async def _show_product_options(self, query: CallbackQuery, product_id: int) -> None:
+        """Show and manage product option assignments (quick view)."""
+        try:
+            user_id = query.from_user.id
+            # Fetch current config
+            cfg_resp = await self.admin_service.get_product_option_config(product_id)
+            if not cfg_resp.get("success"):
+                await query.message.reply_text("Failed to load product options")
+                return
+            cfg = cfg_resp.get("config") or {}
+            rules = cfg.get("rules", [])
+            choices = cfg.get("choices", {})
+
+            # Build text summary and top-level action buttons
+            from src.utils.i18n import i18n
+            from src.utils.language_manager import language_manager
+            from src.utils.helpers import format_price
+
+            user_lang = language_manager.get_user_language(user_id)
+
+            lines = [i18n.get_text("ADMIN_PRODUCT_OPTIONS_TITLE", user_id=user_id), ""]
+            if rules:
+                lines.append(i18n.get_text("ADMIN_PRODUCT_OPTIONS_RULES", user_id=user_id))
+                for r in rules:
+                    opt_type = r['option_type']
+                    type_label = i18n.get_text(f"OPTION_TYPE_{opt_type}", user_id=user_id)
+                    if type_label == f"OPTION_TYPE_{opt_type}":
+                        type_label = opt_type
+                    req_label = i18n.get_text("REQUIRED", user_id=user_id) if r.get('is_required') else i18n.get_text("OPTIONAL", user_id=user_id)
+                    sel_type = r.get('selection_type','single')
+                    lines.append(f"- {type_label}: {req_label}, {sel_type} (min {r.get('min_choices',0)} max {r.get('max_choices',1)})")
+                lines.append("")
+            lines.append(i18n.get_text("ADMIN_PRODUCT_OPTIONS_ASSIGNED", user_id=user_id))
+            if choices:
+                for opt_type, lst in choices.items():
+                    if not lst:
+                        continue
+                    names = []
+                    type_label = i18n.get_text(f"OPTION_TYPE_{opt_type}", user_id=user_id)
+                    if type_label == f"OPTION_TYPE_{opt_type}":
+                        type_label = opt_type
+                    from src.utils.constants_manager import constants_manager
+                    for o in lst:
+                        dn = (
+                            o.get("display_name_he")
+                            or o.get("display_name_en")
+                            or constants_manager.get_product_option_display_name(
+                                o.get("name", ""), opt_type, user_lang
+                            )
+                        )
+                        pm = float(o.get("price_modifier") or 0)
+                        pm_txt = f" (+{format_price(pm, user_id=user_id)})" if pm else ""
+                        names.append(f"{dn}{pm_txt}")
+                    lines.append(f"• {type_label}: " + ", ".join(names))
+            else:
+                lines.append(i18n.get_text("ADMIN_PRODUCT_OPTIONS_NONE", user_id=user_id))
+
+            # Help text
+            lines.append("")
+            lines.append(i18n.get_text("ADMIN_PRODUCT_OPTIONS_HELP", user_id=user_id))
+            lines.append(i18n.get_text("ADMIN_PRODUCT_OPTIONS_HELP_ASSIGN", user_id=user_id))
+
+            text = "\n".join(lines)
+
+            # Primary action buttons only (clean header)
+            kb = [
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_OPTIONS_ASSIGN_BUTTON", user_id=user_id),
+                        callback_data=f"admin_options_assign_{product_id}"
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_OPTIONS_CATALOG_BUTTON", user_id=user_id),
+                        callback_data=f"admin_options_catalog_{product_id}"
+                    ),
+                    InlineKeyboardButton(
+                        i18n.get_text("ADMIN_OPTIONS_CREATE_BUTTON", user_id=user_id),
+                        callback_data=f"admin_options_create_{product_id}"
+                    ),
+                ],
+            ]
+
+            # Back button
+            kb.append([
+                InlineKeyboardButton(i18n.get_text("ADMIN_PRODUCT_BACK_TO_LIST", user_id=user_id), callback_data="admin_product_back_to_list")
+            ])
+
+            # Use safe edit; force single-column buttons for consistency
+            from src.utils.helpers import to_single_column_markup
+            await self._safe_edit_message(query, text, to_single_column_markup(InlineKeyboardMarkup(kb)))
+        except Exception as e:
+            self.logger.error("Error showing product options: %s", e)
+            await query.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+
+    async def _assign_option_to_product(self, query: CallbackQuery, product_id: int, option_id: int) -> None:
+        try:
+            user_id = query.from_user.id
+            resp = await self.admin_service.assign_option_to_product(product_id, option_id)
+            if not resp.get("success"):
+                await query.answer("Failed to assign", show_alert=True)
+                return
+            await self._show_product_options(query, product_id)
+        except Exception as e:
+            self.logger.error("Error assigning option: %s", e)
+            await query.answer("Error", show_alert=True)
+
+    async def _unassign_option_from_product(self, query: CallbackQuery, product_id: int, option_id: int) -> None:
+        try:
+            user_id = query.from_user.id
+            resp = await self.admin_service.unassign_option_from_product(product_id, option_id)
+            if not resp.get("success"):
+                await query.answer("Failed to unassign", show_alert=True)
+                return
+            await self._show_product_options(query, product_id)
+        except Exception as e:
+            self.logger.error("Error unassigning option: %s", e)
+            await query.answer("Error", show_alert=True)
+
+    async def _show_options_catalog(self, query: CallbackQuery, product_id: int) -> None:
+        """Options catalog scoped to the given product: show only options linked to it.
+        Allows toggling active state and future CRUD actions on those linked options.
+        """
+        try:
+            user_id = query.from_user.id
+            from src.db.operations import get_product_option_config
+            from src.utils.i18n import i18n
+            from src.utils.language_manager import language_manager
+
+            user_lang = language_manager.get_user_language(user_id)
+            cfg = get_product_option_config(product_id)
+            # Flatten assigned choices across all types
+            assigned_by_type = cfg.get("choices", {}) if isinstance(cfg, dict) else {}
+            options = []
+            for lst in assigned_by_type.values():
+                for o in lst:
+                    # normalize shape to id/display_name/is_active
+                    options.append({
+                        "id": o.get("id"),
+                        "name": o.get("name"),
+                        "display_name": (o.get("display_name_he") if user_lang == "he" else o.get("display_name_en")) or o.get("name"),
+                        # fall back to active=True if not present
+                        "is_active": bool(o.get("is_active", True)),
+                    })
+
+            # Header
+            lines = [i18n.get_text("ADMIN_OPTIONS_CATALOG_TITLE", user_id=user_id), ""]
+            lines.append(i18n.get_text("ADMIN_OPTIONS_CATALOG_HELP", user_id=user_id))
+
+            text = "\n".join(lines)
+
+            # Build buttons: show first N options with activate/deactivate
+            kb = []
+            for o in options[:50]:
+                name = o.get("display_name") or o.get("name")
+                active = o.get("is_active", True)
+                toggle_label = i18n.get_text("DEACTIVATE", user_id=user_id) if active else i18n.get_text("ACTIVATE", user_id=user_id)
+                kb.append([
+                    InlineKeyboardButton(
+                        f"{'🟢' if active else '⚪'} {name}", callback_data="noop"
+                    ),
+                    InlineKeyboardButton(
+                        toggle_label, callback_data=f"admin_toggle_option_active_{o['id']}_{'0' if active else '1'}_{product_id}"
+                    )
+                ])
+
+            # Back to options management
+            kb.append([
+                InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_OPTIONS", user_id=user_id), callback_data=f"admin_product_options_{product_id}")
+            ])
+
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb))
+        except Exception as e:
+            self.logger.error("Error showing options catalog: %s", e)
+            await query.answer("Error", show_alert=True)
+
+    async def _toggle_option_active(self, query: CallbackQuery, option_id: int, new_state: bool, product_id: int) -> None:
+        try:
+            from src.db.operations import set_product_option_active
+            ok = set_product_option_active(option_id, new_state)
+            if not ok:
+                await query.answer("Failed", show_alert=True)
+                return
+            await self._show_options_catalog(query, product_id)
+        except Exception as e:
+            self.logger.error("Error toggling option active: %s", e)
+            await query.answer("Error", show_alert=True)
+
+    async def _show_assign_options_screen(self, query: CallbackQuery, product_id: int) -> None:
+        """Dedicated assign screen: organized by type, only assign/unassign actions."""
+        try:
+            from src.utils.i18n import i18n
+            from src.db.operations import get_product_option_config, get_product_options
+            from src.utils.language_manager import language_manager
+            user_id = query.from_user.id
+            user_lang = language_manager.get_user_language(user_id)
+
+            cfg = get_product_option_config(product_id)
+            rules = cfg.get("rules", [])
+            assigned = cfg.get("choices", {})
+
+            # Collect all options grouped by type
+            all_opts = get_product_options(None, language=user_lang)
+            by_type = {}
+            for o in all_opts:
+                by_type.setdefault(o.get("option_type"), []).append(o)
+            for lst in by_type.values():
+                lst.sort(key=lambda x: (x.get("display_order", 0), x.get("id", 0)))
+
+            lines = [i18n.get_text("ADMIN_OPTIONS_ASSIGN_TITLE", user_id=user_id), ""]
+            kb = []
+
+            for r in sorted(rules, key=lambda x: (x.get("display_order", 0), x.get("option_type"))):
+                opt_type = r.get("option_type")
+                type_label = i18n.get_text(f"OPTION_TYPE_{opt_type}", user_id=user_id)
+                lines.append(f"• {type_label}")
+                current_ids = {o["id"] for o in assigned.get(opt_type, [])}
+                for o in by_type.get(opt_type, []):
+                    name = o.get("display_name") or o.get("name")
+                    if o["id"] in current_ids:
+                        kb.append([InlineKeyboardButton(f"❌ {name}", callback_data=f"admin_unassign_option_{product_id}_{o['id']}")])
+                    else:
+                        kb.append([InlineKeyboardButton(f"➕ {name}", callback_data=f"admin_assign_option_{product_id}_{o['id']}")])
+                kb.append([InlineKeyboardButton(" ", callback_data="noop")])
+
+            kb.append([InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_OPTIONS", user_id=user_id), callback_data=f"admin_product_options_{product_id}")])
+
+            from src.utils.helpers import to_single_column_markup
+            await self._safe_edit_message(query, "\n".join(lines), to_single_column_markup(InlineKeyboardMarkup(kb)))
+        except Exception as e:
+            self.logger.error("Error showing assign options: %s", e)
+            await query.answer("Error", show_alert=True)
+
+    # ---------------------- Option CRUD: create/edit/delete (skeleton) ----------------------
+    async def _start_option_create_conversation(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """Entry point: capture product_id from callback and ask for type."""
+        try:
+            query = update.callback_query
+            user_id = query.from_user.id
+            from src.utils.i18n import i18n
+            pid = int(query.data.split("_")[-1])
+            context.user_data["option_create"] = {"product_id": pid}
+            # Prompt for type
+            await self._safe_edit_message(
+                query,
+                i18n.get_text("ADMIN_OPTION_ENTER_TYPE", user_id=user_id),
+                InlineKeyboardMarkup([[InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_OPTIONS", user_id=user_id), callback_data=f"admin_product_options_{pid}")]])
+            )
+            return AWAITING_OPTION_TYPE_SELECT
+        except Exception as e:
+            self.logger.error("Error starting option create convo: %s", e)
+            await update.callback_query.answer("Error", show_alert=True)
+            return ConversationHandler.END
+
+    async def _handle_option_type_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        try:
+            from src.utils.i18n import i18n
+            user_id = update.effective_user.id
+            opt_type = (update.message.text or "").strip()
+            if not opt_type:
+                await update.message.reply_text(i18n.get_text("ADMIN_OPTION_ENTER_TYPE", user_id=user_id))
+                return AWAITING_OPTION_TYPE_SELECT
+            data = context.user_data.get("option_create", {})
+            data["option_type"] = opt_type
+            context.user_data["option_create"] = data
+            await update.message.reply_text(i18n.get_text("ADMIN_OPTION_ENTER_KEY", user_id=user_id))
+            return AWAITING_OPTION_NAME_KEY
+        except Exception as e:
+            self.logger.error("Error handling option type: %s", e)
+            await update.message.reply_text("Error")
+            return ConversationHandler.END
+
+    async def _option_create_choose_type(self, query: CallbackQuery, product_id: int, option_type: str) -> None:
+        """Ask for internal key (name) for the new option."""
+        try:
+            from src.utils.i18n import i18n
+            user_id = query.from_user.id
+            # store context
+            query.message.chat_data.setdefault("option_create", {})
+            query.message.chat_data["option_create"] = {"product_id": product_id, "option_type": option_type}
+            await self._safe_edit_message(query, i18n.get_text("ADMIN_OPTION_ENTER_KEY", user_id=user_id), InlineKeyboardMarkup([[InlineKeyboardButton(i18n.get_text("ADMIN_BACK_TO_OPTIONS", user_id=user_id), callback_data=f"admin_product_options_{product_id}")]]))
+        except Exception as e:
+            self.logger.error("Error in choose type: %s", e)
+            await query.answer("Error", show_alert=True)
+
+    async def _handle_option_key_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """Handle internal key input; ask for HE name next."""
+        try:
+            from src.utils.i18n import i18n
+            user_id = update.effective_user.id
+            data = context.user_data.get("option_create") or {}
+            key = (update.message.text or "").strip().lower().replace(" ", "_")
+            if not key:
+                await update.message.reply_text(i18n.get_text("ADMIN_OPTION_ENTER_KEY", user_id=user_id))
+                return AWAITING_OPTION_NAME_KEY
+            data["name_key"] = key
+            context.user_data["option_create"] = data
+            await update.message.reply_text(i18n.get_text("ADMIN_OPTION_ENTER_NAME_HE", user_id=user_id))
+            return AWAITING_OPTION_NAME_HE
+        except Exception as e:
+            self.logger.error("Error handling option key: %s", e)
+            await update.message.reply_text("Error")
+            return ConversationHandler.END
+
+    async def _handle_option_name_he(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        try:
+            from src.utils.i18n import i18n
+            user_id = update.effective_user.id
+            data = context.user_data.get("option_create") or {}
+            data["display_name_he"] = (update.message.text or "").strip()
+            context.user_data["option_create"] = data
+            await update.message.reply_text(i18n.get_text("ADMIN_OPTION_ENTER_NAME_EN", user_id=user_id))
+            return AWAITING_OPTION_NAME_EN
+        except Exception as e:
+            self.logger.error("Error handling option HE name: %s", e)
+            await update.message.reply_text("Error")
+            return ConversationHandler.END
+
+    async def _handle_option_name_en(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        try:
+            from src.utils.i18n import i18n
+            user_id = update.effective_user.id
+            data = context.user_data.get("option_create") or {}
+            data["display_name_en"] = (update.message.text or "").strip()
+            context.user_data["option_create"] = data
+            await update.message.reply_text(i18n.get_text("ADMIN_OPTION_ENTER_PRICE", user_id=user_id))
+            return AWAITING_OPTION_PRICE
+        except Exception as e:
+            self.logger.error("Error handling option EN name: %s", e)
+            await update.message.reply_text("Error")
+            return ConversationHandler.END
+
+    async def _handle_option_price(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        try:
+            from src.utils.i18n import i18n
+            user_id = update.effective_user.id
+            txt = (update.message.text or "").strip().replace(",", ".")
+            try:
+                price = float(txt)
+            except ValueError:
+                await update.message.reply_text(i18n.get_text("ADMIN_OPTION_ENTER_PRICE", user_id=user_id))
+                return AWAITING_OPTION_PRICE
+            data = context.user_data.get("option_create") or {}
+            data["price_modifier"] = price
+            context.user_data["option_create"] = data
+            await update.message.reply_text(i18n.get_text("ADMIN_OPTION_ENTER_ORDER", user_id=user_id))
+            return AWAITING_OPTION_ORDER
+        except Exception as e:
+            self.logger.error("Error handling option price: %s", e)
+            await update.message.reply_text("Error")
+            return ConversationHandler.END
+
+    async def _handle_option_order(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        try:
+            from src.utils.i18n import i18n
+            from src.services.admin_service import AdminService
+            user_id = update.effective_user.id
+            data = context.user_data.get("option_create") or {}
+            try:
+                order_val = int((update.message.text or "0").strip())
+            except ValueError:
+                order_val = 0
+            data["display_order"] = order_val
+            context.user_data["option_create"] = data
+
+            # Persist and assign
+            svc: AdminService = self.admin_service
+            res = await svc.create_option(
+                option_type=data.get("option_type"),
+                name=data.get("name_key"),
+                display_name_en=data.get("display_name_en"),
+                display_name_he=data.get("display_name_he"),
+                price_modifier=data.get("price_modifier", 0.0),
+                display_order=data.get("display_order", 0),
+                is_active=True,
+            )
+            if not res.get("success") or not res.get("option"):
+                await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+                return ConversationHandler.END
+            option_id = res.get("option")
+            pid = data.get("product_id")
+            assign_ok = await svc.assign_option_to_product(pid, option_id)
+            if not assign_ok.get("success"):
+                await update.message.reply_text(i18n.get_text("ADMIN_ERROR_MESSAGE", user_id=user_id))
+                return ConversationHandler.END
+            # Done: show assign screen filtered to this product
+            await update.message.reply_text(i18n.get_text("ADMIN_OPTION_CREATED_ASSIGNED", user_id=user_id))
+            # Clear and show
+            context.user_data.pop("option_create", None)
+            # Show assign screen
+            fake_query = update.callback_query if update.callback_query else None
+            if fake_query is None and update.message:
+                # Build a minimal CallbackQuery-like proxy is complex; just notify
+                pass
+            return ConversationHandler.END
+        except Exception as e:
+            self.logger.error("Error handling option order: %s", e)
+            await update.message.reply_text("Error")
+            return ConversationHandler.END
 
     async def _start_edit_product(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         """Start the edit product wizard conversation"""
@@ -5474,6 +5908,24 @@ def register_admin_handlers(application: Application):
 
     # Admin command handler
     application.add_handler(CommandHandler("admin", handler.handle_admin_command))
+    # Product option create wizard (conversation)
+    option_create_conv = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(handler._start_option_create_conversation, pattern=r"^admin_options_create_"),
+        ],
+        states={
+            AWAITING_OPTION_TYPE_SELECT: [MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_option_type_input)],
+            AWAITING_OPTION_NAME_KEY: [MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_option_key_input)],
+            AWAITING_OPTION_NAME_HE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_option_name_he)],
+            AWAITING_OPTION_NAME_EN: [MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_option_name_en)],
+            AWAITING_OPTION_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_option_price)],
+            AWAITING_OPTION_ORDER: [MessageHandler(filters.TEXT & ~filters.COMMAND, handler._handle_option_order)],
+        },
+        fallbacks=[CallbackQueryHandler(handler.handle_admin_callback, pattern=r"^admin_product_options_")],
+        per_chat=True,
+        per_user=True,
+    )
+    application.add_handler(option_create_conv)
     
     # Emergency conversation reset command
     application.add_handler(CommandHandler("reset", handler._reset_conversation))

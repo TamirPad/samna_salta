@@ -12,7 +12,8 @@ from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, Union, Generator, Tuple
 from contextlib import contextmanager
 
-from sqlalchemy import Engine, create_engine, event, text
+from sqlalchemy import Engine, create_engine, event, text, cast, bindparam, JSON
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.orm.attributes import flag_modified
@@ -36,6 +37,7 @@ from src.db.models import (
     DeliveryMethod,
     PaymentMethod,
     DeliveryArea,
+    ProductOptionRule,
 )
 from src.utils.logger import PerformanceLogger
 from src.utils.constants import (
@@ -58,7 +60,371 @@ from decimal import Decimal
 import json
 
 logger = logging.getLogger(__name__)
+# ----------------------------- Product options: CRUD & assignment -----------------------------
 
+@retry_on_database_error()
+def create_product_option(
+    option_type: str,
+    name: str,
+    display_name_en: Optional[str] = None,
+    display_name_he: Optional[str] = None,
+    description_en: Optional[str] = None,
+    description_he: Optional[str] = None,
+    price_modifier: float = 0.0,
+    display_order: int = 0,
+    is_active: bool = True,
+) -> Optional[ProductOption]:
+    session = get_db_session()
+    try:
+        opt = ProductOption(
+            option_type=option_type,
+            name=name,
+            display_name_en=display_name_en,
+            display_name_he=display_name_he,
+            description_en=description_en,
+            description_he=description_he,
+            price_modifier=price_modifier,
+            display_order=display_order,
+            is_active=is_active,
+        )
+        session.add(opt)
+        session.commit()
+        session.refresh(opt)
+        return opt
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error("Failed to create product option: %s", e)
+        return None
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def update_product_option(
+    option_id: int,
+    *,
+    display_name_en: Optional[str] = None,
+    display_name_he: Optional[str] = None,
+    description_en: Optional[str] = None,
+    description_he: Optional[str] = None,
+    price_modifier: Optional[float] = None,
+    display_order: Optional[int] = None,
+    is_active: Optional[bool] = None,
+) -> bool:
+    session = get_db_session()
+    try:
+        opt = session.query(ProductOption).filter(ProductOption.id == option_id).first()
+        if not opt:
+            return False
+        if display_name_en is not None:
+            opt.display_name_en = display_name_en
+        if display_name_he is not None:
+            opt.display_name_he = display_name_he
+        if description_en is not None:
+            opt.description_en = description_en
+        if description_he is not None:
+            opt.description_he = description_he
+        if price_modifier is not None:
+            opt.price_modifier = float(price_modifier)
+        if display_order is not None:
+            opt.display_order = int(display_order)
+        if is_active is not None:
+            opt.is_active = bool(is_active)
+        opt.updated_at = datetime.utcnow()
+        session.add(opt)
+        session.commit()
+        return True
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error("Failed to update product option: %s", e)
+        return False
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def delete_product_option(option_id: int) -> bool:
+    """Delete an option and remove any product links."""
+    session = get_db_session()
+    try:
+        # Clear links
+        session.execute(text("DELETE FROM product_option_links WHERE option_id = :oid"), {"oid": option_id})
+        # Delete option
+        opt = session.query(ProductOption).filter(ProductOption.id == option_id).first()
+        if not opt:
+            return False
+        session.delete(opt)
+        session.commit()
+        return True
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error("Failed to delete product option: %s", e)
+        return False
+    finally:
+        session.close()
+
+
+# Per-product option ordering (simple approach: store order in rule display_order per type)
+@retry_on_database_error()
+def reorder_product_option_type(product_id: int, option_type: str, display_order: int) -> bool:
+    """Set the display order of an option group for a product."""
+    return upsert_product_option_rule(
+        product_id=product_id,
+        option_type=option_type,
+        display_order=display_order,
+    )
+
+@retry_on_database_error()
+def assign_option_to_product(product_id: int, option_id: int) -> bool:
+    session = get_db_session()
+    try:
+        product = session.query(Product).filter(Product.id == product_id).first()
+        option = session.query(ProductOption).filter(ProductOption.id == option_id).first()
+        if not product or not option:
+            return False
+        if option not in product.options:
+            product.options.append(option)
+        session.commit()
+        return True
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error("Failed to assign option to product: %s", e)
+        return False
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def unassign_option_from_product(product_id: int, option_id: int) -> bool:
+    session = get_db_session()
+    try:
+        product = session.query(Product).filter(Product.id == product_id).first()
+        option = session.query(ProductOption).filter(ProductOption.id == option_id).first()
+        if not product or not option:
+            return False
+        if option in product.options:
+            product.options.remove(option)
+        session.commit()
+        return True
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error("Failed to unassign option from product: %s", e)
+        return False
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def upsert_product_option_rule(
+    product_id: int,
+    option_type: str,
+    is_required: bool = False,
+    selection_type: str = "single",
+    min_choices: int = 0,
+    max_choices: int = 1,
+    display_order: int = 0,
+) -> bool:
+    session = get_db_session()
+    try:
+        rule = (
+            session.query(ProductOptionRule)
+            .filter(ProductOptionRule.product_id == product_id, ProductOptionRule.option_type == option_type)
+            .first()
+        )
+        if not rule:
+            rule = ProductOptionRule(
+                product_id=product_id,
+                option_type=option_type,
+                is_required=is_required,
+                selection_type=selection_type,
+                min_choices=min_choices,
+                max_choices=max_choices,
+                display_order=display_order,
+            )
+            session.add(rule)
+        else:
+            rule.is_required = is_required
+            rule.selection_type = selection_type
+            rule.min_choices = min_choices
+            rule.max_choices = max_choices
+            rule.display_order = display_order
+        session.commit()
+        return True
+    except SQLAlchemyError as e:
+        session.rollback()
+        logger.error("Failed to upsert product option rule: %s", e)
+        return False
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def get_product_option_config(product_id: int) -> Dict[str, Any]:
+    session = get_db_session()
+    try:
+        product = session.query(Product).options(joinedload(Product.options)).filter(Product.id == product_id).first()
+        if not product:
+            return {"rules": [], "choices": {}}
+        rules = (
+            session.query(ProductOptionRule)
+            .filter(ProductOptionRule.product_id == product_id)
+            .order_by(ProductOptionRule.display_order, ProductOptionRule.option_type)
+            .all()
+        )
+        grouped: Dict[str, list] = {}
+        for opt in product.options:
+            grouped.setdefault(opt.option_type, []).append(opt)
+        for k in grouped:
+            grouped[k].sort(key=lambda x: (x.display_order, x.id))
+        return {
+            "rules": [
+                {
+                    "option_type": r.option_type,
+                    "is_required": r.is_required,
+                    "selection_type": r.selection_type,
+                    "min_choices": r.min_choices,
+                    "max_choices": r.max_choices,
+                    "display_order": r.display_order,
+                }
+                for r in rules
+            ],
+            "choices": {
+                k: [
+                    {
+                        "id": o.id,
+                        "name": o.name,
+                        "display_name_en": o.display_name_en,
+                        "display_name_he": o.display_name_he,
+                        "price_modifier": o.price_modifier,
+                    }
+                    for o in v
+                ]
+                for k, v in grouped.items()
+            },
+        }
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def get_option_labels_by_ids(option_ids: list[int], language: str = "en") -> list[str]:
+    """Return localized labels for option IDs including price delta.
+    Keeps the input order and skips missing/inactive options.
+    """
+    if not option_ids:
+        return []
+    session = get_db_session()
+    try:
+        opts = (
+            session.query(ProductOption)
+            .filter(ProductOption.id.in_([int(i) for i in option_ids]), ProductOption.is_active == True)
+            .all()
+        )
+        id_to_opt = {o.id: o for o in opts}
+        labels: list[str] = []
+        for raw_id in option_ids:
+            oid = int(raw_id)
+            o = id_to_opt.get(oid)
+            if not o:
+                continue
+            # Pick best localized display
+            if language == "he":
+                name = o.display_name_he or o.name_he or o.display_name_en or o.name_en or o.name
+            else:
+                name = o.display_name_en or o.name_en or o.display_name_he or o.name_he or o.name
+            try:
+                delta = float(o.price_modifier or 0)
+            except Exception:
+                delta = 0.0
+            if delta > 0:
+                labels.append(f"{name} (+{delta:.0f}₪)")
+            elif delta < 0:
+                labels.append(f"{name} (-{abs(delta):.0f}₪)")
+            else:
+                labels.append(name)
+        return labels
+    finally:
+        session.close()
+
+
+@retry_on_database_error()
+def get_option_labels_from_payload(options: dict | None, language: str = "en") -> list[str]:
+    """Resolve human-readable labels for an options payload.
+    Supports:
+      - choice_ids: list of ProductOption IDs
+      - size: ProductSize by name
+      - typed options: { option_type: name }
+    """
+    labels: list[str] = []
+    if not options:
+        return labels
+    session = get_db_session()
+    try:
+        # choice_ids
+        try:
+            choice_ids = [int(i) for i in (options.get("choice_ids") or [])]
+        except Exception:
+            choice_ids = []
+        if choice_ids:
+            labels.extend(get_option_labels_by_ids(choice_ids, language))
+
+        # size
+        size_name = options.get("size")
+        if size_name:
+            size = (
+                session.query(ProductSize)
+                .filter(ProductSize.name == size_name, ProductSize.is_active == True)
+                .first()
+            )
+            if size:
+                if language == "he":
+                    name = size.display_name_he or size.name_he or size.display_name_en or size.name_en or size.name
+                else:
+                    name = size.display_name_en or size.name_en or size.display_name_he or size.name_he or size.name
+                try:
+                    delta = float(size.price_modifier or 0)
+                except Exception:
+                    delta = 0.0
+                if delta > 0:
+                    labels.append(f"{name} (+{delta:.0f}₪)")
+                elif delta < 0:
+                    labels.append(f"{name} (-{abs(delta):.0f}₪)")
+                else:
+                    labels.append(name)
+
+        # typed options (option_type -> name)
+        for key, value in (options or {}).items():
+            if key in ("choice_ids", "size"):
+                continue
+            opt = (
+                session.query(ProductOption)
+                .filter(
+                    ProductOption.option_type == key,
+                    ProductOption.name == value,
+                    ProductOption.is_active == True,
+                )
+                .first()
+            )
+            if not opt:
+                continue
+            if language == "he":
+                name = opt.display_name_he or opt.name_he or opt.display_name_en or opt.name_en or opt.name
+            else:
+                name = opt.display_name_en or opt.name_en or opt.display_name_he or opt.name_he or opt.name
+            try:
+                delta = float(opt.price_modifier or 0)
+            except Exception:
+                delta = 0.0
+            if delta > 0:
+                labels.append(f"{name} (+{delta:.0f}₪)")
+            elif delta < 0:
+                labels.append(f"{name} (-{abs(delta):.0f}₪)")
+            else:
+                labels.append(name)
+
+        return labels
+    finally:
+        session.close()
 
 def get_localized_name(product: Product, language: str = "en") -> str:
     """Get localized name for a product based on user language preference.
@@ -513,59 +879,7 @@ def get_db_session() -> Session:
     return get_db_manager().get_session()
 
 
-def retry_on_database_error(
-    max_retries: int = RetrySettings.MAX_RETRIES,
-    delay: int = RetrySettings.RETRY_DELAY_SECONDS,
-) -> Callable:
-    """Decorator for database operations with retry logic"""
-
-    def decorator(func: Callable) -> Callable:
-        @wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            last_exception: Optional[Exception] = None
-            logger = logging.getLogger(func.__module__)
-
-            for attempt in range(max_retries):
-                try:
-                    return func(*args, **kwargs)
-                except (OperationalError, DatabaseConnectionError) as e:
-                    last_exception = e
-                    if attempt < max_retries - 1:
-                        logger.warning(
-                            f"Database operation {func.__name__} failed (attempt {attempt + 1}/{max_retries}): {e}",
-                            extra={"attempt": attempt + 1, "function": func.__name__},
-                        )
-                        time.sleep(delay)
-                    else:
-                        logger.error(
-                            f"Database operation {func.__name__} failed after {max_retries} attempts: {e}",
-                            extra={"function": func.__name__},
-                            exc_info=True,
-                        )
-                except SQLAlchemyError as e:
-                    last_exception = e
-                    logger.error(
-                        f"Database operation {func.__name__} failed with non-retryable error: {e}",
-                        extra={"function": func.__name__},
-                        exc_info=True,
-                    )
-                    break
-
-            # All retries failed
-            if isinstance(last_exception, (OperationalError, DatabaseConnectionError)):
-                raise DatabaseRetryExhaustedError(
-                    f"Database operation {func.__name__} failed after {max_retries} attempts: {last_exception}",
-                    ErrorCodes.DATABASE_ERROR,
-                ) from last_exception
-            else:
-                raise DatabaseOperationError(
-                    f"Database operation {func.__name__} failed: {last_exception}",
-                    ErrorCodes.DATABASE_ERROR,
-                ) from last_exception
-
-        return wrapper
-
-    return decorator
+from src.utils.error_handler import retry_on_database_error
 
 
 
@@ -592,6 +906,24 @@ def init_db():
 
             # Initialize default products (only if none exist)
             init_default_products()
+
+            # Best-effort ensure new rules table exists (when Alembic not used)
+            try:
+                with get_db_manager().get_session_context() as session:
+                    session.execute(text(
+                        "CREATE TABLE IF NOT EXISTS product_option_rules ("
+                        "id SERIAL PRIMARY KEY,"
+                        "product_id INTEGER NOT NULL REFERENCES menu_products(id),"
+                        "option_type VARCHAR(50) NOT NULL,"
+                        "is_required BOOLEAN NOT NULL DEFAULT FALSE,"
+                        "selection_type VARCHAR(10) NOT NULL DEFAULT 'single',"
+                        "min_choices INTEGER NOT NULL DEFAULT 0,"
+                        "max_choices INTEGER NOT NULL DEFAULT 1,"
+                        "display_order INTEGER NOT NULL DEFAULT 0" 
+                        ")"
+                    ))
+            except Exception as e:
+                logger.debug("product_option_rules ensure failed or skipped: %s", e)
             
             logger.info("Database initialization completed successfully")
             return
@@ -1340,11 +1672,66 @@ def add_to_cart(
             if not product:
                 raise ValueError(f"Product {product_id} not found or inactive")
             
-            # Check if item already exists in cart
-            existing_item = session.query(CartItem).filter(
-                CartItem.cart_id == cart.id,
-                CartItem.product_id == product_id
-            ).with_for_update().first()
+            # Compute unit price with options
+            def _compute_unit_price() -> float:
+                price = float(product.price)
+                if not options:
+                    return price
+                # size modifier
+                try:
+                    size_name = options.get("size") if isinstance(options, dict) else None
+                    if size_name:
+                        size = (
+                            session.query(ProductSize)
+                            .filter(ProductSize.name == size_name, ProductSize.is_active == True)
+                            .first()
+                        )
+                        if size:
+                            price += float(size.price_modifier or 0)
+                except Exception:
+                    pass
+                # explicit choice ids
+                try:
+                    for oid in (options.get("choice_ids") or []):
+                        opt = (
+                            session.query(ProductOption)
+                            .filter(ProductOption.id == int(oid), ProductOption.is_active == True)
+                            .first()
+                        )
+                        if opt:
+                            price += float(opt.price_modifier or 0)
+                except Exception:
+                    pass
+                # keyed selections (option_type -> name)
+                try:
+                    for k, v in (options or {}).items():
+                        if k in ("size", "choice_ids"):
+                            continue
+                        opt = (
+                            session.query(ProductOption)
+                            .filter(ProductOption.option_type == k, ProductOption.name == v, ProductOption.is_active == True)
+                            .first()
+                        )
+                        if opt:
+                            price += float(opt.price_modifier or 0)
+                except Exception:
+                    pass
+                return price
+
+            computed_unit_price = _compute_unit_price()
+
+            # Check if item already exists in cart (same options grouped)
+            # Compare options structurally using JSONB to avoid json= json operator error
+            existing_item = (
+                session.query(CartItem)
+                .filter(
+                    CartItem.cart_id == cart.id,
+                    CartItem.product_id == product_id,
+                    cast(CartItem.product_options, JSONB) == cast((options or {}), JSONB),
+                )
+                .with_for_update()
+                .first()
+            )
             
             if existing_item:
                 # Update quantity
@@ -1357,7 +1744,7 @@ def add_to_cart(
                     cart_id=cart.id,
                     product_id=product_id,
                     quantity=quantity,
-                    unit_price=product.price,
+                    unit_price=computed_unit_price,
                     product_options=options or {},
                     special_instructions=""
                 )
@@ -2189,12 +2576,20 @@ def get_business_settings_dict() -> dict:
 # ============================================================================
 
 @retry_on_database_error()
-def get_product_options(option_type: Optional[str] = None, language: str = "en") -> List[Dict]:
-    """Get product options with optional filtering by type"""
+def get_product_options(
+    option_type: Optional[str] = None,
+    language: str = "en",
+    include_inactive: bool = False,
+) -> List[Dict]:
+    """Get product options with optional filtering by type.
+    When include_inactive is True, return active and inactive; otherwise only active.
+    """
     db_manager = get_db_manager()
     
     with db_manager.get_session_context() as session:
-        query = session.query(ProductOption).filter(ProductOption.is_active == True)
+        query = session.query(ProductOption)
+        if not include_inactive:
+            query = query.filter(ProductOption.is_active == True)
         
         if option_type:
             query = query.filter(ProductOption.option_type == option_type)
@@ -2211,10 +2606,74 @@ def get_product_options(option_type: Optional[str] = None, language: str = "en")
                 "description": option.get_localized_description(language),
                 "option_type": option.option_type,
                 "price_modifier": option.price_modifier,
-                "display_order": option.display_order
+                "display_order": option.display_order,
+                "is_active": bool(option.is_active),
             })
         
         return result
+
+
+@retry_on_database_error()
+def set_product_option_active(option_id: int, is_active: bool) -> bool:
+    """Activate/deactivate a product option."""
+    db_manager = get_db_manager()
+    with db_manager.get_session_context() as session:
+        option = session.query(ProductOption).filter(ProductOption.id == option_id).first()
+        if not option:
+            return False
+        option.is_active = bool(is_active)
+        option.updated_at = datetime.utcnow()
+        session.add(option)
+        return True
+
+
+@retry_on_database_error()
+def reset_product_options(seed_defaults: bool = False) -> bool:
+    """Clear the product_options table safely. Also clears links to avoid FK errors.
+
+    Args:
+        seed_defaults: When True, seed a small set of default choices after clearing.
+    """
+    db_manager = get_db_manager()
+    with db_manager.get_session_context() as session:
+        # Remove links first to satisfy FKs
+        session.execute(text("DELETE FROM product_option_links"))
+        session.execute(text("DELETE FROM product_options"))
+        if seed_defaults:
+            _seed_default_product_options_in_session(session)
+        return True
+
+
+def _seed_default_product_options_in_session(session: Session) -> None:
+    """Seed a minimal, opinionated set of options without modifying pricing."""
+    now_defaults = [
+        # Samneh types
+        {"option_type": "samneh_type", "name": "classic", "display_name_en": "Classic", "display_name_he": "קלאסי", "price_modifier": 0.0, "display_order": 1},
+        {"option_type": "samneh_type", "name": "spicy", "display_name_en": "Spicy", "display_name_he": "חריף", "price_modifier": 0.0, "display_order": 2},
+        {"option_type": "samneh_type", "name": "smoked", "display_name_en": "Smoked", "display_name_he": "מעושן", "price_modifier": 0.0, "display_order": 3},
+        # Hilbeh types
+        {"option_type": "hilbeh_type", "name": "classic", "display_name_en": "Classic", "display_name_he": "קלאסי", "price_modifier": 0.0, "display_order": 1},
+        {"option_type": "hilbeh_type", "name": "spicy", "display_name_en": "Spicy", "display_name_he": "חריף", "price_modifier": 0.0, "display_order": 2},
+        {"option_type": "hilbeh_type", "name": "sweet", "display_name_en": "Sweet", "display_name_he": "מתוק", "price_modifier": 0.0, "display_order": 3},
+        # Red bisbas types
+        {"option_type": "red_bisbas_type", "name": "mild", "display_name_en": "Mild", "display_name_he": "עדין", "price_modifier": 0.0, "display_order": 1},
+        {"option_type": "red_bisbas_type", "name": "medium", "display_name_en": "Medium", "display_name_he": "בינוני", "price_modifier": 0.0, "display_order": 2},
+        {"option_type": "red_bisbas_type", "name": "spicy", "display_name_en": "Spicy", "display_name_he": "חריף", "price_modifier": 0.0, "display_order": 3},
+        # Kubaneh types
+        {"option_type": "kubaneh_type", "name": "classic", "display_name_en": "Classic", "display_name_he": "קלאסי", "price_modifier": 0.0, "display_order": 1},
+        {"option_type": "kubaneh_type", "name": "seeded", "display_name_en": "Seeded", "display_name_he": "עם זרעים", "price_modifier": 0.0, "display_order": 2},
+        {"option_type": "kubaneh_type", "name": "herb", "display_name_en": "Herb", "display_name_he": "עשבי תיבול", "price_modifier": 0.0, "display_order": 3},
+    ]
+    for d in now_defaults:
+        session.add(ProductOption(
+            option_type=d["option_type"],
+            name=d["name"],
+            display_name_en=d["display_name_en"],
+            display_name_he=d["display_name_he"],
+            price_modifier=d["price_modifier"],
+            display_order=d["display_order"],
+            is_active=True,
+        ))
 
 
 @retry_on_database_error()

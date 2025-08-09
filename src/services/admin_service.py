@@ -21,6 +21,16 @@ from src.db.operations import (
 )
 from src.db.models import Order
 from src.utils.multilingual_content import MultilingualContentManager
+from src.db.operations import (
+    create_product_option as db_create_product_option,
+    update_product_option as db_update_product_option,
+    delete_product_option as db_delete_product_option,
+    assign_option_to_product as db_assign_option_to_product,
+    unassign_option_from_product as db_unassign_option_from_product,
+    upsert_product_option_rule as db_upsert_product_option_rule,
+    get_product_option_config as db_get_product_option_config,
+    reorder_product_option_type as db_reorder_product_option_type,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1089,6 +1099,139 @@ class AdminService:
         except Exception as e:
             logger.error("Error getting product categories: %s", e)
             return []
+    # ----- Options CRUD -----
+    async def create_option(self, *, option_type: str, name: str, display_name_en: str = None, display_name_he: str = None, description_en: str = None, description_he: str = None, price_modifier: float = 0.0, display_order: int = 0, is_active: bool = True) -> Dict:
+        try:
+            opt = db_create_product_option(
+                option_type=option_type,
+                name=name,
+                display_name_en=display_name_en,
+                display_name_he=display_name_he,
+                description_en=description_en,
+                description_he=description_he,
+                price_modifier=price_modifier,
+                display_order=display_order,
+                is_active=is_active,
+            )
+            return {"success": bool(opt), "option": getattr(opt, "id", None)}
+        except Exception as e:
+            logger.error("Error creating option: %s", e)
+            return {"success": False, "error": str(e)}
+
+    async def update_option(self, option_id: int, **fields) -> Dict:
+        try:
+            ok = db_update_product_option(option_id, **fields)
+            return {"success": ok}
+        except Exception as e:
+            logger.error("Error updating option: %s", e)
+            return {"success": False, "error": str(e)}
+
+    async def delete_option(self, option_id: int) -> Dict:
+        try:
+            ok = db_delete_product_option(option_id)
+            return {"success": ok}
+        except Exception as e:
+            logger.error("Error deleting option: %s", e)
+            return {"success": False, "error": str(e)}
+
+    async def reorder_option_type_for_product(self, product_id: int, option_type: str, display_order: int) -> Dict:
+        try:
+            ok = db_reorder_product_option_type(product_id, option_type, display_order)
+            return {"success": ok}
+        except Exception as e:
+            logger.error("Error reordering option type: %s", e)
+            return {"success": False, "error": str(e)}
+
+    # -------------------------- Product Options Management --------------------------
+
+    async def create_product_option(
+        self,
+        option_type: str,
+        name: str,
+        price_modifier: float = 0.0,
+        display_name_en: Optional[str] = None,
+        display_name_he: Optional[str] = None,
+        description_en: Optional[str] = None,
+        description_he: Optional[str] = None,
+        display_order: int = 0,
+        is_active: bool = True,
+    ) -> Dict:
+        try:
+            opt = db_create_product_option(
+                option_type=option_type,
+                name=name.strip(),
+                display_name_en=display_name_en,
+                display_name_he=display_name_he,
+                description_en=description_en,
+                description_he=description_he,
+                price_modifier=float(price_modifier or 0.0),
+                display_order=int(display_order or 0),
+                is_active=bool(is_active),
+            )
+            if not opt:
+                return {"success": False, "error": "Failed to create product option"}
+            return {
+                "success": True,
+                "option": {
+                    "id": opt.id,
+                    "option_type": opt.option_type,
+                    "name": opt.name,
+                    "price_modifier": opt.price_modifier,
+                },
+            }
+        except Exception as e:
+            logger.error("Error creating product option: %s", e)
+            return {"success": False, "error": str(e)}
+
+    async def assign_option_to_product(self, product_id: int, option_id: int) -> Dict:
+        try:
+            ok = db_assign_option_to_product(product_id, option_id)
+            return {"success": ok}
+        except Exception as e:
+            logger.error("Error assigning option to product: %s", e)
+            return {"success": False, "error": str(e)}
+
+    async def unassign_option_from_product(self, product_id: int, option_id: int) -> Dict:
+        try:
+            ok = db_unassign_option_from_product(product_id, option_id)
+            return {"success": ok}
+        except Exception as e:
+            logger.error("Error unassigning option from product: %s", e)
+            return {"success": False, "error": str(e)}
+
+    async def set_product_option_rule(
+        self,
+        product_id: int,
+        option_type: str,
+        *,
+        is_required: bool = False,
+        selection_type: str = "single",
+        min_choices: int = 0,
+        max_choices: int = 1,
+        display_order: int = 0,
+    ) -> Dict:
+        try:
+            ok = db_upsert_product_option_rule(
+                product_id=product_id,
+                option_type=option_type,
+                is_required=is_required,
+                selection_type=selection_type,
+                min_choices=min_choices,
+                max_choices=max_choices,
+                display_order=display_order,
+            )
+            return {"success": ok}
+        except Exception as e:
+            logger.error("Error setting product option rule: %s", e)
+            return {"success": False, "error": str(e)}
+
+    async def get_product_option_config(self, product_id: int) -> Dict:
+        try:
+            cfg = db_get_product_option_config(product_id)
+            return {"success": True, "config": cfg}
+        except Exception as e:
+            logger.error("Error fetching product option config: %s", e)
+            return {"success": False, "error": str(e)}
 
     async def get_product_categories_multilingual(self, user_id: int = None) -> List[Dict]:
         """Get all categories with multilingual support for admin menu"""
