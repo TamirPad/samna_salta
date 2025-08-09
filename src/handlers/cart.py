@@ -6,7 +6,7 @@ import logging
 from typing import Dict, Any, Optional, List
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ForceReply
-from telegram.ext import ContextTypes, filters, Application
+from telegram.ext import Application, CallbackQueryHandler, MessageHandler, ContextTypes, filters
 
 from src.container import get_container
 from src.utils.i18n import i18n
@@ -24,70 +24,30 @@ def expecting_delivery_address_filter(update, context):
 def register_cart_handlers(application: Application):
     """Register cart handlers with the application"""
     cart_handler = CartHandler()
-    
-    # Register callback query handlers
-    application.add_handler(
-        filters.CallbackQuery("add_to_cart_", prefix=True),
-        cart_handler.handle_add_to_cart
-    )
-    application.add_handler(
-        filters.CallbackQuery("view_cart"),
-        cart_handler.handle_view_cart
-    )
-    application.add_handler(
-        filters.CallbackQuery("clear_cart_confirm"),
-        cart_handler.handle_clear_cart_confirmation
-    )
-    application.add_handler(
-        filters.CallbackQuery("clear_cart"),
-        cart_handler.handle_clear_cart
-    )
-    application.add_handler(
-        filters.CallbackQuery("checkout"),
-        cart_handler.handle_checkout
-    )
-    application.add_handler(
-        filters.CallbackQuery("cart_decrease_", prefix=True),
-        cart_handler.handle_decrease_quantity
-    )
-    application.add_handler(
-        filters.CallbackQuery("cart_increase_", prefix=True),
-        cart_handler.handle_increase_quantity
-    )
-    application.add_handler(
-        filters.CallbackQuery("cart_remove_", prefix=True),
-        cart_handler.handle_remove_item
-    )
-    application.add_handler(
-        filters.CallbackQuery("cart_edit_", prefix=True),
-        cart_handler.handle_edit_quantity
-    )
-    application.add_handler(
-        filters.CallbackQuery("cart_info_", prefix=True),
-        cart_handler.handle_item_info
-    )
-    application.add_handler(
-        filters.CallbackQuery("cart_separator"),
-        cart_handler.handle_separator
-    )
-    application.add_handler(
-        filters.CallbackQuery("delivery_method_", prefix=True),
-        cart_handler.handle_delivery_method
-    )
-    application.add_handler(
-        filters.CallbackQuery("delivery_address_", prefix=True),
-        cart_handler.handle_delivery_address_choice
-    )
-    application.add_handler(
-        filters.CallbackQuery("confirm_order"),
-        cart_handler.handle_confirm_order
-    )
-    
-    # Register message handler for delivery address input
-    application.add_handler(
-        filters.TEXT & filters.ChatType.PRIVATE & filters.CREATE,
-        cart_handler.handle_delivery_address_input
-    )
+
+    # CallbackQueryHandlers (use regex patterns)
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_add_to_cart, pattern=r"^(add_product_|add_)"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_view_cart, pattern=r"^cart_view$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart_confirmation, pattern=r"^cart_clear_confirm$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_clear_cart, pattern=r"^(cart_clear|cart_clear_yes)$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_checkout, pattern=r"^cart_checkout$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_decrease_quantity, pattern=r"^cart_decrease_\d+$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_increase_quantity, pattern=r"^cart_increase_\d+$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_remove_item, pattern=r"^cart_remove_\d+$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_edit_quantity, pattern=r"^cart_edit_\d+$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_item_info, pattern=r"^cart_info_\d+$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_separator, pattern=r"^cart_separator$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_method, pattern=r"^delivery_(pickup|delivery)$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_area_selection, pattern=r"^delivery_area_\d+$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_delivery_address_choice, pattern=r"^delivery_address_"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_confirm_order, pattern=r"^confirm_order$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_add_delivery_instructions, pattern=r"^delivery_instructions_add$"))
+    application.add_handler(CallbackQueryHandler(cart_handler.handle_quick_signup_start, pattern=r"^quick_signup$"))
+
+    # MessageHandlers for text inputs (they gate on context flags inside)
+    application.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT, cart_handler.handle_delivery_address_input))
+    application.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT, cart_handler.handle_quick_signup_input))
+    application.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT, cart_handler.handle_delivery_instructions_input))
 
 
 class CartHandler:
@@ -209,6 +169,15 @@ class CartHandler:
                         {"product_name": product_info["display_name"], "options": product_info.get('options', {})}, 
                         user_id
                     )
+                # Build option labels if any
+                option_labels = []
+                try:
+                    from src.db.operations import get_option_labels_by_ids
+                    choice_ids = (product_info.get("options", {}) or {}).get("choice_ids") or []
+                    option_labels = get_option_labels_by_ids(choice_ids, user_lang)
+                except Exception:
+                    option_labels = []
+                options_line = ("\n" + " • ".join(option_labels)) if option_labels else ""
                 
                 # Format total with RTL support
                 from src.utils.helpers import format_price, format_quantity
@@ -219,7 +188,7 @@ class CartHandler:
                 
                 from src.utils.text_formatter import format_title
                 success_title = format_title(f'✅ {i18n.get_text("CART_SUCCESS_TITLE", user_id=user_id)}')
-                product_name = f'📦 <b>{localized_product_name}</b>'
+                product_name = f'📦 <b>{localized_product_name}</b>{options_line}'
                 added_success = i18n.get_text("CART_ADDED_SUCCESSFULLY", user_id=user_id)
                 items_count = f'🛒 {i18n.get_text("CART_ITEMS_COUNT", user_id=user_id)}: {formatted_item_count}'
                 total_text = f'💰 {i18n.get_text("CART_TOTAL", user_id=user_id).format(total=formatted_total)}'
@@ -324,6 +293,15 @@ class CartHandler:
                     localized_product_name = name_en
                 else:
                     localized_product_name = self._get_localized_product_name(item, user_id)
+                # Build option labels
+                option_labels = []
+                try:
+                    from src.db.operations import get_option_labels_by_ids
+                    choice_ids = (item.get("options") or {}).get("choice_ids") or []
+                    option_labels = get_option_labels_by_ids(choice_ids, user_lang)
+                except Exception:
+                    option_labels = []
+                options_line = ("\n" + " • ".join(option_labels)) if option_labels else ""
                 
                 # Format prices and quantities with RTL support
                 from src.utils.helpers import format_price, format_quantity
@@ -331,7 +309,7 @@ class CartHandler:
                 formatted_item_total = format_price(item_total, user_id)
                 formatted_quantity = format_quantity(item.get('quantity', 1), user_id)
                 
-                item_text = f"""<b>{i}.</b> 📦 <b>{localized_product_name}</b>
+                item_text = f"""<b>{i}.</b> 📦 <b>{localized_product_name}</b>{options_line}
 🔢 {i18n.get_text("CART_QUANTITY_LABEL", user_id=user_id)}: {formatted_quantity}
 💰 {i18n.get_text("CART_PRICE_LABEL", user_id=user_id)}: {formatted_unit_price}
 💵 {i18n.get_text("CART_SUBTOTAL_LABEL", user_id=user_id)}: {formatted_item_total}"""
@@ -473,13 +451,21 @@ class CartHandler:
                 else:
                     from src.utils.helpers import translate_product_name
                     translated_product_name = translate_product_name(item.get('product_name', i18n.get_text('PRODUCT_UNKNOWN', user_id=user_id)), item.get('options', {}), user_id)
+                # Build option labels (choice IDs, sizes, typed)
+                try:
+                    from src.db.operations import get_option_labels_from_payload
+                    labels = get_option_labels_from_payload(item.get('options') or {}, user_lang)
+                except Exception:
+                    labels = []
+                options_block = ("\n   • " + "\n   • ".join(labels)) if labels else ""
+
                 message += i18n.get_text("CART_ITEM_FORMAT", user_id=user_id).format(
                     index=i,
                     product_name=translated_product_name,
                     quantity=item.get('quantity', 1),
                     price=item.get('unit_price', 0),
                     item_total=item_total
-                ) + "\n\n"
+                ) + options_block + "\n\n"
 
             message += i18n.get_text("CART_TOTAL", user_id=user_id).format(total=cart_total) + "\n\n"
             message += i18n.get_text("SELECT_DELIVERY_METHOD", user_id=user_id)
@@ -873,8 +859,15 @@ class CartHandler:
                             item.get("options", {}),
                             user_id,
                         )
+                    # Append option labels
+                    try:
+                        from src.db.operations import get_option_labels_from_payload
+                        labels = get_option_labels_from_payload(item.get("options") or {}, user_lang)
+                    except Exception:
+                        labels = []
+                    name_with_opts = f"{display_name} (" + ", ".join(labels) + ")" if labels else display_name
                     items_summary += i18n.get_text("CUSTOMER_ORDER_ITEM_LINE", user_id=user_id).format(
-                        name=display_name,
+                        name=name_with_opts,
                         quantity=item.get("quantity", 1),
                         price=item.get("unit_price", 0),
                     ) + "\n"
@@ -1213,6 +1206,16 @@ class CartHandler:
             product_name = translate_product_name(item.get('product_name', i18n.get_text('PRODUCT_UNKNOWN', user_id=user_id)), item.get('options', {}), user_id)
             
             info_message = f"📦 <b>{product_name}</b>\n"
+            # Include option labels
+            try:
+                from src.db.operations import get_option_labels_from_payload
+                from src.utils.language_manager import language_manager
+                user_lang = language_manager.get_user_language(user_id)
+                labels = get_option_labels_from_payload(item.get('options') or {}, user_lang)
+            except Exception:
+                labels = []
+            if labels:
+                info_message += "🧩 " + ", ".join(labels) + "\n"
             info_message += f"💰 {i18n.get_text('CART_PRICE_LABEL', user_id=user_id)}: ₪{item.get('unit_price', 0):.2f}\n"
             info_message += f"📊 {i18n.get_text('CART_QUANTITY_LABEL', user_id=user_id)}: {item.get('quantity', 1)}\n"
             info_message += f"💵 {i18n.get_text('CART_SUBTOTAL_LABEL', user_id=user_id)}: ₪{item.get('unit_price', 0) * item.get('quantity', 1):.2f}"
@@ -1276,17 +1279,24 @@ class CartHandler:
         try:
             # Handle new dynamic product pattern
             if callback_data.startswith("add_product_"):
-                product_id = int(callback_data.replace("add_product_", ""))
+                # supports add_product_{id} and add_product_{id}_opt_{optionId}
+                remainder = callback_data.replace("add_product_", "")
+                parts = remainder.split("_opt_")
+                product_id = int(parts[0])
                 # Get product from database
                 from src.db.operations import get_product_by_id
                 product = get_product_by_id(product_id)
                 if product:
+                    options: Dict[str, Any] = {}
+                    if len(parts) == 2 and parts[1].isdigit():
+                        # single option id quick-add
+                        options["choice_ids"] = [int(parts[1])]
                     return {
                         "product_id": product.id,
-                        "display_name": product.name,  # This will be localized later in the process
+                        "display_name": product.name,
                         "name_en": product.name_en,
                         "name_he": product.name_he,
-                        "options": {}
+                        "options": options,
                     }
             
             # Handle legacy product option patterns (from sub-menus)
@@ -1628,6 +1638,16 @@ class CartHandler:
                 item_total = item.get("unit_price", 0) * item.get("quantity", 1)
                 # Get localized product name
                 localized_product_name = self._get_localized_product_name(item, user_id)
+                # Build option labels (choice IDs, sizes, typed)
+                option_labels = []
+                try:
+                    from src.db.operations import get_option_labels_from_payload
+                    from src.utils.language_manager import language_manager
+                    user_lang = language_manager.get_user_language(user_id)
+                    option_labels = get_option_labels_from_payload(item.get("options") or {}, user_lang)
+                except Exception:
+                    option_labels = []
+                options_line = ("\n" + " • ".join(option_labels)) if option_labels else ""
                 
                 # Format prices and quantities with RTL support
                 from src.utils.helpers import format_price, format_quantity
@@ -1636,7 +1656,7 @@ class CartHandler:
                 formatted_quantity = format_quantity(item.get('quantity', 1), user_id)
                 
                 message += f"""
-<b>{i}.</b> 📦 <b>{localized_product_name}</b>
+<b>{i}.</b> 📦 <b>{localized_product_name}</b>{options_line}
    🔢 {i18n.get_text("CART_QUANTITY_LABEL", user_id=user_id)}: {formatted_quantity}
    💰 {i18n.get_text("CART_PRICE_LABEL", user_id=user_id)}: {formatted_unit_price}
    💵 {i18n.get_text("CART_SUBTOTAL_LABEL", user_id=user_id)}: {formatted_item_total}
@@ -1742,9 +1762,19 @@ class CartHandler:
                 formatted_unit_price = format_price(item.get('unit_price', 0), user_id)
                 formatted_item_total = format_price(item_total, user_id)
                 formatted_quantity = format_quantity(item.get('quantity', 1), user_id)
-                
+                # Build option labels
+                option_labels = []
+                try:
+                    from src.db.operations import get_option_labels_from_payload
+                    from src.utils.language_manager import language_manager
+                    user_lang = language_manager.get_user_language(user_id)
+                    option_labels = get_option_labels_from_payload(item.get("options") or {}, user_lang)
+                except Exception:
+                    option_labels = []
+                options_line = ("\n" + " • ".join(option_labels)) if option_labels else ""
+
                 confirmation_message += f"""
-<b>{i}.</b> 📦 <b>{localized_product_name}</b>
+<b>{i}.</b> 📦 <b>{localized_product_name}</b>{options_line}
    🔢 {i18n.get_text("CART_QUANTITY_LABEL", user_id=user_id)}: {formatted_quantity}
    💰 {i18n.get_text("CART_PRICE_LABEL", user_id=user_id)}: {formatted_unit_price}
    💵 {i18n.get_text("CART_SUBTOTAL_LABEL", user_id=user_id)}: {formatted_item_total}

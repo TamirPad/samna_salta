@@ -40,6 +40,11 @@ class Settings(BaseSettings):
         default="development", description="Application environment"
     )
 
+    # Feature flags
+    enable_product_options: bool = Field(
+        default=True, description="Enable product options selection and pricing"
+    )
+
     # Delivery settings
     delivery_charge: float = Field(default=5.00, description="Delivery charge amount")
     currency: str = Field(default="ILS", description="Currency code")

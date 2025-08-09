@@ -13,6 +13,7 @@ from typing import Any, Dict, Generic, Optional, TypeVar, Union
 from src.config import get_config
 from src.utils.constants import CacheSettings
 from src.utils.constants_manager import get_product_option_name, get_product_size_name
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
 logger = logging.getLogger(__name__)
 
@@ -396,3 +397,23 @@ def format_quantity(quantity: int, user_id: Optional[int] = None) -> str:
         return f"\u200E{formatted_quantity}"
     
     return formatted_quantity
+
+
+def to_single_column_markup(markup: Optional[InlineKeyboardMarkup]) -> Optional[InlineKeyboardMarkup]:
+    """Ensure any inline keyboard renders one button per row.
+    If markup is None, returns None.
+    """
+    if markup is None:
+        return None
+    try:
+        rows = getattr(markup, "inline_keyboard", []) or []
+        # Flatten to buttons
+        buttons: list[InlineKeyboardButton] = []
+        for row in rows:
+            for btn in row:
+                buttons.append(btn)
+        # Rebuild as single-column
+        single_rows = [[btn] for btn in buttons]
+        return InlineKeyboardMarkup(single_rows)
+    except Exception:
+        return markup
